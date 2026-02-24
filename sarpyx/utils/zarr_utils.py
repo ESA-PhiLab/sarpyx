@@ -3,6 +3,7 @@ import numpy as np
 import zarr
 from pathlib import Path
 from typing import Optional, Tuple, Union, Dict, Any, List, Callable
+from enum import Enum
 import numcodecs # Ensure numcodecs is installed for compression
 import pandas as pd
 import shutil
@@ -11,6 +12,57 @@ import dask.array as da
 from .io import gc_collect
 
 # -----------  Functions -----------------
+def _serialize_scalar_for_attrs(value: Any) -> Any:
+    """Convert a scalar-like value into a JSON/Zarr-attribute-safe type."""
+    if value is None or value is pd.NA:
+        return None
+
+    if value is pd.NaT:
+        return None
+
+    if isinstance(value, pd.Timestamp):
+        return value.isoformat()
+
+    if isinstance(value, Enum):
+        enum_value = value.value
+        if isinstance(enum_value, np.generic):
+            return enum_value.item()
+        return enum_value
+
+    if isinstance(value, (bytes, bytearray)):
+        return bytes(value).decode('utf-8', errors='replace')
+
+    if isinstance(value, Path):
+        return str(value)
+
+    if isinstance(value, np.generic):
+        value = value.item()
+
+    if isinstance(value, float) and np.isnan(value):
+        return None
+
+    return value
+
+
+def _serialize_for_attrs(value: Any) -> Any:
+    """Recursively convert nested data into JSON/Zarr-attribute-safe values."""
+    if isinstance(value, dict):
+        return {str(k): _serialize_for_attrs(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_serialize_for_attrs(v) for v in value]
+    if isinstance(value, tuple):
+        return [_serialize_for_attrs(v) for v in value]
+    if isinstance(value, np.ndarray):
+        return [_serialize_for_attrs(v) for v in value.tolist()]
+    return _serialize_scalar_for_attrs(value)
+
+
+def _records_from_dataframe(df: pd.DataFrame) -> List[Dict[str, Any]]:
+    """Convert a DataFrame into attribute-safe record dictionaries."""
+    records = df.to_dict('records')
+    return [_serialize_for_attrs(record) for record in records]
+
+
 def save_array_to_zarr(array: 'np.ndarray', 
                        file_path: str, 
                        compressor_level: int = 9, 
@@ -59,20 +111,15 @@ def save_array_to_zarr(array: 'np.ndarray',
     store.attrs['creation_date'] = pd.Timestamp.now().isoformat()
     # Add metadata as attributes if provided
     if metadata_df is not None:
-        # Handle NaN values by filling them with None or converting to string
-        metadata_clean = metadata_df.fillna('null')
-        
-        # Convert DataFrame to dictionary for zarr attributes
-        store.attrs['metadata'] = metadata_clean.to_dict('records')
+        # Convert DataFrame to JSON-safe records (Enum, NumPy scalars, NaN, etc.).
+        store.attrs['metadata'] = _records_from_dataframe(metadata_df)
         store.attrs['metadata_columns'] = list(metadata_df.columns)
         store.attrs['metadata_dtypes'] = metadata_df.dtypes.astype(str).to_dict()
         print(f'Added metadata with {len(metadata_df)} records as zarr attributes')
     
     # Add ephemeris data as attributes if provided
     if ephemeris_df is not None:
-        ephemeris_clean = ephemeris_df.fillna('null')
-        
-        store.attrs['ephemeris'] = ephemeris_clean.to_dict('records')
+        store.attrs['ephemeris'] = _records_from_dataframe(ephemeris_df)
         store.attrs['ephemeris_columns'] = list(ephemeris_df.columns)
         store.attrs['ephemeris_dtypes'] = ephemeris_df.dtypes.astype(str).to_dict()
         print(f'Added ephemeris with {len(ephemeris_df)} records as zarr attributes')
@@ -88,21 +135,7 @@ def _serialize_dict(data: Dict[str, Any]) -> Dict[str, Any]:
     Returns:
         Serialized dictionary compatible with Zarr attributes
     """
-    serialized = {}
-    for key, value in data.items():
-        if isinstance(value, np.ndarray):
-            # Convert numpy arrays to lists for JSON compatibility
-            serialized[key] = value.tolist()
-        elif isinstance(value, (np.integer, np.floating)):
-            # Convert numpy scalars to Python types
-            serialized[key] = value.item()
-        elif isinstance(value, dict):
-            # Recursively serialize nested dictionaries
-            serialized[key] = _serialize_dict(value)
-        else:
-            serialized[key] = value
-    
-    return serialized
+    return _serialize_for_attrs(data)
 
 def dask_slice_saver(
     result: Dict[str, Union[np.ndarray, pd.DataFrame, Dict[str, Any]]], 
