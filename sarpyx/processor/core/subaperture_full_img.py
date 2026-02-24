@@ -617,8 +617,8 @@ class CombinedSublooking:
             print(f"{self.numberOfLooks} sublooks created successfully.")
 
     def _generation_dask_block(self, block, si, ei, nPixLook, nRows, block_info=None):
-        """map_blocks kernel: extract spectral window, zero-pad, IFFT, recentre."""
-        chunk_rows, chunk_cols = block.shape
+        """map_blocks kernel: extract spectral window, zero-pad, and IFFT."""
+        _, chunk_cols = block.shape
         # FFT/IFFT axis: range → 1, azimuth → 0
         fft_axis = 1 if self.choice == 0 else 0
         reversed_spec = block[si:ei + 1, :][::-1, :]
@@ -626,7 +626,6 @@ class CombinedSublooking:
         padded = np.zeros((nRows, chunk_cols), dtype=np.complex64)
         padded[:nPixLook, :] = window
         look = np.fft.ifft(padded, axis=fft_axis).astype(np.complex64)
-        look = np.roll(look, look.shape[fft_axis] // 2, axis=fft_axis)
         return look
 
     def _generation_dask(self, VERBOSE=False):
@@ -639,6 +638,8 @@ class CombinedSublooking:
 
         nPixLook = int(np.min(indexLooks[:, 1] - indexLooks[:, 0] + 1))
         self.Looks = []
+        fft_axis = 1 if self.choice == 0 else 0
+        global_shift = (self.nCols // 2) if fft_axis == 1 else (self.nRows // 2)
 
         for it in range(self.numberOfLooks):
             si = int(indexLooks[it, 0])
@@ -651,6 +652,8 @@ class CombinedSublooking:
                 nRows=self.nRows,
                 dtype=np.complex64,
             )
+            # Apply recentering once on the assembled look to avoid per-chunk phase seams.
+            look = da.roll(look, shift=global_shift, axis=fft_axis)
             self.Looks.append(look)
 
         del self.SpectrumOneDimNormDeWe
