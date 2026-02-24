@@ -81,6 +81,9 @@ Examples:
   # Focus with custom processing chunk height
   sarpyx focus --input /path/to/data.zarr --output /path/to/output --slice-height 20000
 
+  # Force single-pass processing with no slicing
+  sarpyx focus --input /path/to/data.zarr --output /path/to/output --no-slicing
+
   # Save output with custom Zarr chunk shape
   sarpyx focus --input /path/to/data.zarr --output /path/to/output --chunk-shape 2048,2048
 
@@ -111,6 +114,12 @@ Examples:
         type=int,
         default=__BUFFER_SLICE_HEIGHT__,
         help=f'Slice height for processing (default: {__BUFFER_SLICE_HEIGHT__})'
+    )
+
+    parser.add_argument(
+        '--no-slicing',
+        action='store_true',
+        help='Disable slicing and process the full input as a single slice'
     )
 
     parser.add_argument(
@@ -329,7 +338,7 @@ def main() -> None:
     logger.info(f'📁 Temporary directory: {tmp_dir}')
     
     try:
-        if args.slice_height <= 0:
+        if not args.no_slicing and args.slice_height <= 0:
             raise ValueError(f'--slice-height must be > 0, got {args.slice_height}')
 
         if not (0 <= args.compression_level <= 9):
@@ -347,8 +356,25 @@ def main() -> None:
         
         # Calculate slice indices
         slice_height = args.slice_height
-        
-        if (H // slice_height) > 1:
+
+        if args.no_slicing:
+            logger.info('🧩 Slicing disabled. Processing full input as a single slice.')
+            slice_indices = [
+                {
+                    'slice_index': 0,
+                    'original_start': 0,
+                    'original_end': H,
+                    'actual_start': 0,
+                    'actual_end': H,
+                    'is_first': True,
+                    'is_last': True,
+                    'drop_start': 0,
+                    'drop_end': 0,
+                    'original_height': H,
+                    'actual_height': H
+                }
+            ]
+        elif (H // slice_height) > 1:
             slice_indices = calculate_slice_indices(
                 array_height=H,
                 slice_height=slice_height
