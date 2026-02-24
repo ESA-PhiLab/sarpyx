@@ -36,6 +36,7 @@ def _parse_chunk_shape(chunk_shape: str) -> Optional[Union[str, Tuple[int, ...]]
       - 'auto'
       - 'none' (or empty) to use default behavior in saver
       - comma-separated positive integers, e.g. "2048,2048"
+      - x-separated positive integers, e.g. "2048x2048"
     """
     if chunk_shape is None:
         return 'auto'
@@ -47,11 +48,15 @@ def _parse_chunk_shape(chunk_shape: str) -> Optional[Union[str, Tuple[int, ...]]
         return None
 
     try:
-        parsed = tuple(int(v.strip()) for v in chunk_shape.split(','))
+        parsed_text = chunk_shape.strip().lower().replace('x', ',')
+        parts = [v.strip() for v in parsed_text.split(',')]
+        if any(v == '' for v in parts):
+            raise ValueError
+        parsed = tuple(int(v) for v in parts)
     except ValueError as exc:
         raise ValueError(
             f'Invalid --chunk-shape value "{chunk_shape}". '
-            'Use "auto", "none", or comma-separated integers like "2048,2048".'
+            'Use "auto", "none", comma-separated integers like "2048,2048", or x-separated integers like "2048x2048".'
         ) from exc
 
     if len(parsed) == 0 or any(v <= 0 for v in parsed):
@@ -124,9 +129,11 @@ Examples:
 
     parser.add_argument(
         '--chunk-shape',
+        '--chunk-size',
+        dest='chunk_shape',
         type=str,
         default='auto',
-        help='Output Zarr chunk shape: "auto", "none", or comma-separated ints (e.g. 2048,2048)'
+        help='Output Zarr chunk shape: "auto", "none", comma-separated ints (e.g. 2048,2048), or x-separated ints (e.g. 2048x2048)'
     )
 
     parser.add_argument(

@@ -166,10 +166,17 @@ def _add_focus_arguments(parser: argparse.ArgumentParser) -> None:
         help='Slice height for processing (default: 15000)'
     )
     parser.add_argument(
+        '--no-slicing',
+        action='store_true',
+        help='Disable slicing and process the full input as a single slice'
+    )
+    parser.add_argument(
         '--chunk-shape',
+        '--chunk-size',
+        dest='chunk_shape',
         type=str,
         default='auto',
-        help='Output Zarr chunk shape: "auto", "none", or comma-separated ints (e.g. 2048,2048)'
+        help='Output Zarr chunk shape: "auto", "none", comma-separated ints (e.g. 2048,2048), or x-separated ints (e.g. 2048x2048)'
     )
     parser.add_argument(
         '--compression-level',
