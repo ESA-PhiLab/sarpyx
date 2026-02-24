@@ -8,9 +8,12 @@ From: ubuntu:22.04
 %environment
     export DEBIAN_FRONTEND=noninteractive
     export TZ=Etc/UTC
+    export LANG=en_US.UTF-8
+    export LANGUAGE=en_US:en
+    export LC_ALL=en_US.UTF-8
 
     export JAVA_HOME="/usr/lib/jvm/java-8-openjdk-amd64"
-    export SNAP_HOME="/usr/local/snap"
+    export SNAP_HOME="/workspace/snap12"
     export SNAP_SKIP_UPDATES=1
 
     export PATH="${PATH}:${SNAP_HOME}/bin"
@@ -19,69 +22,77 @@ From: ubuntu:22.04
     export PIP_NO_CACHE_DIR=1
 
 %files
-    support/snap-install.sh   /tmp/snap-install.sh
-    support/snap.varfile      /tmp/snap.varfile
-    pyproject.toml            /workspace/pyproject.toml
-    sarpyx                    /workspace/sarpyx
-    entrypoint.sh             /usr/local/bin/entrypoint.sh
+    support/snap-install.sh     /tmp/snap-install.sh
+    support/snap.varfile        /tmp/snap.varfile
+    pyproject.toml              /workspace/pyproject.toml
+    sarpyx                      /workspace/sarpyx
+    tests                       /workspace/tests
+    entrypoint.sh               /usr/local/bin/entrypoint.sh
+    start-jupyter.sh            /usr/local/bin/start-jupyter.sh
 
 %post
-    set -e
+    set -euo pipefail
 
     apt-get update && apt-get install -y --no-install-recommends \
         ca-certificates \
         curl \
-        wget \
-        git \
-        build-essential \
-        python3.11 \
-        python3.11-venv \
-        python3.11-dev \
+        locales \
         openjdk-8-jdk \
         gdal-bin \
-        libgdal-dev \
+        libgdal30 \
+        python3.11 \
+        && locale-gen en_US.UTF-8 \
+        && update-locale LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 \
         && rm -rf /var/lib/apt/lists/*
 
-    # Python symlinks (like your Dockerfile runtime stage)
+    # Create python symlinks
     ln -sf /usr/bin/python3.11 /usr/bin/python3
     ln -sf /usr/bin/python3.11 /usr/bin/python
 
-    # Install SNAP
+    mkdir -p /workspace
+
+    # Configure and install SNAP into ${SNAP_HOME}
+    sed -i "s|^sys.installationDir=.*|sys.installationDir=${SNAP_HOME}|" /tmp/snap.varfile
     chmod +x /tmp/snap-install.sh
     /tmp/snap-install.sh -v
     rm -f /tmp/snap-install.sh /tmp/snap.varfile
 
-    # Install pip for python3.11
+    # Install pip for Python 3.11
     curl -fsSL https://bootstrap.pypa.io/get-pip.py -o /tmp/get-pip.py
     python3.11 /tmp/get-pip.py
     rm -f /tmp/get-pip.py
 
-    # Install sarpyx
+    # Make SNAP CLI available on PATH
+    ln -sf /workspace/snap12/bin/snap /usr/local/bin/snap
+    ln -sf /workspace/snap12/bin/gpt /usr/local/bin/gpt
+
+    # Install sarpyx and runtime dependencies as in Dockerfile
     cd /workspace
-    python3.11 -m pip install --no-cache-dir .
-
-    # Validate install
+    python3.11 -m pip install --upgrade pip setuptools wheel
+    python3.11 -m pip install -e .
     python3.11 -c "import sarpyx; print('sarpyx installed successfully')"
+    python3.11 -c "import six; print('six installed successfully')"
+    python3.11 -m pip install --ignore-installed --no-cache-dir six python-dateutil
+    python3.11 -c "import six, dateutil; print('runtime deps ok')"
 
-    # Install entrypoint
-    chmod +x /usr/local/bin/entrypoint.sh
+    chmod +x /usr/local/bin/entrypoint.sh /usr/local/bin/start-jupyter.sh
 
-    # Cleanup to reduce image size
-    apt-get purge -y --auto-remove \
-        build-essential \
-        python3.11-dev \
-        libgdal-dev \
-        git \
-        wget \
-        curl \
-        && apt-get clean \
-        && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+    apt-get clean
+    rm -rf /var/lib/apt/lists/* /var/cache/apt/* /tmp/* /var/tmp/*
 
 %runscript
-    exec /usr/local/bin/entrypoint.sh "$@"
+    if [ "$#" -eq 0 ]; then
+        exec /usr/local/bin/entrypoint.sh /bin/bash
+    else
+        exec /usr/local/bin/entrypoint.sh "$@"
+    fi
 
 %startscript
-    exec /usr/local/bin/entrypoint.sh "$@"
+    if [ "$#" -eq 0 ]; then
+        exec /usr/local/bin/entrypoint.sh /bin/bash
+    else
+        exec /usr/local/bin/entrypoint.sh "$@"
+    fi
 
 %test
     python3.11 -c "import sarpyx; print('sarpyx OK')"
