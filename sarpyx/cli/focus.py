@@ -10,7 +10,7 @@ import argparse
 import sys
 import shutil
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, Optional, Tuple, Union
 import logging
 
 from sarpyx.processor.core.focus import CoarseRDA
@@ -28,6 +28,46 @@ logger = logging.getLogger(__name__)
 __BUFFER_SLICE_HEIGHT__ = 15000  # Buffer size for each slice in rows
 
 
+def _parse_chunk_shape(chunk_shape: str) -> Optional[Union[str, Tuple[int, ...]]]:
+    """
+    Parse a chunk-shape CLI value.
+
+    Supported values:
+      - 'auto'
+      - 'none' (or empty) to use default behavior in saver
+      - comma-separated positive integers, e.g. "2048,2048"
+      - x-separated positive integers, e.g. "2048x2048"
+    """
+    if chunk_shape is None:
+        return 'auto'
+
+    normalized = chunk_shape.strip().lower()
+    if normalized == 'auto':
+        return 'auto'
+    if normalized in {'none', ''}:
+        return None
+
+    try:
+        parsed_text = chunk_shape.strip().lower().replace('x', ',')
+        parts = [v.strip() for v in parsed_text.split(',')]
+        if any(v == '' for v in parts):
+            raise ValueError
+        parsed = tuple(int(v) for v in parts)
+    except ValueError as exc:
+        raise ValueError(
+            f'Invalid --chunk-shape value "{chunk_shape}". '
+            'Use "auto", "none", comma-separated integers like "2048,2048", or x-separated integers like "2048x2048".'
+        ) from exc
+
+    if len(parsed) == 0 or any(v <= 0 for v in parsed):
+        raise ValueError(
+            f'Invalid --chunk-shape value "{chunk_shape}". '
+            'Chunk dimensions must be positive integers.'
+        )
+
+    return parsed
+
+
 def create_parser() -> argparse.ArgumentParser:
     """
     Create the argument parser for focus command.
@@ -43,8 +83,17 @@ Examples:
   # Focus a zarr file
   sarpyx focus --input /path/to/data.zarr --output /path/to/output
   
-  # Focus with custom slice height
+  # Focus with custom processing chunk height
   sarpyx focus --input /path/to/data.zarr --output /path/to/output --slice-height 20000
+
+  # Force single-pass processing with no slicing
+  sarpyx focus --input /path/to/data.zarr --output /path/to/output --no-slicing
+
+  # Save output with custom Zarr chunk shape
+  sarpyx focus --input /path/to/data.zarr --output /path/to/output --chunk-shape 2048,2048
+
+  # Disable output compression
+  sarpyx focus --input /path/to/data.zarr --output /path/to/output --no-compression
   
   # Keep temporary files for debugging
   sarpyx focus --input /path/to/data.zarr --output /path/to/output --keep-tmp
@@ -70,6 +119,34 @@ Examples:
         type=int,
         default=__BUFFER_SLICE_HEIGHT__,
         help=f'Slice height for processing (default: {__BUFFER_SLICE_HEIGHT__})'
+    )
+
+    parser.add_argument(
+        '--no-slicing',
+        action='store_true',
+        help='Disable slicing and process the full input as a single slice'
+    )
+
+    parser.add_argument(
+        '--chunk-shape',
+        '--chunk-size',
+        dest='chunk_shape',
+        type=str,
+        default='auto',
+        help='Output Zarr chunk shape: "auto", "none", comma-separated ints (e.g. 2048,2048), or x-separated ints (e.g. 2048x2048)'
+    )
+
+    parser.add_argument(
+        '--compression-level',
+        type=int,
+        default=5,
+        help='Output compression level (0-9, where 0 means no compression)'
+    )
+
+    parser.add_argument(
+        '--no-compression',
+        action='store_true',
+        help='Disable output compression (equivalent to --compression-level 0)'
     )
     
     parser.add_argument(
@@ -157,6 +234,8 @@ def process_sar_slice(
     tmp_dir: Path,
     verbose: bool = True,
     unique_slice: bool = True,
+    output_chunks: Optional[Union[str, Tuple[int, ...]]] = 'auto',
+    compression_level: int = 5,
 ) -> Path:
     """
     Process a single SAR data slice.
@@ -168,6 +247,8 @@ def process_sar_slice(
         tmp_dir: Temporary directory for saving results
         verbose: Enable verbose output
         unique_slice: Whether this is the only slice to process
+        output_chunks: Chunking strategy passed to Zarr saver
+        compression_level: Compression level passed to Zarr saver
         
     Returns:
         Path to saved slice file
@@ -198,8 +279,10 @@ def process_sar_slice(
     if hasattr(result['metadata'], 'iloc'):
         if drop_end > 0:
             result['metadata'] = result['metadata'].iloc[drop_start:-drop_end]
+            result['ephemeris'] = result['ephemeris'].iloc[drop_start:-drop_end]
         else:
             result['metadata'] = result['metadata'].iloc[drop_start:]
+            result['ephemeris'] = result['ephemeris'].iloc[drop_start:]
     
     logger.info(f'📉 Dropped overlapping data: start={drop_start}, end={drop_end}')
     logger.info(f'📊 Focused data shape: {result["raw"].shape}')
@@ -208,13 +291,13 @@ def process_sar_slice(
         # Save slice in tmp folder
         zarr_path = tmp_dir / f'processor_slice_{slice_idx}.zarr'
         logger.info(f'💾 Saving slice {slice_idx + 1} to: {zarr_path}')
-        dask_slice_saver(result, zarr_path, chunks='auto', clevel=5)
+        dask_slice_saver(result, zarr_path, chunks=output_chunks, clevel=compression_level)
         logger.info(f'📂 Slice {slice_idx + 1} saved successfully.')
     else:
         # Save the unique slice directly
         zarr_path = tmp_dir.parent / f'{filename}.zarr'
         logger.info(f'💾 Saving entire product to: {zarr_path}')
-        dask_slice_saver(result, zarr_path, chunks='auto', clevel=5)
+        dask_slice_saver(result, zarr_path, chunks=output_chunks, clevel=compression_level)
         logger.info('📂 Product saved successfully.')
     
     # Clean up memory
@@ -262,14 +345,43 @@ def main() -> None:
     logger.info(f'📁 Temporary directory: {tmp_dir}')
     
     try:
+        if not args.no_slicing and args.slice_height <= 0:
+            raise ValueError(f'--slice-height must be > 0, got {args.slice_height}')
+
+        if not (0 <= args.compression_level <= 9):
+            raise ValueError(f'--compression-level must be in [0, 9], got {args.compression_level}')
+
+        output_chunks = _parse_chunk_shape(args.chunk_shape)
+        compression_level = 0 if args.no_compression else args.compression_level
+
+        logger.info(f'🧩 Output chunking: {output_chunks}')
+        logger.info(f'🗜️ Output compression level: {compression_level}')
+
         # Initialize handler
         handler = ZarrManager(str(input_path))
         H = handler.load().shape[0]  # Get total height
         
         # Calculate slice indices
         slice_height = args.slice_height
-        
-        if (H // slice_height) > 1:
+
+        if args.no_slicing:
+            logger.info('🧩 Slicing disabled. Processing full input as a single slice.')
+            slice_indices = [
+                {
+                    'slice_index': 0,
+                    'original_start': 0,
+                    'original_end': H,
+                    'actual_start': 0,
+                    'actual_end': H,
+                    'is_first': True,
+                    'is_last': True,
+                    'drop_start': 0,
+                    'drop_end': 0,
+                    'original_height': H,
+                    'actual_height': H
+                }
+            ]
+        elif (H // slice_height) > 1:
             slice_indices = calculate_slice_indices(
                 array_height=H,
                 slice_height=slice_height
@@ -313,7 +425,9 @@ def main() -> None:
                 slice_info=slice_indices[slice_idx],
                 tmp_dir=tmp_dir,
                 verbose=args.verbose,
-                unique_slice=(n_slices == 1)
+                unique_slice=(n_slices == 1),
+                output_chunks=output_chunks,
+                compression_level=compression_level,
             )
             tmp_files.append(zarr_path)
             logger.info(f'✅ Slice {slice_idx + 1} processed successfully.')
@@ -322,7 +436,12 @@ def main() -> None:
         if n_slices > 1:
             logger.info(f'🔗 Concatenating {len(tmp_files)} slices...')
             output_file = output_dir / f'{product_name}.zarr'
-            concatenate_slices_efficient(tmp_files, output_file)
+            concatenate_slices_efficient(
+                tmp_files,
+                output_file,
+                chunks=output_chunks,
+                clevel=compression_level
+            )
             logger.info(f'✅ Concatenated data saved to: {output_file}')
         
         # Cleanup temporary files
