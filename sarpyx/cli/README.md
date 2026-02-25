@@ -67,6 +67,12 @@ sarpyx focus \
   --slice-height 20000 \
   --keep-tmp \
   --verbose
+
+# Disable slicing and process the full input in one pass
+sarpyx focus \
+  --input /path/to/decoded_data.zarr \
+  --output /path/to/focused_output \
+  --no-slicing
 ```
 
 #### Parameters
@@ -76,6 +82,7 @@ sarpyx focus \
 | `--input` | str | Required | Input zarr file path |
 | `--output` | str | ./focused_data | Output directory |
 | `--slice-height` | int | 15000 | Slice height for processing |
+| `--no-slicing` | bool | False | Disable slicing and process the full input as a single slice |
 | `--verbose` | bool | False | Enable verbose output |
 | `--keep-tmp` | bool | False | Keep temporary files after processing |
 

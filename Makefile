@@ -16,6 +16,8 @@ DOCKER_FULL := $(DOCKER_IMAGE):$(DOCKER_TAG)
 PLATFORM ?= linux/amd64
 
 SIF ?= sarpyx.sif
+SIF_TMPDIR ?= $(CURDIR)/.singularity/tmp
+SIF_CACHEDIR ?= $(CURDIR)/.singularity/cache
 HF_REPO ?= WORLDSAR/support
 HF_REPO_TYPE ?= dataset
 
@@ -116,10 +118,13 @@ install-snap: check-wget ## Install SNAP and configure default memory
 # ---------- SIF / Singularity ----------
 sif-build: check-singularity ## Build SIF from Docker image (uses DOCKER_FULL)
 	@echo "Building $(SIF) from docker://$(DOCKER_FULL)..."
+	@mkdir -p "$(SIF_TMPDIR)" "$(SIF_CACHEDIR)"
 	@if command -v apptainer >/dev/null 2>&1; then \
-		apptainer build --disable-cache "$(SIF)" "docker://$(DOCKER_FULL)"; \
+		APPTAINER_TMPDIR="$(SIF_TMPDIR)" APPTAINER_CACHEDIR="$(SIF_CACHEDIR)" \
+		apptainer build --force --disable-cache "$(SIF)" "docker://$(DOCKER_FULL)"; \
 	else \
-		singularity build --disable-cache "$(SIF)" "docker://$(DOCKER_FULL)"; \
+		SINGULARITY_TMPDIR="$(SIF_TMPDIR)" SINGULARITY_CACHEDIR="$(SIF_CACHEDIR)" \
+		singularity build --force --disable-cache "$(SIF)" "docker://$(DOCKER_FULL)"; \
 	fi
 
 sif-push: check-hf ## Upload SIF to Hugging Face (uses HF_REPO)
