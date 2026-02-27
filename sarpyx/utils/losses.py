@@ -1367,7 +1367,8 @@ class SARFocusingLoss(BaseLoss):
         lambda_dist (float): Weight for distribution matching. Default: 0.5
         lambda_tv (float): Weight for total variation. Default: 0.01
         rec_loss_type (str): Type of reconstruction loss ('mse', 'mae', 'complex_mse'). Default: 'complex_mse'
-        focus_metric (str): Focus quality metric ('variance', 'entropy', 'contrast'). Default: 'contrast'
+        focus_metric (str): Focus quality metric
+            ('variance', 'entropy', 'contrast', 'structure'/'ssim'). Default: 'contrast'
         dist_metric (str): Distribution matching metric ('moments', 'histogram', 'none'). Default: 'moments'
         use_tv (bool): Whether to use total variation regularization. Default: True
         use_adaptive_weights (bool): Dynamically balance loss components. Default: True
@@ -1379,6 +1380,19 @@ class SARFocusingLoss(BaseLoss):
         - λ_dist = 0.5-2.0 (distribution matching is now more important)
         - λ_tv = 0.01-0.1 (can be higher due to magnitude-based computation)
     """
+    _FOCUS_METRIC_ALIASES = {
+        'variance': 'variance',
+        'var': 'variance',
+        'entropy': 'entropy',
+        'ent': 'entropy',
+        'contrast': 'contrast',
+        'sharpness': 'contrast',
+        # SSIM naming aliases
+        'structure': 'structure',
+        'structural': 'structure',
+        'ssim': 'structure',
+        'ssim_structure': 'structure',
+    }
     
     def __init__(
         self,
@@ -1399,7 +1413,8 @@ class SARFocusingLoss(BaseLoss):
         self.lambda_dist = lambda_dist
         self.lambda_tv = lambda_tv
         self.rec_loss_type = rec_loss_type
-        self.focus_metric = focus_metric
+        self.focus_metric_raw = focus_metric
+        self.focus_metric = self._canonicalize_focus_metric(focus_metric)
         self.dist_metric = dist_metric
         self.use_tv = use_tv
         self.use_adaptive_weights = use_adaptive_weights
@@ -1435,6 +1450,18 @@ class SARFocusingLoss(BaseLoss):
         else:
             raise ValueError(f"Unknown rec_loss_type: {rec_loss_type}. Options: 'mse', 'mae', 'complex_mse', 'complex_mae', 'distribution_aware_mse', 'huber', 'polarimetric'")
     
+    @classmethod
+    def _canonicalize_focus_metric(cls, focus_metric: str) -> str:
+        """Normalize supported focus metric names to internal canonical values."""
+        normalized = str(focus_metric).strip().lower()
+        if normalized in cls._FOCUS_METRIC_ALIASES:
+            return cls._FOCUS_METRIC_ALIASES[normalized]
+        valid_aliases = "', '".join(sorted(cls._FOCUS_METRIC_ALIASES.keys()))
+        raise ValueError(
+            f"Unknown focus_metric: {focus_metric!r}. "
+            f"Supported values/aliases: '{valid_aliases}'"
+        )
+    
     def reconstruction_loss(self, pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
         """Forward-model reconstruction or L1/L2 to ground truth."""
         return self.rec_loss(pred, target)
@@ -1458,20 +1485,22 @@ class SARFocusingLoss(BaseLoss):
         else:
             mag = pred.abs()
         
-        if self.focus_metric == 'variance':
+        focus_metric = self.focus_metric
+        
+        if focus_metric == 'variance':
             # Normalized centroid variance
             return self._normalized_centroid_variance(mag)
         
-        elif self.focus_metric == 'entropy':
+        elif focus_metric == 'entropy':
             # Normalized image entropy
             return self._normalized_entropy(mag)
         
-        elif self.focus_metric == 'contrast':
+        elif focus_metric == 'contrast':
             # Image contrast - measures sharpness
             # Maximize contrast = minimize negative contrast
             return -self._image_contrast(mag)
         
-        elif self.focus_metric == 'structure':
+        elif focus_metric == 'structure':
             # Structural similarity using SSIM
             # Requires target for comparison
             if target is None:
@@ -1479,7 +1508,7 @@ class SARFocusingLoss(BaseLoss):
             return self._structure_similarity(pred, target)
         
         else:
-            raise ValueError(f"Unknown focus_metric: {self.focus_metric}")
+            raise ValueError(f"Unknown focus_metric: {self.focus_metric!r}")
     
     def _normalized_centroid_variance(self, mag: torch.Tensor) -> torch.Tensor:
         """
