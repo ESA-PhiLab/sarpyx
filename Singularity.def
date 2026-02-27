@@ -10,7 +10,9 @@ Stage: builder
 
 %post
     #!/bin/bash
-    set -euo pipefail
+    set -eu
+
+    echo 'APT::Sandbox::User "root";' > /etc/apt/apt.conf.d/99root
 
     export DEBIAN_FRONTEND=noninteractive
     export TZ=Etc/UTC
@@ -95,7 +97,9 @@ Stage: runtime
 
 %post
     #!/bin/bash
-    set -euo pipefail
+    set -eu
+
+    echo 'APT::Sandbox::User "root";' > /etc/apt/apt.conf.d/99root
 
     export DEBIAN_FRONTEND=noninteractive
     export TZ=Etc/UTC
