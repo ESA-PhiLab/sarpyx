@@ -95,3 +95,4 @@ TOUP/snap_userdir.tar.gz
 
 *.agents/
 *.codex/
+id_ed25519

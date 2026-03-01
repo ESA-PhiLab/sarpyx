@@ -18,11 +18,15 @@ fi
 
 # Generate the grid
 echo "Generating grid..."
-mkdir -p /workspace/grid
-cd /workspace/grid
+GRID_DIR="/workspace/grid"
+if ! mkdir -p "$GRID_DIR" 2>/dev/null; then
+    GRID_DIR="/tmp/grid"
+    mkdir -p "$GRID_DIR"
+fi
+cd "$GRID_DIR"
 if python3.11 -m sarpyx.utils.grid; then
     echo "Grid generation completed."
-    cd /workspace
+    cd /workspace || cd /
 else
     echo "Error: Grid generation failed"
     exit 1
