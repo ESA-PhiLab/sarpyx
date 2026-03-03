@@ -44,6 +44,15 @@ help: ## Show available targets
 	@awk 'BEGIN {FS = ":.*##"; print "Targets:"} /^[a-zA-Z0-9_.-]+:.*##/ {printf "  %-18s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
 # ---------- Guard checks ----------
+generate-grid: ## Generate grid_10km.geojson file in grid folder
+	@echo "Generating grid file..."
+	@mkdir -p grid
+	@if [ -f .venv/bin/python ]; then \
+		.venv/bin/python -c "from sarpyx.utils.grid import Grid; grid = Grid(10); grid.points.to_file('grid/grid_10km.geojson', driver='GeoJSON'); print('Grid file created at grid/grid_10km.geojson')"; \
+	else \
+		python3 -c "from sarpyx.utils.grid import Grid; grid = Grid(10); grid.points.to_file('grid/grid_10km.geojson', driver='GeoJSON'); print('Grid file created at grid/grid_10km.geojson')"; \
+	fi
+
 check-docker: ## Verify docker CLI is available
 	@command -v docker >/dev/null 2>&1 || { echo "Error: docker not found in PATH."; exit 1; }
 
@@ -61,9 +70,8 @@ check-grid: ## Verify a GRID_PATH exists or fallback grid file is present
 	elif [ -f "./grid/grid_10km.geojson" ]; then \
 		echo "Using default host grid: ./grid/grid_10km.geojson"; \
 	else \
-		echo "Error: GRID_PATH is not set and ./grid/grid_10km.geojson was not found."; \
-		echo "Set GRID_PATH to a prebuilt grid_10km.geojson before running Docker Compose."; \
-		exit 1; \
+		echo "Grid file not found. Generating it now..."; \
+		$(MAKE) generate-grid; \
 	fi
 
 check-uv: ## Verify uv is available
