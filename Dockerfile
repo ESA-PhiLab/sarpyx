@@ -127,5 +127,5 @@ RUN python3.11 -m pip install --upgrade pip setuptools wheel && \
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 COPY start-jupyter.sh /usr/local/bin/start-jupyter.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh /usr/local/bin/start-jupyter.sh
-ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+RUN /usr/local/bin/entrypoint.sh
 CMD ["/bin/bash"]
