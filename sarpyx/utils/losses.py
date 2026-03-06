@@ -1418,6 +1418,7 @@ class SARFocusingLoss(BaseLoss):
         self.dist_metric = dist_metric
         self.use_tv = use_tv
         self.use_adaptive_weights = use_adaptive_weights
+        self.WIN_SIZE = 31 # For SSIM if used in focus metric
         
         # Running statistics for adaptive weighting
         self.register_buffer('rec_scale', torch.tensor(1.0))
@@ -1628,7 +1629,7 @@ class SARFocusingLoss(BaseLoss):
             target_mag = target.abs()
         
         # Use SSIM1DLoss for 1D signals (SAR focusing)
-        ssim_loss_fn = SSIM1DLoss(window_size=11, reduction=self.reduction)
+        ssim_loss_fn = SSIM1DLoss(window_size=self.WIN_SIZE, reduction=self.reduction)
         
         # SSIM1DLoss already returns 1 - SSIM
         return ssim_loss_fn(pred_mag, target_mag)
