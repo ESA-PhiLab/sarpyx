@@ -1,9 +1,12 @@
-"""This script provides utility functions for extracting Well-Known Text (WKT) representations of geographic footprints 
-from satellite product metadata. It includes functions for extracting WKT polygons from Sentinel-1 products using 
+"""This script provides utility functions for extracting Well-Known Text (WKT) representations of geographic footprints
+from satellite product metadata. It includes functions for extracting WKT polygons from Sentinel-1 products using
 the Copernicus Data Search API and from Terrasar-X product XML files.
 """
 
+import re
 from pathlib import Path
+
+import h5py
 from phidown.search import CopernicusDataSearcher
 from shapely.geometry import shape, MultiPolygon, Polygon
 import xml.etree.ElementTree as ET
@@ -198,6 +201,40 @@ def terrasar_wkt_extractor(product_path: Path) -> str:
     return f"POLYGON(({', '.join(f'{lon} {lat}' for lon, lat in corners)}))"
 
 
+
+
+def nisar_wkt_extractor(product_path: Path) -> str:
+    """Extract a 2D bounding polygon WKT from a NISAR GSLC .h5 file.
+
+    The NISAR GSLC product stores an OGR-compatible 3D WKT polygon
+    (lon, lat, height) at ``science/LSAR/identification/boundingPolygon``.
+    This function reads it, strips the Z (height) component, and returns
+    a standard 2D WKT POLYGON string suitable for downstream tiling.
+
+    Args:
+        product_path: Path to the NISAR GSLC HDF5 file.
+
+    Returns:
+        2D WKT POLYGON string in EPSG:4326.
+    """
+    with h5py.File(str(product_path), 'r') as f:
+        raw = f['science/LSAR/identification/boundingPolygon'][()]
+        if isinstance(raw, bytes):
+            raw = raw.decode('utf-8')
+
+    def _strip_z(wkt_3d: str) -> str:
+        def _replace_coords(m):
+            pairs = []
+            for pt in m.group(1).split(','):
+                parts = pt.strip().split()
+                if len(parts) >= 2:
+                    pairs.append(f'{parts[0]} {parts[1]}')
+            return '(' + ', '.join(pairs) + ')'
+        return re.sub(r'\(([^()]+)\)', _replace_coords, wkt_3d)
+
+    wkt_2d = _strip_z(raw)
+    print(f'Extracted NISAR bounding polygon (2D, EPSG:4326): {wkt_2d[:120]}...')
+    return wkt_2d
 
 
 if __name__ == "__main__":
