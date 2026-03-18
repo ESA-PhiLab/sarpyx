@@ -24,6 +24,7 @@ Example:
 
 import h5py
 import numpy as np
+import pyproj
 from typing import Dict, List, Tuple, Optional, Union
 from dataclasses import dataclass
 from pathlib import Path
@@ -31,6 +32,7 @@ import rasterio
 from rasterio.transform import Affine
 from shapely import wkt
 from shapely.geometry import Polygon
+from shapely.ops import transform as shapely_transform
 try:
     from shapely.vectorized import contains
 except ImportError:
@@ -207,12 +209,18 @@ class NISARReader:
                 x_spacing = y_spacing = 1.0
             
             # Try to get EPSG code
+            # NISAR stores EPSG as the dataset value; attrs use 'epsg_code'
             epsg = None
             projection_path = f'{science_path}/projection'
             if projection_path in f:
-                proj_group = f[projection_path]
-                if 'epsg' in proj_group.attrs:
-                    epsg = int(proj_group.attrs['epsg'])
+                proj_ds = f[projection_path]
+                try:
+                    epsg = int(proj_ds[()])
+                except Exception:
+                    for attr_name in ('epsg_code', 'epsg'):
+                        if attr_name in proj_ds.attrs:
+                            epsg = int(proj_ds.attrs[attr_name])
+                            break
             
             metadata = NISARMetadata(
                 product_path=str(self.product_path),
@@ -449,10 +457,15 @@ class NISARCutter:
         """
         # Parse WKT polygon
         polygon = self._wkt_to_polygon(wkt_polygon)
-        
+
         # Get product metadata
         metadata = self.reader.get_metadata(frequency)
-        
+
+        # Reproject polygon from WGS84 to product's native CRS if needed
+        if metadata.epsg is not None and metadata.epsg != 4326:
+            transformer = pyproj.Transformer.from_crs(4326, metadata.epsg, always_xy=True)
+            polygon = shapely_transform(transformer.transform, polygon)
+
         # Calculate pixel window
         window = self._get_pixel_window(polygon, metadata)
         (row_start, row_stop), (col_start, col_stop) = window
@@ -511,6 +524,87 @@ class NISARCutter:
             'polygon': polygon
         }
     
+    def cut_by_bbox(
+        self,
+        x_min: float,
+        y_min: float,
+        x_max: float,
+        y_max: float,
+        polarization: str,
+        frequency: str = 'frequencyA',
+        apply_mask: bool = True,
+    ) -> Dict[str, Union[np.ndarray, 'NISARMetadata', Affine]]:
+        """Cut NISAR product by a bounding box already in the product's native CRS.
+
+        Unlike cut_by_wkt, no CRS reprojection is performed. The bbox coordinates
+        are used directly to compute the pixel window, which avoids the artificial
+        expansion that occurs when a WGS84 rectangle is reprojected to UTM and its
+        axis-aligned bounds are taken (causing adjacent tiles to overlap).
+
+        Args:
+            x_min: Left edge in the product's native CRS (metres).
+            y_min: Bottom edge in the product's native CRS (metres).
+            x_max: Right edge in the product's native CRS (metres).
+            y_max: Top edge in the product's native CRS (metres).
+            polarization: Polarization to read (e.g. 'HH').
+            frequency: Frequency band (default: 'frequencyA').
+            apply_mask: If True, pixels outside the bbox are set to NaN.
+
+        Returns:
+            Same dict as cut_by_wkt: data, mask, metadata, transform, window, polygon.
+        """
+        from shapely.geometry import box as shapely_box
+
+        metadata = self.reader.get_metadata(frequency)
+        polygon = shapely_box(x_min, y_min, x_max, y_max)
+
+        window = self._get_pixel_window(polygon, metadata)
+        (row_start, row_stop), (col_start, col_stop) = window
+
+        data = self.reader.read_data(polarization, frequency, window)
+        mask = self._create_mask(polygon, window, metadata)
+
+        if apply_mask:
+            if not np.iscomplexobj(data):
+                data = data.astype(float)
+            masked_data = data.copy()
+            if np.iscomplexobj(data):
+                masked_data[~mask] = np.nan + 1j * np.nan
+            else:
+                masked_data[~mask] = np.nan
+            data = masked_data
+
+        subset_transform = metadata.transform * Affine.translation(col_start, row_start)
+
+        subset_x_min = metadata.x_min + col_start * metadata.x_spacing
+        subset_y_max = metadata.y_max - row_start * abs(metadata.y_spacing)
+        subset_x_max = metadata.x_min + col_stop * metadata.x_spacing
+        subset_y_min = metadata.y_max - row_stop * abs(metadata.y_spacing)
+
+        subset_metadata = NISARMetadata(
+            product_path=metadata.product_path,
+            frequency=frequency,
+            polarizations=metadata.polarizations,
+            grid_name=metadata.grid_name,
+            shape=data.shape,
+            epsg=metadata.epsg,
+            x_spacing=metadata.x_spacing,
+            y_spacing=metadata.y_spacing,
+            x_min=subset_x_min,
+            y_min=subset_y_min,
+            x_max=subset_x_max,
+            y_max=subset_y_max,
+        )
+
+        return {
+            'data': data,
+            'mask': mask,
+            'metadata': subset_metadata,
+            'transform': subset_transform,
+            'window': window,
+            'polygon': polygon,
+        }
+
     def save_subset(
         self,
         subset_result: Dict,
@@ -591,11 +685,41 @@ class NISARCutter:
             # Save polarizations as string array
             if metadata.polarizations:
                 dt = h5py.special_dtype(vlen=str)
-                pol_ds = meta_group.create_dataset('polarizations', 
-                                                   (len(metadata.polarizations),), 
+                pol_ds = meta_group.create_dataset('polarizations',
+                                                   (len(metadata.polarizations),),
                                                    dtype=dt)
                 for i, pol in enumerate(metadata.polarizations):
                     pol_ds[i] = pol
+
+            # Write Abstracted_Metadata-compatible group so read_h5 / extract_core_metadata_sentinel work
+            abst = f.create_group('metadata/Abstracted_Metadata')
+            src_path = Path(metadata.product_path)
+            if src_path.exists():
+                with h5py.File(src_path, 'r') as src:
+                    def _str(ds_val):
+                        return ds_val.decode() if isinstance(ds_val, (bytes, bytearray)) else str(ds_val)
+
+                    ident = src.get('science/LSAR/identification')
+                    if ident is not None:
+                        abst.attrs['MISSION']          = _str(ident['missionId'][()])
+                        abst.attrs['PRODUCT_TYPE']     = _str(ident['productType'][()])
+                        abst.attrs['ACQUISITION_MODE'] = _str(ident['productType'][()])
+                        abst.attrs['PRODUCT']          = _str(ident['granuleId'][()])
+                        abst.attrs['PASS']             = _str(ident['orbitPassDirection'][()])
+                        abst.attrs['first_line_time']  = _str(ident['zeroDopplerStartTime'][()])
+                        abst.attrs['antenna_pointing'] = _str(ident['lookDirection'][()])
+
+                    freq_base = f'science/LSAR/GSLC/grids/{metadata.frequency}'
+                    if f'{freq_base}/centerFrequency' in src:
+                        abst.attrs['radar_frequency'] = float(src[f'{freq_base}/centerFrequency'][()])
+                    if f'{freq_base}/slantRangeSpacing' in src:
+                        abst.attrs['range_spacing'] = float(src[f'{freq_base}/slantRangeSpacing'][()])
+
+            abst.attrs['azimuth_spacing'] = abs(metadata.y_spacing)
+            if metadata.polarizations:
+                abst.attrs['mds1_tx_rx_polar'] = metadata.polarizations[0]
+                if len(metadata.polarizations) > 1:
+                    abst.attrs['mds2_tx_rx_polar'] = metadata.polarizations[1]
     
     def _save_subset_rasterio(
         self,
