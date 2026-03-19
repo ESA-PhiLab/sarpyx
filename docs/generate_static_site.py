@@ -262,6 +262,7 @@ def page_template(
         ("Installation", "installation.html"),
         ("Quick Start", "quickstart.html"),
         ("Architecture", "architecture.html"),
+        ("Results", "results/snapflow_v2/index.html"),
         ("API", "api/index.html"),
         ("Configuration", "configuration.html"),
         ("Usage", "usage.html"),
@@ -850,6 +851,11 @@ def make_index_page(project: dict[str, Any], highlights: list[str], module_items
     <section class=\"card\" data-searchable data-search=\"dependencies\">
       <h3 id=\"dependencies\">Core Dependencies</h3>
       <p>{h(top_deps)}</p>
+    </section>
+    <section class=\"card\" data-searchable data-search=\"results snapflow insar report notebook outputs\">
+      <h3 id=\"results\">Latest Results</h3>
+      <p>Review the latest burst-based SNAPflow v2 run as a static HTML report with summary tables, separated plots, and the embedded burst map.</p>
+      <p><a href=\"results/snapflow_v2/index.html\">Open the SNAPflow v2 results page</a></p>
     </section>
   </div>
   <h2 id=\"module-distribution\">Module Distribution</h2>
