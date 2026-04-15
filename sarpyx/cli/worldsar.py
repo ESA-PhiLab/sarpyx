@@ -26,6 +26,7 @@ from dotenv import load_dotenv
 from sarpyx.snapflow.engine import GPT
 from sarpyx.utils.geos import check_points_in_polygon, rectangle_to_wkt, rectanglify
 from sarpyx.utils.io import read_h5
+from sarpyx.utils.meta import normalize_sar_timestamp
 from sarpyx.utils.nisar_utils import NISARCutter, NISARReader
 from sarpyx.utils.wkt_utils import sentinel1_wkt_extractor_cdse, sentinel1_wkt_extractor_manifest
 
@@ -380,6 +381,7 @@ def create_tile_database(input_folder: str, output_db_folder: str) -> pd.DataFra
         print(f'Processing tile {idx + 1}/{len(h5_tiles)}: {tile_file.name}')
         _data, metadata = read_h5(tile_file)
         row = pd.Series(metadata['quickinfo'])
+        row['first_line_time'] = normalize_sar_timestamp(row.get('first_line_time'))
         row['ID'] = tile_file.stem
         db = pd.concat([db, pd.DataFrame([row])], ignore_index=True)
 
