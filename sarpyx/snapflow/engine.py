@@ -12,6 +12,7 @@ import zipfile
 from pathlib import Path
 from typing import List, Optional, Union
 from urllib import request
+from xml.sax.saxutils import escape
 import json
 
 warnings.filterwarnings('ignore')
@@ -215,21 +216,31 @@ class GPT:
         else:
             return 'gpt'
 
-    def _reset_command(self) -> None:
+    def _reset_command(self, source_param: str = "source") -> None:
         """Reset the command list for a new GPT operation."""
         self.current_cmd = self._base_cmd()
-        self.current_cmd.append(f'-Ssource={self.prod_path.as_posix()}')
+        self.current_cmd.append(f'-S{source_param}={self.prod_path.as_posix()}')
 
     def run_graph(
         self,
         graph_path: str | Path,
         output_path: str | Path,
         delete_graph: bool = False,
+        parameters: Optional[dict[str, str | Path | int | float | bool]] = None,
+        source_parameters: Optional[dict[str, str | Path]] = None,
     ) -> Optional[str]:
         """Execute a standalone GPT XML graph file."""
         graph_path = Path(graph_path)
         output_path = Path(output_path)
         self.current_cmd = self._base_cmd()
+        if source_parameters:
+            for name, value in source_parameters.items():
+                rendered = Path(value).as_posix() if isinstance(value, Path) else str(value)
+                self.current_cmd.append(f"-S{name}={rendered}")
+        if parameters:
+            for name, value in parameters.items():
+                rendered = json.dumps(Path(value).as_posix() if isinstance(value, Path) else value)
+                self.current_cmd.append(f"-P{name}={rendered}")
         self.current_cmd.append(graph_path.as_posix())
 
         if self._execute_command():
@@ -238,6 +249,18 @@ class GPT:
                 graph_path.unlink(missing_ok=True)
             return output_path.as_posix()
         return None
+
+    def _write_graph(
+        self,
+        suffix: str,
+        graph_xml: str,
+        output_name: Optional[str] = None,
+    ) -> tuple[Path, Path]:
+        """Persist a temporary XML graph alongside its expected output path."""
+        output_path = self._build_output_path(suffix=suffix, output_name=output_name)
+        graph_path = self.outdir / f"{output_path.stem}_graph.xml"
+        graph_path.write_text(graph_xml, encoding="utf-8")
+        return graph_path, output_path
 
     def _build_output_path(self, suffix: str, output_name: Optional[str] = None) -> Path:
         """Build the output path for a processing step.
@@ -2194,7 +2217,7 @@ class GPT:
         Returns:
             Path to output product with topographic phase removed, or None if failed.
         """
-        self._reset_command()
+        self._reset_command(source_param='sourceProduct')
         
         cmd_params = [
             f'-PorbitDegree={orbit_degree}',
@@ -2533,6 +2556,8 @@ class GPT:
         prefix: str = "",
         VERBOSE: bool = False,
         chunk_cols: Optional[int] = None,
+        update_dim: bool = True,
+        **kwargs,
     ) -> Path:
         """
         Run sub-aperture decomposition on a SNAP DIM product.
@@ -2588,7 +2613,9 @@ class GPT:
             byte_order=byte_order,
             prefix=prefix,
             VERBOSE=VERBOSE,
-            chunk_cols=chunk_cols
+            chunk_cols=chunk_cols,
+            update_dim=update_dim,
+            **kwargs,
         )
 
         return dim_path
@@ -3080,6 +3107,63 @@ class GPT:
         
         self.current_cmd.append(f'Back-Geocoding {" ".join(cmd_params)}')
         return self._call(suffix='BGEO', output_name=output_name)
+
+    def stamps_export_pair(
+        self,
+        coreg_product: str | Path,
+        ifg_product: str | Path,
+        target_folder: str | Path,
+        psi_format: bool = True,
+        output_name: Optional[str] = None,
+        keep_graph: bool = False,
+    ) -> Optional[str]:
+        """Run StaMPS export for a coreg/IFG pair using a graph with two inputs."""
+        coreg_path = Path(coreg_product)
+        ifg_path = Path(ifg_product)
+        if not coreg_path.exists():
+            raise FileNotFoundError(f"Coregistered product path does not exist: {coreg_path}")
+        if not ifg_path.exists():
+            raise FileNotFoundError(f"Interferogram product path does not exist: {ifg_path}")
+
+        target_folder_path = Path(target_folder)
+        target_folder_path.mkdir(parents=True, exist_ok=True)
+        graph_xml = f"""<graph id="stamps-export-pair">
+  <version>1.0</version>
+  <node id="ReadCoreg">
+    <operator>Read</operator>
+    <sources/>
+    <parameters class="com.bc.ceres.binding.dom.XppDomElement">
+      <file>{coreg_path.as_posix()}</file>
+    </parameters>
+  </node>
+  <node id="ReadIfg">
+    <operator>Read</operator>
+    <sources/>
+    <parameters class="com.bc.ceres.binding.dom.XppDomElement">
+      <file>{ifg_path.as_posix()}</file>
+    </parameters>
+  </node>
+  <node id="StampsExport">
+    <operator>StampsExport</operator>
+    <sources>
+      <sourceProduct refid="ReadCoreg"/>
+      <sourceProduct.1 refid="ReadIfg"/>
+    </sources>
+    <parameters class="com.bc.ceres.binding.dom.XppDomElement">
+      <targetFolder>{target_folder_path.as_posix()}</targetFolder>
+      <psiFormat>{str(psi_format).lower()}</psiFormat>
+    </parameters>
+  </node>
+</graph>
+"""
+        marker_output = self._build_output_path(suffix="STMP", output_name=output_name)
+        graph_path = self.outdir / f"{marker_output.stem}_graph.xml"
+        graph_path.write_text(graph_xml, encoding="utf-8")
+        return self.run_graph(
+            graph_path=graph_path,
+            output_path=marker_output,
+            delete_graph=not keep_graph,
+        )
 
     def create_stack(
         self,
