@@ -388,8 +388,8 @@ class TestPolDetectionRobustNaming:
             open(os.path.join(tmp_path, name), "w").close()
 
         groups = sorted(_scan_data_dir_for_groups(str(tmp_path)))
-        assert ("CAL", "VH", None) in groups
-        assert ("L2", "VV", "SA1") in groups
+        assert ("CAL", None, "VH", None) in groups
+        assert ("L2", None, "VV", "SA1") in groups
 
 
 class TestSpatialAlignment:

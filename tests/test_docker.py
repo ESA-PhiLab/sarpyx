@@ -18,6 +18,7 @@ import sys
 
 import pytest
 
+IN_DOCKER_IMAGE = os.path.exists("/.dockerenv") or os.path.isdir("/workspace")
 
 # ── 1. Python runtime ───────────────────────────────────────────────
 
@@ -107,6 +108,7 @@ class TestDependencies:
 
 # ── 5. SNAP / Java environment ──────────────────────────────────────
 
+@pytest.mark.skipif(not IN_DOCKER_IMAGE, reason="Docker image checks only")
 class TestSnapEnvironment:
     """Validate SNAP toolbox and Java are present."""
 
@@ -126,6 +128,7 @@ class TestSnapEnvironment:
 
 # ── 6. Filesystem layout ────────────────────────────────────────────
 
+@pytest.mark.skipif(not IN_DOCKER_IMAGE, reason="Docker image checks only")
 class TestFilesystem:
     """Check expected files / dirs inside the container."""
 
