@@ -398,8 +398,7 @@ ROUTER = {
 _PARSER_ARGS = [
     # (['--input', '-i'],                dict(dest='product_path', type=str, required=True, help='Path to the input SAR product.')),
     (['--input', '-i'],                dict(dest='product_path', type=str, default='/shared/home/vmarsocci/S1C_IW_SLC__1SDV_20260130T152608_20260130T152634_006135_00C4FA_664F.SAFE', required=False, help='Path to the input SAR product.')),
-    # (['--output', '-o'],               dict(dest='output_dir', type=str, default=None, help='Processed output directory, or target .zarr path in --h5-to-zarr-only mode.')),
-    (['--output', '-o'],               dict(dest='output_dir', type=str, default='/shared/home/vmarsocci/WORLDSAR/outputs/worldsar-output', required=False, help='Directory to save the processed output.')),
+    (['--output', '-o'],               dict(dest='output_dir', type=str, default=None, help='Processed output directory, or target .zarr path in --h5-to-zarr-only mode.')),
     # (['--cuts-outdir', '--cuts_outdir'], dict(dest='cuts_outdir', type=str, default=None, help='Where to store the tiles after extraction.')),
     (['--cuts-outdir', '--cuts_outdir'], dict(dest='cuts_outdir', type=str, default='/shared/home/vmarsocci/WORLDSAR/outputs/tiles', help='Where to store the tiles after extraction.')),
     (['--product-wkt', '--product_wkt'], dict(dest='product_wkt', type=str, default=None, help='WKT string defining the product region of interest.')),
@@ -595,6 +594,16 @@ def _utm_bbox_to_pixel_region(utm_bbox: tuple, geotransform: tuple) -> str:
     return f'{col_start},{row_start},{width},{height}'
 
 
+def _parse_epsg_value(value) -> int:
+    """Accept integer EPSG codes or strings like 'EPSG:32633'."""
+    if isinstance(value, int):
+        return value
+    text = str(value).strip()
+    if ':' in text:
+        text = text.split(':', 1)[1]
+    return int(text)
+
+
 def _update_h5_corners(h5_path: Path, utm_bbox: tuple, epsg: int) -> None:
     """Overwrite Abstracted_Metadata corner coordinates with the actual TC-output WGS84 corners.
 
@@ -631,13 +640,13 @@ def _cut_single_tile(rect, product_path, cuts_dir, product_mode, gpt_memory, gpt
     tile_path = cuts_dir / f'{tile_name}.h5'
     try:
         if product_mode == 'NISAR':
-            epsg = int(rect['BL']['properties']['epsg'].split(':')[1])
+            epsg = _parse_epsg_value(rect['BL']['properties']['epsg'])
             x_min, y_min, x_max, y_max = grid_cell_utm_bbox(rect, epsg)
             reader = NISARReader(str(product_path))
             cutter = NISARCutter(reader)
             cutter.save_subset(cutter.cut_by_bbox(x_min, y_min, x_max, y_max, ['HH', 'HV'], apply_mask=False), tile_path, driver='H5')
         else:
-            epsg = int(rect['BL']['properties']['epsg'].split(':')[1])
+            epsg = _parse_epsg_value(rect['BL']['properties']['epsg'])
             utm_bbox = grid_cell_utm_bbox(rect, epsg)
             gt = _read_geotransform(product_path)
             region = _utm_bbox_to_pixel_region(utm_bbox, gt)
@@ -1127,9 +1136,13 @@ def _run_db_indexing(validation_rows, name, swath=None):
 
 
 def _run_h5_to_zarr_only(product_path, output_path, chunk_size, overwrite):
+    if output_path:
+        resolved_output = output_path
+    else:
+        resolved_output = Path(product_path).with_suffix('.zarr')
     converted = convert_tile_h5_to_zarr(
         input_path=product_path,
-        output_path=output_path,
+        output_path=resolved_output,
         chunk_size=tuple(chunk_size),
         overwrite=overwrite,
     )
