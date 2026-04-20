@@ -2,39 +2,36 @@
 name: Publish Python Package to PyPI
 
 on:
-    push:
-        branches: [main]
-    workflow_dispatch:
+  workflow_dispatch:
 
 jobs:
-    pypi-publish:
-        name: PyPI Release Publication
-        runs-on: ubuntu-latest
-        if: github.ref == 'refs/heads/main'
-        permissions:
-            id-token: write # Required for trusted publishing
-        steps:
-          - name: Checkout Repository
-            uses: actions/checkout@v4
+  pypi-publish:
+    name: PyPI Release Publication
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write # Required for trusted publishing
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
 
-          - name: Configure Python Environment
-            uses: actions/setup-python@v4
-            with:
-              python-version: "3.x"
+      - name: Configure Python Environment
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.x"
 
-          - name: Install GDAL System Dependencies
-            run: |
-              sudo apt-get update
-              sudo apt-get install -y gdal-bin libgdal-dev
+      - name: Install GDAL System Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gdal-bin libgdal-dev
 
-          - name: Configure PDM Environment
-            uses: pdm-project/setup-pdm@v4
-            with:
-              python-version: "3.x"
-              cache: true
+      - name: Configure PDM Environment
+        uses: pdm-project/setup-pdm@v4
+        with:
+          python-version: "3.x"
+          cache: true
 
-          - name: Build Python Package
-            run: pdm build
+      - name: Build Python Package
+        run: pdm build
 
-          - name: Upload Distributions to PyPI
-            uses: pypa/gh-action-pypi-publish@release/v1
+      - name: Upload Distributions to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
