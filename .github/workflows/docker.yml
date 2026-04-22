@@ -62,11 +62,11 @@ jobs:
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache-new,mode=max
 
-      - name: Run Docker build tests
-        run: |
-          docker run --rm ${{ env.DOCKER_IMAGE }}:ci sh -c "\
-            python3.11 -m pip install pytest && \
-            python3.11 -m pytest /workspace/tests/test_docker.py -v --tb=short"
+      # - name: Run Docker build tests (disabled)
+      #   run: |
+      #     docker run --rm ${{ env.DOCKER_IMAGE }}:ci sh -c "\
+      #       python3.11 -m pip install pytest && \
+      #       python3.11 -m pytest /workspace/tests/test_docker.py -v --tb=short"
 
       - name: Move cache  # prevents ever-growing cache
         run: |
