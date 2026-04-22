@@ -485,60 +485,25 @@ def _add_worldsar_arguments(parser: argparse.ArgumentParser) -> None:
         help='Override GPT timeout in seconds for a single invocation.'
     )
     parser.add_argument(
-        '--snap-userdir',
-        dest='snap_userdir',
-        type=str,
-        default=None,
-        help='Override SNAP user directory.'
-    )
-    parser.add_argument(
-        '--orbit-type',
-        dest='orbit_type',
-        type=str,
-        default='Sentinel Precise (Auto Download)',
-        help='SNAP Apply-Orbit-File orbitType.'
-    )
-    parser.add_argument(
-        '--orbit-continue-on-fail',
-        dest='orbit_continue_on_fail',
+        '--h5-to-zarr-only',
+        dest='h5_to_zarr_only',
         action='store_true',
-        help='Continue if orbit file cannot be applied.'
+        help='Skip preprocessing/tiling and convert an existing .h5 tile into a Zarr v3 store.'
     )
     parser.add_argument(
-        '--tops-swaths',
-        dest='tops_swaths',
-        type=str,
-        nargs='+',
-        choices=['IW1', 'IW2', 'IW3'],
-        default=None,
-        help='Sentinel-1 TOPS swaths to process. Defaults to all swaths.'
+        '--zarr-chunk-size',
+        dest='zarr_chunk_size',
+        type=int,
+        nargs=2,
+        metavar=('ROWS', 'COLS'),
+        default=(32, 32),
+        help='Chunk size for H5-to-Zarr conversion (default: 32 32).'
     )
     parser.add_argument(
-        '--polarizations',
-        dest='polarizations',
-        type=str,
-        nargs='+',
-        choices=['VV', 'VH', 'HH', 'HV'],
-        default=None,
-        help='Polarizations to process. Defaults to all available.'
-    )
-    parser.add_argument(
-        '--skip-subaperture',
-        dest='skip_subaperture',
+        '--overwrite-zarr',
+        dest='overwrite_zarr',
         action='store_true',
-        help='Skip sub-aperture processing in Sentinel pipelines.'
-    )
-    parser.add_argument(
-        '--skip-polarimetric-decomposition',
-        dest='skip_polarimetric_decomposition',
-        action='store_true',
-        help='Skip polarimetric decomposition in Sentinel pipelines.'
-    )
-    parser.add_argument(
-        '--single-band',
-        dest='single_band',
-        action='store_true',
-        help='Keep a single representative band before terrain correction.'
+        help='Replace an existing output Zarr store when converting H5 tiles.'
     )
 
 

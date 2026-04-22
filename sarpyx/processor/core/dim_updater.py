@@ -11,13 +11,12 @@ from typing import Dict, List, Tuple, Optional
 #   q_IW1_VV.hdr
 #   L2_i_IW1_VV_SA1.hdr
 #   L3_q_VH_SA2.hdr
-#   CAL_i_VH.hdr
 #
 # Where:
-#   - optional prefix can be any alphanumeric token (used to namespace decompositions or calibrated products)
+#   - optional L-prefix is restricted to "L<digits>_" (used to namespace multiple decompositions)
 #   - optional swath token is "<2 letters><digit>" (IW1/EW3/SM?); if absent -> "SM-like"
 HDR_RE = re.compile(
-    r"^(?:(?P<prefix>[A-Z0-9]+)_)?(i|q)_(?:(?P<swath>[A-Z]{2}\d)_)?(?P<pol>[A-Z]{2})(?:_(?P<sa>SA\d+))?$",
+    r"^(?:(L\d+)_)?(i|q)_(?:(?P<swath>[A-Z]{2}\d)_)?(?P<pol>[A-Z]{2})(?:_(?P<sa>SA\d+))?$",
     re.IGNORECASE
 )
 
@@ -56,7 +55,7 @@ def _scan_data_dir_for_groups(data_dir: str) -> List[Tuple[Optional[str], Option
         if not m:
             continue
 
-        Lpref = m.group("prefix") or None
+        Lpref = (m.group(1) or None)
         iq = (m.group(2) or "").lower()
         swath = m.group("swath")
         pol = m.group("pol")

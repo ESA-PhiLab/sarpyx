@@ -12,7 +12,9 @@ from pathlib import Path
 from typing import List, Dict, Tuple
 import logging
 
-from .utils import validate_path, create_output_directory
+from sarpyx.processor.core.decode import S1L0Decoder
+from sarpyx.utils.io import find_dat_file
+from .utils import validate_path, create_output_directory, get_product_info
 
 # Configure logging
 logging.basicConfig(
@@ -83,8 +85,6 @@ def decode_s1_l0(input_file: Path, output_dir: Path) -> None:
         input_file: Path to the input .dat file.
         output_dir: Directory to save decoded output.
     """
-    from sarpyx.processor.core.decode import S1L0Decoder
-
     decoder = S1L0Decoder()
     decoder.decode_file(input_file, output_dir, save_to_zarr=True, headers_only=False)
     logger.info(f'✅ Decoding completed for {input_file.name} to {output_dir}')
@@ -105,8 +105,6 @@ def retrieve_input_files(
     Returns:
         Tuple of (input_files, folders_map)
     """
-    from sarpyx.utils.io import find_dat_file
-
     pols = ['vh', 'vv', 'hh', 'hv']
     input_files: List[Path] = []
     folders_map: Dict[Path, List[Path]] = {folder: [] for folder in safe_folders}
