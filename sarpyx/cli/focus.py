@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Dict, Any, Optional, Tuple, Union
 import logging
 
+from sarpyx.processor.core.focus import CoarseRDA
 from sarpyx.utils.zarr_utils import ZarrManager, dask_slice_saver, concatenate_slices_efficient
 from sarpyx.utils.io import calculate_slice_indices
 from .utils import validate_path, create_output_directory
@@ -192,8 +193,6 @@ def focalize_slice(raw_data: Dict[str, Any], verbose: bool = False) -> Dict[str,
     Returns:
         Processed data dictionary containing 'raw', 'rc', 'rcmc', 'az', 'metadata', and 'ephemeris'
     """
-    from sarpyx.processor.core.focus import CoarseRDA
-
     logger.info('Processing slice...')
     
     # Initialize processor

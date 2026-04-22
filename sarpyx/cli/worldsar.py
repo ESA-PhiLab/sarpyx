@@ -120,15 +120,6 @@ REQUIRED_BAND_ATTRS = (
     'scaling_offset',
     'unit',
 )
-DEFAULT_TOPS_SWATHS = ('IW1', 'IW2', 'IW3')
-SINGLE_BAND_PREFIX_PRIORITY = (
-    'Intensity',
-    'Sigma0',
-    'Gamma0',
-    'Beta0',
-    'i_',
-    'q_',
-)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -174,40 +165,20 @@ def _sentinel_post_chain(
     product_path,
     orbit_type='Sentinel Precise (Auto Download)',
     orbit_continue_on_fail=False,
-    polarizations=None,
-    skip_subaperture=False,
-    skip_polarimetric_decomposition=False,
-    single_band=False,
 ):
     """Calibration → DerampDemod → Deburst → PolDecomp → TC  (shared by each swath)."""
-    reduced_chain = skip_subaperture and skip_polarimetric_decomposition
-    pols = [pol.upper() for pol in polarizations] if polarizations else None
-
     fp_orb = _apply_sentinel_orbit_file(
         op,
         orbit_type=orbit_type,
         orbit_continue_on_fail=orbit_continue_on_fail,
     )
-    fp_cal = op.Calibration(
-        pols=pols,
-        output_complex=not reduced_chain,
-    )
+    fp_cal = op.Calibration(output_complex=True)
     if fp_cal is None:
         raise RuntimeError(f'Calibration failed: {op.last_error_summary()}')
-
-    if reduced_chain:
-        fp_deb = op.Deburst(pols=pols)
-        if fp_deb is None:
-            raise RuntimeError(f'TOPSAR-Deburst failed: {op.last_error_summary()}')
-        if single_band:
-            _select_single_band(op, polarizations=pols)
-        _run_reduced_terrain_correction(op)
-        return op.prod_path
-
     fp_deramp = op.TopsarDerampDemod()
     if fp_deramp is None:
         raise RuntimeError(f'TOPSAR-DerampDemod failed: {op.last_error_summary()}')
-    fp_deb = op.Deburst(pols=pols)
+    fp_deb = op.Deburst()
     if fp_deb is None:
         raise RuntimeError(f'TOPSAR-Deburst failed: {op.last_error_summary()}')
 
@@ -250,61 +221,11 @@ def _sentinel_post_chain(
     return op.prod_path
 
 
-def _select_single_band(op, polarizations=None):
-    """Keep a single representative band from the current product."""
-    bands = _expected_band_names_from_dim(Path(op.prod_path))
-    if len(bands) <= 1:
-        return op.prod_path
-
-    candidate_bands = bands
-    if polarizations:
-        matching = [
-            band for band in bands
-            if any(f'_{pol.upper()}' in band or band.endswith(pol.upper()) for pol in polarizations)
-        ]
-        if matching:
-            candidate_bands = matching
-
-    for prefix in SINGLE_BAND_PREFIX_PRIORITY:
-        preferred = next((band for band in candidate_bands if band.startswith(prefix)), None)
-        if preferred is not None:
-            selected_band = preferred
-            break
-    else:
-        selected_band = candidate_bands[0]
-
-    result = op.band_select(source_bands=[selected_band])
-    if result is None:
-        raise RuntimeError(f'BandSelect failed: {op.last_error_summary()}')
-    return result
-
-
-def _run_reduced_terrain_correction(op):
-    """Terrain-correct only the essential source band for cut verification."""
-    result = op.TerrainCorrection(
-        map_projection='AUTO:42001',
-        pixel_spacing_in_meter=10.0,
-        output_complex=False,
-        save_dem=False,
-        save_local_incidence_angle=False,
-        save_selected_source_band=True,
-    )
-    if result is None:
-        raise RuntimeError(f'Terrain Correction failed: {op.last_error_summary()}')
-    return result
-
-
 def pipeline_sentinel(
     product_path, output_dir, is_TOPS=False,
     gpt_memory=None, gpt_parallelism=None, gpt_timeout=None,
     orbit_type='Sentinel Precise (Auto Download)',
-    orbit_continue_on_fail=False,
-    tops_swaths=None,
-    polarizations=None,
-    skip_subaperture=False,
-    skip_polarimetric_decomposition=False,
-    single_band=False,
-    **_,
+    orbit_continue_on_fail=False, **_,
 ):
     """Sentinel-1 pipeline.
 
@@ -316,24 +237,14 @@ def pipeline_sentinel(
 
     if is_TOPS:
         results = {}
-        swaths = tuple(tops_swaths) if tops_swaths else DEFAULT_TOPS_SWATHS
-        for swath in swaths:
+        for swath in ('IW1', 'IW2', 'IW3'):
             sw_op = _create_gpt_operator(Path(op.prod_path), output_dir / swath, 'BEAM-DIMAP', **gpt_kw)
-            split_result = sw_op.TopsarSplit(
-                subswath=swath,
-                selected_polarisations=polarizations,
-            )
-            if split_result is None:
-                raise RuntimeError(f'TOPSAR-Split failed for {swath}: {sw_op.last_error_summary()}')
+            sw_op.TopsarSplit(subswath=swath) # SPLIT
             results[swath] = _sentinel_post_chain(
                 op=sw_op,
                 product_path=product_path,
                 orbit_type=orbit_type,
                 orbit_continue_on_fail=orbit_continue_on_fail,
-                polarizations=polarizations,
-                skip_subaperture=skip_subaperture,
-                skip_polarimetric_decomposition=skip_polarimetric_decomposition,
-                single_band=single_band,
             )
         return results                    # {IW1: path, IW2: path, IW3: path}
     
@@ -343,20 +254,9 @@ def pipeline_sentinel(
         orbit_type=orbit_type,
         orbit_continue_on_fail=orbit_continue_on_fail,
     )
-    reduced_chain = skip_subaperture and skip_polarimetric_decomposition
-    pols = [pol.upper() for pol in polarizations] if polarizations else None
-    fp_cal = op.Calibration(
-        pols=pols,
-        output_complex=not reduced_chain,
-    )
+    fp_cal = op.Calibration(output_complex=True)
     if fp_cal is None:
         raise RuntimeError(f'Calibration failed: {op.last_error_summary()}')
-
-    if reduced_chain:
-        if single_band:
-            _select_single_band(op, polarizations=pols)
-        _run_reduced_terrain_correction(op)
-        return op.prod_path
 
     op.do_subaps(
         safe_path=product_path,
@@ -442,11 +342,6 @@ _PARSER_ARGS = [
     (['--snap-userdir'],               dict(dest='snap_userdir', type=str, default=None, help='Override SNAP user directory.')),
     (['--orbit-type'],                 dict(dest='orbit_type', type=str, default='Sentinel Precise (Auto Download)', help='SNAP Apply-Orbit-File orbitType.')),
     (['--orbit-continue-on-fail'],     dict(dest='orbit_continue_on_fail', action='store_true', help='Continue if orbit file cannot be applied.')),
-    (['--tops-swaths'],                dict(dest='tops_swaths', type=str, nargs='+', choices=DEFAULT_TOPS_SWATHS, default=None, help='Sentinel-1 TOPS swaths to process. Defaults to all swaths.')),
-    (['--polarizations'],              dict(dest='polarizations', type=str, nargs='+', choices=['VV', 'VH', 'HH', 'HV'], default=None, help='Polarizations to process. Defaults to all available.')),
-    (['--skip-subaperture'],           dict(dest='skip_subaperture', action='store_true', help='Skip sub-aperture processing in Sentinel pipelines.')),
-    (['--skip-polarimetric-decomposition'], dict(dest='skip_polarimetric_decomposition', action='store_true', help='Skip polarimetric decomposition in Sentinel pipelines.')),
-    (['--single-band'],                dict(dest='single_band', action='store_true', help='Keep a single representative band before terrain correction.')),
 ]
 
 
@@ -524,31 +419,6 @@ def infer_product_mode(product_path: Path) -> str:
         f'Could not infer product mode from input path: {product_path}. '
         'Supported modes: S1TOPS/S1STRIP, BM, NISAR, TSX, CSG.'
     )
-
-
-def _wkt_bounds(wkt_text):
-    pattern = re.compile(r'(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)\s+(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)')
-    coords = [(float(match.group(1)), float(match.group(2))) for match in pattern.finditer(wkt_text)]
-    if not coords:
-        raise ValueError(f'Could not parse coordinates from WKT: {wkt_text[:80]}')
-    xs = [coord[0] for coord in coords]
-    ys = [coord[1] for coord in coords]
-    return min(xs), min(ys), max(xs), max(ys)
-
-
-def _swap_wkt_axes(wkt_text):
-    pattern = re.compile(r'(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)\s+(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)')
-    return pattern.sub(lambda match: f'{match.group(2)} {match.group(1)}', wkt_text)
-
-
-def _bbox_overlap_area(bounds_a, bounds_b):
-    minx = max(bounds_a[0], bounds_b[0])
-    miny = max(bounds_a[1], bounds_b[1])
-    maxx = min(bounds_a[2], bounds_b[2])
-    maxy = min(bounds_a[3], bounds_b[3])
-    if minx >= maxx or miny >= maxy:
-        return 0.0
-    return (maxx - minx) * (maxy - miny)
 
 
 # ── Tile cutting ─────────────────────────────────────────────────────────────
@@ -821,32 +691,13 @@ def _ensure_grid_file(grid_path, base_path):
     return generated
 
 
-def _run_preprocessing(
-    product_path,
-    output_dir,
-    product_mode,
-    orbit_type,
-    orbit_continue_on_fail,
-    gpt_memory,
-    gpt_parallelism,
-    gpt_timeout,
-    tops_swaths=None,
-    polarizations=None,
-    skip_subaperture=False,
-    skip_polarimetric_decomposition=False,
-    single_band=False,
-):
+def _run_preprocessing(product_path, output_dir, product_mode, orbit_type, orbit_continue_on_fail, gpt_memory, gpt_parallelism, gpt_timeout):
     if not prepro:
         return product_path
     result = ROUTER[product_mode](
         product_path, output_dir,
         orbit_type=orbit_type, orbit_continue_on_fail=orbit_continue_on_fail,
         gpt_memory=gpt_memory, gpt_parallelism=gpt_parallelism, gpt_timeout=gpt_timeout,
-        tops_swaths=tops_swaths,
-        polarizations=polarizations,
-        skip_subaperture=skip_subaperture,
-        skip_polarimetric_decomposition=skip_polarimetric_decomposition,
-        single_band=single_band,
     )
     # TOPS returns {IW1: path, IW2: path, IW3: path}; others return a single path.
     if isinstance(result, dict):
@@ -916,13 +767,6 @@ def _resolve_tiling_wkt(product_wkt, source_product, intermediate_product, produ
     if product_mode == 'S1TOPS' and swath:
         derived_wkt = sentinel1_swath_wkt_extractor_safe(source_product, swath, display_results=False, verbose=False)
         if derived_wkt:
-            try:
-                if _bbox_overlap_area(_wkt_bounds(derived_wkt), _wkt_bounds(product_wkt)) == 0.0:
-                    swapped_wkt = _swap_wkt_axes(derived_wkt)
-                    if _bbox_overlap_area(_wkt_bounds(swapped_wkt), _wkt_bounds(product_wkt)) > 0.0:
-                        return swapped_wkt
-            except Exception:
-                pass
             return derived_wkt
     return product_wkt
 
@@ -1051,12 +895,6 @@ def main():
     args = create_parser().parse_args()
     _apply_runtime_overrides(args)
 
-    if args.single_band and not (args.skip_subaperture and args.skip_polarimetric_decomposition):
-        raise ValueError(
-            '--single-band currently requires both --skip-subaperture '
-            'and --skip-polarimetric-decomposition.'
-        )
-
     product_path = Path(args.product_path)
     if args.h5_to_zarr_only:
         _run_h5_to_zarr_only(
@@ -1088,11 +926,7 @@ def main():
     if args.product_wkt is not None:
         product_wkt = args.product_wkt
     elif product_mode in {'S1TOPS', 'S1STRIP'}:
-        product_wkt = sentinel1_wkt_extractor_manifest(
-            product_path,
-            display_results=False,
-            axis_order='lonlat',
-        )
+        product_wkt = sentinel1_wkt_extractor_manifest(product_path, display_results=False)
         if product_wkt is None:
             product_wkt = sentinel1_wkt_extractor_cdse(product_path.name, display_results=False)
         if product_wkt is None:
@@ -1106,11 +940,6 @@ def main():
         product_path, output_dir, product_mode,
         orbit_type=args.orbit_type,
         orbit_continue_on_fail=args.orbit_continue_on_fail,
-        tops_swaths=args.tops_swaths,
-        polarizations=args.polarizations,
-        skip_subaperture=args.skip_subaperture,
-        skip_polarimetric_decomposition=args.skip_polarimetric_decomposition,
-        single_band=args.single_band,
         **gpt_kwargs,
     )
 
