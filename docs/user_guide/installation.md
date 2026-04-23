@@ -25,6 +25,8 @@ Before installing sarpyx, ensure you have:
 
 ### Containerized execution (optional)
 
+Docker images are built and published by GitHub Actions. On machines without Docker, `sarpyx` still supports Apptainer/Singularity-based SIF builds from the published image tags.
+
 If you run `sarpyx` via the provided container, the entrypoint uses this order:
 
 1. `GRID_PATH` (or `grid_path`) if it points to an existing `*.geojson`
@@ -44,6 +46,22 @@ If you use `docker-compose`, mount the grid directory and optionally set `GRID_P
 ```bash
 - ./grid:/workspace/grid
 - GRID_PATH=/workspace/grid/my_region.geojson
+```
+
+### Local SIF build from CI image
+
+If Docker is unavailable locally, build the SIF from the CI-published Docker Hub image:
+
+```bash
+make sif-build
+make sif-all
+```
+
+By default the SIF artifact, Apptainer temp directory, and Apptainer cache are written to local scratch under `/var/tmp/$USER/sarpyx` to avoid slow network filesystem writes. Override them if needed:
+
+```bash
+make sif-build SIF=/var/tmp/$USER/sarpyx-dev.sif
+make sif-build DOCKER_TAG=latest
 ```
 
 ### 1. Using pip (Recommended for Users)

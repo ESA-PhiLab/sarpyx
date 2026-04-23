@@ -5,7 +5,7 @@ SHELL := /bin/bash
 
 # ---------- Config ----------
 SUDO ?= sudo
-DOCKER ?= $(SUDO) docker
+DOCKER ?= docker
 COMPOSE_BAKE ?= false
 COMPOSE_FILE ?= docker-compose.yml
 COMPOSE ?= COMPOSE_BAKE=$(COMPOSE_BAKE) $(DOCKER) compose -f $(COMPOSE_FILE)
@@ -15,9 +15,13 @@ DOCKER_TAG ?= latest
 DOCKER_FULL := $(DOCKER_IMAGE):$(DOCKER_TAG)
 PLATFORM ?= linux/amd64
 
-SIF ?= sarpyx.sif
-SIF_TMPDIR ?= $(CURDIR)/.singularity/tmp
-SIF_CACHEDIR ?= $(CURDIR)/.singularity/cache
+LOCAL_USER ?= $(shell id -un 2>/dev/null || printf '%s' unknown)
+HOME_DIR ?= $(or $(HOME),$(CURDIR))
+SIF_SCRATCH ?= $(HOME_DIR)/.cache/sarpyx
+SIF_TMPROOT ?= $(if $(wildcard /dev/shm),/dev/shm/$(LOCAL_USER)/sarpyx,$(SIF_SCRATCH))
+SIF ?= $(SIF_SCRATCH)/sarpyx.sif
+SIF_TMPDIR ?= $(SIF_TMPROOT)/tmp
+SIF_CACHEDIR ?= $(SIF_SCRATCH)/cache
 HF_REPO ?= WORLDSAR/support
 HF_REPO_TYPE ?= dataset
 
@@ -142,15 +146,15 @@ install-snap: check-wget ## Install SNAP and configure default memory
 	@echo "SNAP installation complete."
 
 # ---------- SIF / Singularity ----------
-sif-build: check-singularity ## Build SIF from Docker image (uses DOCKER_FULL)
-	@echo "Building $(SIF) from docker://$(DOCKER_FULL)..."
-	@mkdir -p "$(SIF_TMPDIR)" "$(SIF_CACHEDIR)"
+sif-build: check-singularity ## Build SIF from CI-published Docker image (uses DOCKER_FULL)
+	@echo "Building $(SIF) from CI-published docker://$(DOCKER_FULL)..."
+	@mkdir -p "$(dir $(SIF))" "$(SIF_TMPDIR)" "$(SIF_CACHEDIR)"
 	@if command -v apptainer >/dev/null 2>&1; then \
 		APPTAINER_TMPDIR="$(SIF_TMPDIR)" APPTAINER_CACHEDIR="$(SIF_CACHEDIR)" \
-		apptainer build --force --disable-cache "$(SIF)" "docker://$(DOCKER_FULL)"; \
+		apptainer build --force "$(SIF)" "docker://$(DOCKER_FULL)"; \
 	else \
 		SINGULARITY_TMPDIR="$(SIF_TMPDIR)" SINGULARITY_CACHEDIR="$(SIF_CACHEDIR)" \
-		singularity build --force --disable-cache "$(SIF)" "docker://$(DOCKER_FULL)"; \
+		singularity build --force "$(SIF)" "docker://$(DOCKER_FULL)"; \
 	fi
 
 sif-push: check-hf ## Upload SIF to Hugging Face (uses HF_REPO)
@@ -159,11 +163,11 @@ sif-push: check-hf ## Upload SIF to Hugging Face (uses HF_REPO)
 	hf upload "$(HF_REPO)" "$(SIF)" --repo-type "$(HF_REPO_TYPE)"
 
 sif-run:
-	apptainer run --writable-tmpfs sarpyx.sif /bin/bash
+	apptainer run --writable-tmpfs "$(SIF)" /bin/bash
 
 
 # sif-all: sif-build sif-push ## Build + upload SIF
-sif-all: sif-build push-to-hpc ## Build + upload SIF
+sif-all: sif-build push-to-hpc ## Build SIF from CI Docker image + upload to SpaceHPC
 
 sifbuid: sif-build
 sifpush: sif-push
@@ -217,8 +221,8 @@ pull: check-compose ## Pull compose service images
 push: check-docker recreate ## Push image configured by DOCKER_IMAGE/DOCKER_TAG
 	$(DOCKER) push "$(DOCKER_FULL)"
 
-push-to-hpc: ## Run HPC upload script
-	bash /shared/home/rdelprete/PythonProjects/srp/scripts/upload_sif.sh
+push-to-hpc: ## Upload SIF to SpaceHPC
+	bash /shared/home/rdelprete/PythonProjects/srp/scripts/upload_sif.sh "$(SIF)"
 
 
 # ---------- Backward-compatible aliases ----------

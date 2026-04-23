@@ -29,12 +29,14 @@
 
 ## Install
 
-For container workflows, use the Docker Compose CLI plugin (`docker compose`) with full commands:
+For local container runtime workflows, use the Docker Compose CLI plugin (`docker compose`) with full commands:
 
 ```bash
 docker compose version
 make recreate
 ```
+
+Docker image builds are owned by GitHub Actions in [`.github/workflows/docker.yml`](.github/workflows/docker.yml). This machine only consumes the published image for Apptainer/Singularity-based SIF creation.
 
 <details open>
 <summary><strong>Using uv (recommended)</strong></summary>
@@ -62,6 +64,23 @@ python -m pip install -e .
 ## Docs
 
 See `docs/user_manual.md` for full CLI usage and end-to-end workflows.
+
+## SIF workflow
+
+Local SIF creation does not require Docker to be installed on this machine. The `Makefile` pulls the CI-published image tag from Docker Hub and builds the SIF with Apptainer/Singularity using local scratch storage under `/var/tmp/$USER/sarpyx` by default.
+
+```bash
+make sif-build
+make sif-all
+```
+
+Useful overrides:
+
+```bash
+make sif-build DOCKER_TAG=latest
+make sif-build SIF=/var/tmp/$USER/custom.sif
+make sif-all SIF=/var/tmp/$USER/custom.sif
+```
 
 ## Container grid configuration
 

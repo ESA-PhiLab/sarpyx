@@ -898,8 +898,8 @@ export HF_TOKEN=***
   <pre><code class=\"language-bash\"># local package install
 python -m pip install -e .
 
-# container build
-make docker-build
+# local SIF build from the CI-published Docker image
+make sif-build
 </code></pre>
 
   <h2 id=\"development\">Development</h2>
@@ -909,8 +909,8 @@ pytest -q
 </code></pre>
 
   <h2 id=\"production\">Production</h2>
-  <p>Production workflows are typically containerized, pinning SNAP and Python dependencies through Docker image builds.</p>
-  <pre><code class=\"language-bash\">make recreate
+  <p>Docker images are built in GitHub Actions. Production workflows on Docker-less machines consume the published image and build a local SIF with Apptainer/Singularity.</p>
+  <pre><code class=\"language-bash\">make sif-all
 </code></pre>
 
   <h2 id=\"docker\">Docker</h2>
