@@ -7,19 +7,31 @@ TODO: InSAR support.
 """
 
 import argparse
+import importlib.util
 import json
 import os
 import re
 import subprocess
 import sys
+import xml.etree.ElementTree as ET
 from datetime import datetime
 from functools import partial
 from pathlib import Path
 
+import h5py
+import pandas as pd
+import pyproj
 from dotenv import load_dotenv
 
 from sarpyx.processor.core.dim_updater import update_dim_add_bands_from_data_dir
 from sarpyx.snapflow.engine import GPT
+from sarpyx.utils.geos import (
+    check_points_in_polygon, grid_cell_utm_bbox, rectangle_to_wkt, rectanglify,
+)
+from sarpyx.utils.io import read_h5
+from sarpyx.utils.meta import normalize_sar_timestamp
+from sarpyx.utils.nisar_utils import NISARCutter, NISARReader
+from sarpyx.utils.wkt_utils import nisar_wkt_extractor, sentinel1_wkt_extractor_cdse, sentinel1_wkt_extractor_manifest
 from sarpyx.utils.worldsar_h5 import (
     DEFAULT_ZARR_CHUNK_SIZE,
     convert_tile_h5_to_zarr,
@@ -67,6 +79,26 @@ def sentinel1_wkt_extractor_manifest(*args, **kwargs):
     return _impl(*args, **kwargs)
 
 
+def merge_iq_into_pdec(*args, **kwargs):
+    try:
+        from src.merge_iq_into_pdec import merge_iq_into_pdec as _impl
+    except ModuleNotFoundError as exc:
+        if getattr(exc, 'name', None) != 'merge_iq_into_pdec':
+            raise
+        module_file = globals().get('__file__')
+        candidate = Path(module_file).with_name('merge_iq_into_pdec.py') if module_file else None
+        if candidate is None or not candidate.exists():
+            raise
+        spec = importlib.util.spec_from_file_location('worldsar_merge_iq_into_pdec', candidate)
+        if spec is None or spec.loader is None:
+            raise ImportError(f'Could not load merge_iq_into_pdec from {candidate}')
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        _impl = module.merge_iq_into_pdec
+    globals()['merge_iq_into_pdec'] = _impl
+    return _impl(*args, **kwargs)
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 #  Configuration
 # ══════════════════════════════════════════════════════════════════════════════
@@ -78,6 +110,20 @@ def _env(*names, default=None):
         if v:
             return v
     return default
+
+
+def _expand_path(path_value):
+    path = Path(path_value).expanduser()
+    if not path.is_absolute():
+        path = (Path.cwd() / path).absolute()
+    return path
+
+
+def _ensure_existing_path(path_value, label):
+    path = _expand_path(path_value)
+    if not path.exists():
+        raise FileNotFoundError(f'{label} does not exist: {path}')
+    return path
 
 
 GPT_PATH     = _env('gpt_path', 'GPT_PATH')
@@ -201,17 +247,25 @@ def _sentinel_post_chain(
         iw_crosslook_row_balance_smooth_win=257,
         iw_crosslook_row_balance_clip=1.5,
     )
-    fp_deb = update_dim_add_bands_from_data_dir(fp_deb, verbose=False)
 
     fp_pdec = op.polarimetric_decomposition(decomposition="H-Alpha Dual Pol Decomposition", window_size=5)
     if fp_pdec is None:
         raise RuntimeError(f'Polarimetric decomposition failed: {op.last_error_summary()}')
-    fp_merged = op.BandMerge(
-        source_products=[fp_pdec, fp_deb],
-        output_name=f'{Path(fp_pdec).stem}_MERGED',
-    )
-    if fp_merged is None:
-        raise RuntimeError(f'BandMerge failed: {op.last_error_summary()}')
+    try:
+        merge_iq_into_pdec(
+            src_dim=fp_deb,
+            pdec_dim=fp_pdec,
+            is_tops=True,
+            overwrite_copied_files=False,
+            backup=False,
+        )
+    except ModuleNotFoundError as exc:
+        if getattr(exc, 'name', None) != 'merge_iq_into_pdec':
+            raise
+        raise RuntimeError(
+            'merge_iq_into_pdec module is required for TOPS flow. '
+            'TOPS fallback to DIM metadata rewrite is disabled to avoid malformed DEB metadata.'
+        )
     fp_tc = op.TerrainCorrection(
         map_projection='AUTO:42001',
         pixel_spacing_in_meter=10.0,
@@ -239,7 +293,11 @@ def pipeline_sentinel(
         results = {}
         for swath in ('IW1', 'IW2', 'IW3'):
             sw_op = _create_gpt_operator(Path(op.prod_path), output_dir / swath, 'BEAM-DIMAP', **gpt_kw)
-            sw_op.TopsarSplit(subswath=swath) # SPLIT
+            split_result = sw_op.TopsarSplit(subswath=swath)  # SPLIT
+            if split_result is None:
+                raise RuntimeError(f'TOPSAR-Split failed for {swath}: {sw_op.last_error_summary()}')
+            if not Path(split_result).exists():
+                raise FileNotFoundError(f'TOPSAR-Split output missing for {swath}: {split_result}')
             results[swath] = _sentinel_post_chain(
                 op=sw_op,
                 product_path=product_path,
@@ -266,16 +324,27 @@ def pipeline_sentinel(
         VERBOSE=False,
         update_dim=False,
     )
-    fp_cal = update_dim_add_bands_from_data_dir(fp_cal, verbose=False)
     fp_pdec = op.polarimetric_decomposition(decomposition="H-Alpha Dual Pol Decomposition", window_size=5)
     if fp_pdec is None:
         raise RuntimeError(f'Polarimetric decomposition failed: {op.last_error_summary()}')
-    fp_merged = op.BandMerge(
-        source_products=[fp_pdec, fp_cal],
-        output_name=f'{Path(fp_pdec).stem}_MERGED',
-    )
-    if fp_merged is None:
-        raise RuntimeError(f'BandMerge failed: {op.last_error_summary()}')
+    try:
+        merge_iq_into_pdec(
+            src_dim=fp_cal,
+            pdec_dim=fp_pdec,
+            is_tops=False,
+            overwrite_copied_files=False,
+            backup=False,
+        )
+    except ModuleNotFoundError as exc:
+        if getattr(exc, 'name', None) != 'merge_iq_into_pdec':
+            raise
+        fp_cal = update_dim_add_bands_from_data_dir(fp_cal, verbose=False)
+        fp_merged = op.BandMerge(
+            source_products=[fp_pdec, fp_cal],
+            output_name=f'{Path(fp_pdec).stem}_MERGED',
+        )
+        if fp_merged is None:
+            raise RuntimeError(f'BandMerge failed: {op.last_error_summary()}')
     fp_tc = op.TerrainCorrection(
         map_projection='AUTO:42001',
         pixel_spacing_in_meter=10.0,
@@ -307,7 +376,8 @@ def pipeline_biomass(product_path, output_dir, gpt_memory=None, gpt_parallelism=
 
 def pipeline_nisar(product_path, output_dir, **_):
     """NISAR: pass-through (tiling handled downstream by NISARCutter)."""
-    assert product_path.suffix == '.h5', 'NISAR products must be in .h5 format.'
+    if Path(product_path).suffix.lower() != '.h5':
+        raise ValueError('NISAR products must be in .h5 format.')
     return product_path
 
 
@@ -326,24 +396,30 @@ ROUTER = {
 # ══════════════════════════════════════════════════════════════════════════════
 
 _PARSER_ARGS = [
-    (['--input', '-i'],                dict(dest='product_path', type=str, required=True, help='Path to the input SAR product.')),
-    (['--output', '-o'],               dict(dest='output_dir', type=str, default=None, help='Processed output directory, or target .zarr path in --h5-to-zarr-only mode.')),
-    (['--cuts-outdir', '--cuts_outdir'], dict(dest='cuts_outdir', type=str, default=None, help='Where to store the tiles after extraction.')),
+    # (['--input', '-i'],                dict(dest='product_path', type=str, required=True, help='Path to the input SAR product.')),
+    (['--input', '-i'],                dict(dest='product_path', type=str, default='/shared/home/vmarsocci/S1C_IW_SLC__1SDV_20260130T152608_20260130T152634_006135_00C4FA_664F.SAFE', required=False, help='Path to the input SAR product.')),
+    # (['--output', '-o'],               dict(dest='output_dir', type=str, default=None, help='Processed output directory, or target .zarr path in --h5-to-zarr-only mode.')),
+    (['--output', '-o'],               dict(dest='output_dir', type=str, default='/shared/home/vmarsocci/WORLDSAR/outputs/worldsar-output', required=False, help='Directory to save the processed output.')),
+    # (['--cuts-outdir', '--cuts_outdir'], dict(dest='cuts_outdir', type=str, default=None, help='Where to store the tiles after extraction.')),
+    (['--cuts-outdir', '--cuts_outdir'], dict(dest='cuts_outdir', type=str, default='/shared/home/vmarsocci/WORLDSAR/outputs/tiles', help='Where to store the tiles after extraction.')),
     (['--product-wkt', '--product_wkt'], dict(dest='product_wkt', type=str, default=None, help='WKT string defining the product region of interest.')),
     (['--h5-to-zarr-only'],            dict(dest='h5_to_zarr_only', action='store_true', help='Skip preprocessing/tiling and convert an existing .h5 tile into a Zarr v3 store.')),
     (['--zarr-chunk-size'],            dict(dest='zarr_chunk_size', type=int, nargs=2, metavar=('ROWS', 'COLS'), default=DEFAULT_ZARR_CHUNK_SIZE, help='Chunk size for H5-to-Zarr conversion. Defaults to 32 32.')),
     (['--overwrite-zarr'],             dict(dest='overwrite_zarr', action='store_true', help='Replace an existing output Zarr store when converting H5 tiles.')),
-    (['--gpt-path'],                   dict(dest='gpt_path', type=str, default=None, help='Override GPT executable path.')),
-    (['--grid-path'],                  dict(dest='grid_path', type=str, default=None, help='Override grid GeoJSON path.')),
-    (['--db-dir'],                     dict(dest='db_dir', type=str, default=None, help='Override database output directory.')),
+    # (['--gpt-path'],                   dict(dest='gpt_path', type=str, default=None, help='Override GPT executable path.')),
+    (['--gpt-path'],                   dict(dest='gpt_path', type=str, default='/shared/home/vmarsocci/WORLDSAR/gpt-wrapper.sh', help='Override GPT executable path.')),
+    (['--grid-path'],                  dict(dest='grid_path', type=str, default='/shared/home/vmarsocci/WORLDSAR/grid/grid_10km.geojson', help='Override grid GeoJSON path.')),
+    # (['--grid-path'],                  dict(dest='grid_path', type=str, default=None, help='Override grid GeoJSON path.')),
+    (['--db-dir'],                     dict(dest='db_dir', type=str, default='/shared/home/vmarsocci/WORLDSAR/outputs/DB', help='Override database output directory.')),
+    # (['--db-dir'],                     dict(dest='db_dir', type=str, default=None, help='Override database output directory.')),
     (['--gpt-memory'],                 dict(dest='gpt_memory', type=str, default='16G', help='GPT Java heap (e.g., 24G).')),
-    (['--gpt-parallelism'],            dict(dest='gpt_parallelism', type=int, default=10, help='GPT parallelism (number of tiles).')),
-    (['--gpt-timeout'],                dict(dest='gpt_timeout', type=int, default=None, help='GPT timeout in seconds.')),
+    (['--gpt-parallelism'],            dict(dest='gpt_parallelism', type=int, default=16, help='GPT parallelism (number of tiles).')),
+    (['--gpt-timeout'],                dict(dest='gpt_timeout', type=int, default=0, help='GPT timeout in seconds. Use 0 to disable timeout (recommended for long TOPS flows).')),
     (['--snap-userdir'],               dict(dest='snap_userdir', type=str, default=None, help='Override SNAP user directory.')),
     (['--orbit-type'],                 dict(dest='orbit_type', type=str, default='Sentinel Precise (Auto Download)', help='SNAP Apply-Orbit-File orbitType.')),
     (['--orbit-continue-on-fail'],     dict(dest='orbit_continue_on_fail', action='store_true', help='Continue if orbit file cannot be applied.')),
+    (['--skip-preprocessing'],         dict(dest='skip_preprocessing', action='store_true', help='Skip TC preprocessing and reuse existing BEAM-DIMAP intermediate products for tiling.')),
 ]
-
 
 def create_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description='Process SAR data using SNAP GPT and sarpyx pipelines.')
@@ -375,7 +451,11 @@ def _run_gpt_op(product_path, output_dir, output_format, op_name, gpt_memory=Non
     op = _create_gpt_operator(product_path, output_dir, output_format, gpt_memory, gpt_parallelism, gpt_timeout)
     result = getattr(op, op_name)(**op_kwargs)
     if result is None:
-        raise RuntimeError(f'GPT {op_name} failed: {op.last_error_summary()}')
+        error_summary = op.last_error_summary()
+        timeout_hint = ''
+        if 'timed out' in error_summary.lower():
+            timeout_hint = ' Increase --gpt-timeout (e.g. 14400) or disable it with --gpt-timeout 0.'
+        raise RuntimeError(f'GPT {op_name} failed: {error_summary}{timeout_hint}')
     output_path = Path(result)
     if not output_path.exists():
         raise RuntimeError(f'GPT {op_name} reported {output_path} but output file is missing.')
@@ -434,17 +514,24 @@ def _validate_tile_result(tile_name, output_path, label):
 
 
 def to_geotiff(product_path, output_dir, geo_region=None, output_name=None, gpt_memory=None, gpt_parallelism=None, gpt_timeout=None):
-    assert geo_region is not None, 'Geo region WKT string must be provided.'
+    if geo_region is None:
+        raise ValueError('Geo region WKT string must be provided.')
     return _run_gpt_op(product_path, output_dir, 'GDAL-GTiff-WRITER', 'Write',
                        gpt_memory=gpt_memory, gpt_parallelism=gpt_parallelism, gpt_timeout=gpt_timeout)
 
 
-def subset(product_path, output_dir, geo_region=None, output_name=None, gpt_memory=None, gpt_parallelism=None, gpt_timeout=None):
-    assert geo_region is not None, 'Geo region WKT string must be provided.'
+def subset(product_path, output_dir, geo_region=None, region=None, output_name=None, gpt_memory=None, gpt_parallelism=None, gpt_timeout=None):
+    assert geo_region is not None or region is not None, \
+        'Either geo_region (WKT) or region (pixel coords "x,y,width,height") must be provided.'
+    kwargs = {'copy_metadata': True, 'output_name': output_name}
+    if geo_region is not None:
+        kwargs['geo_region'] = geo_region
+    if region is not None:
+        kwargs['region'] = region
     return _run_gpt_op(
         product_path, output_dir, 'HDF5', 'Subset',
         gpt_memory=gpt_memory, gpt_parallelism=gpt_parallelism, gpt_timeout=gpt_timeout,
-        copy_metadata=True, output_name=output_name, geo_region=geo_region,
+        **kwargs,
     )
 
 
@@ -457,26 +544,117 @@ def swath_splitter(swath, product_path, output_dir, gpt_memory=None, gpt_paralle
     )
 
 
+def _read_geotransform(dim_path: Path) -> tuple:
+    """Read a GDAL-style geotransform from a BEAM-DIMAP .dim file.
+
+    Returns (x_origin, x_pixel_size, 0, y_origin, 0, y_pixel_size) where
+    x_origin/y_origin are the UTM coordinates of the top-left pixel corner and
+    y_pixel_size is negative (northing decreases going down rows).
+
+    BEAM-DIMAP IMAGE_TO_MODEL_TRANSFORM stores values in Java AffineTransform order:
+    (m00, m10, m01, m11, m02, m12) = (x_scale, y_shear, x_shear, y_scale, x_translate, y_translate)
+    GDAL geotransform order: (x_origin, x_scale, x_rot, y_origin, y_rot, y_scale)
+    Mapping: GDAL = (m02, m00, m01, m12, m10, m11) = (values[4], values[0], values[2], values[5], values[1], values[3])
+    Note: GDAL's own BEAM-DIMAP driver misparses this transform, so we always use the XML directly.
+    """
+    tree = ET.parse(dim_path)
+    root = tree.getroot()
+    elem = root.find('.//IMAGE_TO_MODEL_TRANSFORM')
+    if elem is not None and elem.text is not None:
+        # Java AffineTransform order: (m00, m10, m01, m11, m02, m12)
+        v = [float(x.strip()) for x in elem.text.split(',')]
+        m00, m10, m01, m11, m02, m12 = v
+        return (m02, m00, m01, m12, m10, m11)
+    ulx = root.find('.//ULXMAP')
+    uly = root.find('.//ULYMAP')
+    xdim = root.find('.//XDIM')
+    ydim = root.find('.//YDIM')
+    if ulx is not None and uly is not None and xdim is not None and ydim is not None:
+        return (float(ulx.text), float(xdim.text), 0.0, float(uly.text), 0.0, -float(ydim.text))  # type: ignore[arg-type]
+    raise RuntimeError(f'Could not extract geotransform from {dim_path}')
+
+
+def _utm_bbox_to_pixel_region(utm_bbox: tuple, geotransform: tuple) -> str:
+    """Convert a UTM bounding box to a SNAP Subset region string 'x,y,width,height'.
+
+    Args:
+        utm_bbox: (x_min, y_min, x_max, y_max) in UTM metres.
+        geotransform: GDAL-style 6-tuple from _read_geotransform.
+
+    Returns:
+        SNAP region string suitable for the Subset operator's -Pregion parameter.
+    """
+    x_min, y_min, x_max, y_max = utm_bbox
+    orig_x, px_w, _, orig_y, _, px_h = geotransform  # px_h is negative
+
+    col_start = int(round((x_min - orig_x) / px_w))
+    row_start = int(round((y_max - orig_y) / px_h))  # px_h < 0 and y_max <= orig_y → positive
+    width     = int(round((x_max - x_min) / px_w))
+    height    = int(round((y_max - y_min) / abs(px_h)))
+
+    return f'{col_start},{row_start},{width},{height}'
+
+
+def _update_h5_corners(h5_path: Path, utm_bbox: tuple, epsg: int) -> None:
+    """Overwrite Abstracted_Metadata corner coordinates with the actual TC-output WGS84 corners.
+
+    SNAP preserves pre-TC SAR acquisition corners in the HDF5 metadata even after
+    terrain correction and subsetting.  This function replaces them with the correct
+    values derived from the UTM bounding box used to produce the tile.
+    """
+    x_min, y_min, x_max, y_max = utm_bbox
+    t = pyproj.Transformer.from_crs(epsg, 4326, always_xy=True)
+
+    bl_lon, bl_lat = t.transform(x_min, y_min)   # bottom-left  (last_near)
+    tl_lon, tl_lat = t.transform(x_min, y_max)   # top-left     (first_near)
+    tr_lon, tr_lat = t.transform(x_max, y_max)   # top-right    (first_far)
+    br_lon, br_lat = t.transform(x_max, y_min)   # bottom-right (last_far)
+    cx_lon, cx_lat = t.transform((x_min + x_max) / 2, (y_min + y_max) / 2)
+
+    with h5py.File(h5_path, 'r+') as f:
+        am = f['metadata/Abstracted_Metadata'].attrs
+        am['last_near_long']  = bl_lon
+        am['last_near_lat']   = bl_lat
+        am['first_near_long'] = tl_lon
+        am['first_near_lat']  = tl_lat
+        am['first_far_long']  = tr_lon
+        am['first_far_lat']   = tr_lat
+        am['last_far_long']   = br_lon
+        am['last_far_lat']    = br_lat
+        am['centre_lon']      = cx_lon
+        am['centre_lat']      = cx_lat
+
+
 def _cut_single_tile(rect, product_path, cuts_dir, product_mode, gpt_memory, gpt_parallelism, gpt_timeout):
     """Cut one tile from the product and return a result dict."""
-    geo_region = rectangle_to_wkt(rect)
     tile_name = rect['BL']['properties']['name']
     tile_path = cuts_dir / f'{tile_name}.h5'
     try:
         if product_mode == 'NISAR':
-            from sarpyx.utils.nisar_utils import NISARCutter, NISARReader
+            epsg = int(rect['BL']['properties']['epsg'].split(':')[1])
+            x_min, y_min, x_max, y_max = grid_cell_utm_bbox(rect, epsg)
             reader = NISARReader(str(product_path))
             cutter = NISARCutter(reader)
-            cutter.save_subset(cutter.cut_by_wkt(geo_region, 'HH', apply_mask=False), tile_path, driver='H5')
+            cutter.save_subset(cutter.cut_by_bbox(x_min, y_min, x_max, y_max, ['HH', 'HV'], apply_mask=False), tile_path, driver='H5')
         else:
+            epsg = int(rect['BL']['properties']['epsg'].split(':')[1])
+            utm_bbox = grid_cell_utm_bbox(rect, epsg)
+            gt = _read_geotransform(product_path)
+            region = _utm_bbox_to_pixel_region(utm_bbox, gt)
             tile_path = Path(subset(
                 product_path, cuts_dir,
-                output_name=tile_name, geo_region=geo_region,
+                output_name=tile_name, region=region,
                 gpt_memory=gpt_memory, gpt_parallelism=gpt_parallelism, gpt_timeout=gpt_timeout,
             ))
+            _update_h5_corners(tile_path, utm_bbox, epsg)
         return _validate_tile_result(tile_name, tile_path, 'tile cut')
     except Exception as exc:
-        return {'tile': tile_name, 'status': 'failed', 'reason': f'{type(exc).__name__}: {exc}', 'output_path': str(tile_path)}
+        reason = f'{type(exc).__name__}: {exc}'
+        # Tiles at the edge of the global grid can be outside the product footprint.
+        # Treat these as expected skips, not hard failures.
+        if 'does not intersect with product bounds' in reason:
+            return {'tile': tile_name, 'status': 'skipped', 'reason': reason, 'output_path': str(tile_path)}
+        return {'tile': tile_name, 'status': 'failed', 'reason': reason, 'output_path': str(tile_path)}
 
 
 # ── Reporting ────────────────────────────────────────────────────────────────
@@ -488,8 +666,9 @@ def _write_cut_report(
 ):
     report_dir.mkdir(parents=True, exist_ok=True)
     timestamp = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')
-    failed = [r for r in results if r.get('status') != 'success']
-    ok     = [r for r in results if r.get('status') == 'success']
+    failed  = [r for r in results if r.get('status') == 'failed']
+    skipped = [r for r in results if r.get('status') == 'skipped']
+    ok      = [r for r in results if r.get('status') == 'success']
     status = 'SUCCESS' if not failed and not missing_tiles else 'FAILURE'
 
     lines = [
@@ -504,10 +683,15 @@ def _write_cut_report(
         f'Expected tiles: {len(expected_tiles)}',
         f'Actual tiles on disk: {len(actual_tiles)}',
         f'Successful tiles (this run): {len(ok)}',
+        f'Skipped tiles (outside product bounds): {len(skipped)}',
         f'Failed tiles (this run): {len(failed)}',
         f'Missing tiles: {len(missing_tiles)}',
         f'Unexpected tiles: {len(extra_tiles)}',
     ]
+    if skipped:
+        lines.extend(['', 'Skipped tiles:'])
+        for r in sorted(skipped, key=lambda r: r.get('tile', '')):
+            lines.append(f"- {r.get('tile', 'UNKNOWN')}: {r.get('reason', '?')} | {r.get('output_path', '')}")
     if failed:
         lines.extend(['', 'Failed tiles:'])
         for r in sorted(failed, key=lambda r: r.get('tile', '')):
@@ -577,6 +761,9 @@ def _validate_tile_group(cuts_dir, intermediate_product, swath=None, tiling_resu
     cuts_dir = Path(cuts_dir)
     expected_bands = _expected_band_names_from_dim(intermediate_product)
     tile_files = sorted(cuts_dir.glob('*.h5'))
+    if not tile_files:
+        swath_label = f' for swath {swath}' if swath else ''
+        raise FileNotFoundError(f'No H5 tiles found in {cuts_dir}{swath_label}.')
     results = [_validate_h5_tile(tile_file, expected_bands, swath=swath) for tile_file in tile_files]
     structure_summary = enrich_validation_results_with_h5_structure(results)
     rows = [result['quickinfo_row'] for result in results]
@@ -645,6 +832,8 @@ def create_tile_database(input_folder, output_db_folder):
 
     tile_path = Path(input_folder)
     h5_tiles = list(tile_path.rglob('*.h5'))
+    if not h5_tiles:
+        raise FileNotFoundError(f'No .h5 tiles found in {tile_path}')
     print(f'Found {len(h5_tiles)} h5 files in {input_folder}')
 
     db = pd.DataFrame()
@@ -652,6 +841,7 @@ def create_tile_database(input_folder, output_db_folder):
         print(f'Processing tile {idx + 1}/{len(h5_tiles)}: {tile_file.name}')
         _data, metadata = read_h5(tile_file)
         row = pd.Series(metadata['quickinfo'])
+        row['first_line_time'] = normalize_sar_timestamp(row.get('first_line_time'))
         row['ID'] = tile_file.stem
         db = pd.concat([db, pd.DataFrame([row])], ignore_index=True)
 
@@ -678,6 +868,31 @@ def _apply_runtime_overrides(args):
         os.environ['SNAP_USERDIR'] = SNAP_USERDIR
 
 
+def _validate_runtime_args(args):
+    if args.gpt_parallelism is not None and args.gpt_parallelism <= 0:
+        raise ValueError(f'--gpt-parallelism must be > 0, got {args.gpt_parallelism}')
+    if args.gpt_timeout is not None and args.gpt_timeout < 0:
+        raise ValueError(f'--gpt-timeout must be >= 0, got {args.gpt_timeout}')
+    if len(args.zarr_chunk_size) != 2 or any(size <= 0 for size in args.zarr_chunk_size):
+        raise ValueError(f'--zarr-chunk-size must contain two positive integers, got {args.zarr_chunk_size}')
+
+
+def _resolve_db_dir(cuts_outdir=None):
+    global DB_DIR
+
+    if DB_DIR:
+        db_dir = _expand_path(DB_DIR)
+    else:
+        if cuts_outdir is None:
+            raise ValueError('db_dir not provided and no default output root is available.')
+        db_dir = _expand_path(Path(cuts_outdir) / '_db')
+        DB_DIR = str(db_dir)
+        print(f'DB_DIR not configured; defaulting to {db_dir}')
+
+    db_dir.mkdir(parents=True, exist_ok=True)
+    return db_dir
+
+
 def _ensure_grid_file(grid_path, base_path):
     if grid_path.exists():
         return grid_path
@@ -691,8 +906,30 @@ def _ensure_grid_file(grid_path, base_path):
     return generated
 
 
-def _run_preprocessing(product_path, output_dir, product_mode, orbit_type, orbit_continue_on_fail, gpt_memory, gpt_parallelism, gpt_timeout):
-    if not prepro:
+def _find_existing_intermediates(output_dir: Path, product_mode: str) -> dict | Path:
+    """Locate existing BEAM-DIMAP intermediate products for --skip-preprocessing."""
+    if product_mode == 'S1TOPS':
+        result = {}
+        for swath in ('IW1', 'IW2', 'IW3'):
+            dims = sorted((output_dir / swath).glob('*.dim'), key=lambda p: p.stat().st_mtime, reverse=True)
+            if not dims:
+                raise FileNotFoundError(f'No .dim intermediate found in {output_dir / swath}')
+            if len(dims) > 1:
+                print(f'[WARN] Multiple .dim files in {output_dir / swath}, using most recent: {dims[0].name}')
+            result[swath] = dims[0]
+            print(f'Reusing intermediate {swath}: {dims[0]}')
+        return result
+    dims = sorted(output_dir.glob('*.dim'), key=lambda p: p.stat().st_mtime, reverse=True)
+    if not dims:
+        raise FileNotFoundError(f'No .dim intermediate found in {output_dir}')
+    print(f'Reusing intermediate: {dims[0]}')
+    return dims[0]
+
+
+def _run_preprocessing(product_path, output_dir, product_mode, orbit_type, orbit_continue_on_fail, gpt_memory, gpt_parallelism, gpt_timeout, skip=False):
+    if not prepro or skip:
+        if skip:
+            return _find_existing_intermediates(output_dir, product_mode)
         return product_path
     result = ROUTER[product_mode](
         product_path, output_dir,
@@ -703,15 +940,22 @@ def _run_preprocessing(product_path, output_dir, product_mode, orbit_type, orbit
     if isinstance(result, dict):
         for swath, path in result.items():
             print(f'Intermediate {swath}: {path}')
-            assert Path(path).exists(), f'Intermediate product {path} ({swath}) does not exist.'
+            if path is None:
+                raise RuntimeError(f'Intermediate product for {swath} was not returned.')
+            if not Path(path).exists():
+                raise FileNotFoundError(f'Intermediate product {path} ({swath}) does not exist.')
         return {sw: Path(p) for sw, p in result.items()}
     print(f'Intermediate processed product located at: {result}')
-    assert Path(result).exists(), f'Intermediate product {result} does not exist.'
+    if result is None:
+        raise RuntimeError(f'No intermediate product was returned for mode {product_mode}.')
+    if not Path(result).exists():
+        raise FileNotFoundError(f'Intermediate product {result} does not exist.')
     return Path(result)
 
 
 def _run_tiling(product_wkt, grid_geoj_path, source_product, intermediate_product, cuts_outdir, product_mode, gpt_memory, gpt_parallelism, gpt_timeout):
-    assert grid_geoj_path is not None and grid_geoj_path.exists(), 'grid_10km.geojson does not exist.'
+    if grid_geoj_path is None or not Path(grid_geoj_path).exists():
+        raise FileNotFoundError(f'grid_10km.geojson does not exist: {grid_geoj_path}')
 
     contained = check_points_in_polygon(product_wkt, geojson_path=grid_geoj_path)
     if not contained:
@@ -734,8 +978,10 @@ def _run_tiling(product_wkt, grid_geoj_path, source_product, intermediate_produc
     ]
 
     expected_tiles = sorted({rect['BL']['properties']['name'] for rect in rectangles})
+    skipped_tiles  = {r['tile'] for r in results if r.get('status') == 'skipped'}
+    required_tiles = sorted(set(expected_tiles) - skipped_tiles)
     actual_tiles   = sorted({p.stem for p in cuts_dir.glob('*.h5')})
-    missing_tiles  = sorted(set(expected_tiles) - set(actual_tiles))
+    missing_tiles  = sorted(set(required_tiles) - set(actual_tiles))
     extra_tiles    = sorted(set(actual_tiles) - set(expected_tiles))
 
     report_path = _write_cut_report(
@@ -746,6 +992,8 @@ def _run_tiling(product_wkt, grid_geoj_path, source_product, intermediate_produc
     for res in results:
         if res.get('status') == 'success':
             print(f"Tile saved: {res.get('output_path', '')}")
+        elif res.get('status') == 'skipped':
+            print(f"Skipped tile {res.get('tile', 'UNKNOWN')}: {res.get('reason', '?')}")
         else:
             print(f"Failed tile {res.get('tile', 'UNKNOWN')}: {res.get('reason', '?')}")
 
@@ -798,12 +1046,13 @@ def _run_tops_swath_tiling(product_wkt, grid_geoj_path, product_path, intermedia
                 tiling_result=tiling_result,
             )
             validation_groups.append(validation_group)
-            try:
+            if validation_group['rows']:
                 _run_db_indexing(validation_group['rows'], name, swath=swath)
-            except Exception as exc:
-                print(f'[WARN] DB indexing for {swath} skipped: {exc}')
         else:
-            validation_groups.append(_validate_tile_group(cuts_outdir / swath / name, swath_product, swath=swath))
+            validation_group = _validate_tile_group(cuts_outdir / swath / name, swath_product, swath=swath)
+            validation_groups.append(validation_group)
+            if validation_group['rows']:
+                _run_db_indexing(validation_group['rows'], name, swath=swath)
 
     if validation_groups:
         pdf_path = cuts_outdir / f'{report_name or validation_groups[0]["name"]}_h5_validation_report.pdf'
@@ -864,9 +1113,16 @@ def _verify_tops_tile_coverage(product_wkt, grid_geoj_path, cuts_outdir, swath_p
 def _run_db_indexing(validation_rows, name, swath=None):
     if not db_indexing:
         return
-    output_name = f'{swath}_{name}' if swath else name
-    db = create_tile_database_from_rows(validation_rows, DB_DIR, output_name)  # type: ignore[arg-type]
-    assert not db.empty, 'Database creation failed, resulting DataFrame is empty.'
+    db_dir = _resolve_db_dir()
+    # Backward-compatible behavior: callers may pass either precomputed rows
+    # (new path) or a cuts directory path (legacy path).
+    if isinstance(validation_rows, (str, Path)):
+        db = create_tile_database((Path(validation_rows) / name).as_posix(), db_dir)
+    else:
+        output_name = f'{swath}_{name}' if swath else name
+        db = create_tile_database_from_rows(validation_rows, db_dir, output_name)
+    if db.empty:
+        raise RuntimeError('Database creation failed, resulting DataFrame is empty.')
     print('Database created successfully.')
 
 
@@ -893,9 +1149,10 @@ def _run_h5_to_zarr_only(product_path, output_path, chunk_size, overwrite):
 
 def main():
     args = create_parser().parse_args()
+    _validate_runtime_args(args)
     _apply_runtime_overrides(args)
 
-    product_path = Path(args.product_path)
+    product_path = _ensure_existing_path(args.product_path, 'Input product')
     if args.h5_to_zarr_only:
         _run_h5_to_zarr_only(
             product_path=product_path,
@@ -907,32 +1164,40 @@ def main():
 
     if not args.output_dir:
         raise ValueError('--output is required unless --h5-to-zarr-only is set.')
-    output_dir = Path(args.output_dir)
+    output_dir = _expand_path(args.output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
 
     if CUTS_OUTDIR is None:
         print('Warning: cuts_outdir env var not found. Set cuts_outdir to avoid passing --cuts-outdir each run.')
     cuts_outdir_value = args.cuts_outdir or CUTS_OUTDIR
     if not cuts_outdir_value:
         raise ValueError('cuts_outdir not provided. Set cuts_outdir env var or pass --cuts-outdir.')
-    cuts_outdir = Path(cuts_outdir_value)
+    cuts_outdir = _expand_path(cuts_outdir_value)
+    cuts_outdir.mkdir(parents=True, exist_ok=True)
+    if db_indexing:
+        _resolve_db_dir(cuts_outdir)
 
-    base_path = Path(BASE_PATH)
-    grid_geoj_path = Path(GRID_PATH) if GRID_PATH else base_path / 'grid' / 'grid_10km.geojson'
+    base_path = _expand_path(BASE_PATH)
+    grid_geoj_path = _expand_path(GRID_PATH) if GRID_PATH else base_path / 'grid' / 'grid_10km.geojson'
     grid_geoj_path = _ensure_grid_file(grid_geoj_path, base_path)
 
     product_mode = infer_product_mode(product_path)
     print(f'Inferred product mode: {product_mode}')
 
     if args.product_wkt is not None:
-        product_wkt = args.product_wkt
+        product_wkt = args.product_wkt.strip()
+        if not product_wkt:
+            raise ValueError('--product-wkt cannot be blank.')
     elif product_mode in {'S1TOPS', 'S1STRIP'}:
         product_wkt = sentinel1_wkt_extractor_manifest(product_path, display_results=False)
         if product_wkt is None:
             product_wkt = sentinel1_wkt_extractor_cdse(product_path.name, display_results=False)
         if product_wkt is None:
             raise ValueError(f'Failed to extract Sentinel-1 WKT for product: {product_path}')
+    elif product_mode == 'NISAR':
+        product_wkt = nisar_wkt_extractor(product_path)
     else:
-        raise ValueError('No --product-wkt provided and automatic WKT extraction is only available for Sentinel-1.')
+        raise ValueError('No --product-wkt provided and automatic WKT extraction is only available for Sentinel-1 and NISAR.')
 
     gpt_kwargs = dict(gpt_memory=args.gpt_memory, gpt_parallelism=args.gpt_parallelism, gpt_timeout=args.gpt_timeout)
 
@@ -940,6 +1205,7 @@ def main():
         product_path, output_dir, product_mode,
         orbit_type=args.orbit_type,
         orbit_continue_on_fail=args.orbit_continue_on_fail,
+        skip=args.skip_preprocessing,
         **gpt_kwargs,
     )
 
@@ -967,6 +1233,14 @@ def main():
                 _run_db_indexing(validation_group['rows'], name)
             if tiling_result['cut_failed']:
                 raise RuntimeError(f"Tile cutting failed; report: {tiling_result['report_path']}")
+            if any(result['status'] != 'success' for result in validation_group['results']):
+                raise RuntimeError(f'H5 validation failed; report: {pdf_path}')
+        else:
+            validation_group = _validate_tile_group(cuts_outdir / name, intermediate)
+            pdf_path = cuts_outdir / f'{name}_h5_validation_report.pdf'
+            _write_h5_validation_report_pdf(pdf_path, name, [validation_group])
+            if validation_group['rows']:
+                _run_db_indexing(validation_group['rows'], name)
             if any(result['status'] != 'success' for result in validation_group['results']):
                 raise RuntimeError(f'H5 validation failed; report: {pdf_path}')
 
