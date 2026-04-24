@@ -57,12 +57,7 @@ copernicus = [
 ]
 
 [project.scripts]
-sarpyx = "sarpyx.cli.main:main"
-sarpyx-decode = "sarpyx.cli.decode:main"
-sarpyx-focus = "sarpyx.cli.focus:main"
-sarpyx-shipdet = "sarpyx.cli.shipdet:main"
-sarpyx-unzip = "sarpyx.cli.unzip:main"
-sarpyx-upload = "sarpyx.cli.upload:main"
+sarpyx = "sarpyx.cli.worldsar:main"
 
 [tool.setuptools]
 include-package-data = false

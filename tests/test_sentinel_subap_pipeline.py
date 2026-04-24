@@ -831,3 +831,63 @@ def test_pipeline_sentinel_tops_raises_when_split_output_is_missing(tmp_path: Pa
             output_dir=tmp_path / "out",
             is_TOPS=True,
         )
+
+
+def test_pipeline_sentinel_tops_can_limit_swath_and_burst(tmp_path: Path):
+    split_calls: list[tuple[Path, dict[str, object]]] = []
+    post_calls: list[tuple[Path, str]] = []
+
+    class FakeBaseOp:
+        def __init__(self):
+            self.prod_path = tmp_path / "input.dim"
+
+    class FakeSwathOp:
+        def __init__(self, outdir: Path):
+            self.outdir = outdir
+            self.prod_path = tmp_path / "input.dim"
+
+        def TopsarSplit(self, **kwargs):
+            split_calls.append((self.outdir, kwargs))
+            split_path = self.outdir / "split.dim"
+            split_path.parent.mkdir(parents=True, exist_ok=True)
+            split_path.write_text("split", encoding="utf-8")
+            self.prod_path = split_path
+            return str(split_path)
+
+        def last_error_summary(self):
+            return "unused"
+
+    def fake_create_gpt_operator(_product_path, output_dir, *_args, **_kwargs):
+        if Path(output_dir) == tmp_path / "out":
+            return FakeBaseOp()
+        return FakeSwathOp(Path(output_dir))
+
+    def fake_post_chain(op, product_path, **_kwargs):
+        post_calls.append((Path(op.prod_path), product_path))
+        return op.prod_path
+
+    pipeline_sentinel.__globals__["Path"] = Path
+    pipeline_sentinel.__globals__["_create_gpt_operator"] = fake_create_gpt_operator
+    pipeline_sentinel.__globals__["_sentinel_post_chain"] = fake_post_chain
+
+    result = pipeline_sentinel(
+        product_path=str(tmp_path / "input.SAFE"),
+        output_dir=tmp_path / "out",
+        is_TOPS=True,
+        sentinel_swath="IW2",
+        sentinel_first_burst=3,
+        sentinel_last_burst=3,
+    )
+
+    assert list(result) == ["IW2"]
+    assert split_calls == [
+        (
+            tmp_path / "out" / "IW2",
+            {
+                "subswath": "IW2",
+                "first_burst_index": 3,
+                "last_burst_index": 3,
+            },
+        )
+    ]
+    assert post_calls == [(tmp_path / "out" / "IW2" / "split.dim", str(tmp_path / "input.SAFE"))]
