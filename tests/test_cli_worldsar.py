@@ -1,9 +1,8 @@
 import sys
-import types
 
 import pytest
 
-from sarpyx.cli.main import create_main_parser
+from sarpyx.cli.worldsar import create_parser, main
 
 
 WORLDSAR_DEFAULT_FIELDS = (
@@ -20,20 +19,19 @@ WORLDSAR_DEFAULT_FIELDS = (
 )
 
 
-def test_create_main_parser_formats_help_with_worldsar_subcommand() -> None:
-    parser = create_main_parser()
+def test_create_parser_formats_help() -> None:
+    parser = create_parser()
     help_text = parser.format_help()
 
-    assert 'worldsar' in help_text
-    assert '--version' in help_text
+    assert '--input' in help_text
+    assert '--orbit-continue-on-fail' in help_text
 
 
-def test_create_main_parser_includes_worldsar_subcommand() -> None:
-    parser = create_main_parser()
+def test_create_parser_parses_worldsar_arguments() -> None:
+    parser = create_parser()
 
     args = parser.parse_args(
         [
-            'worldsar',
             '--input',
             '/tmp/product.SAFE',
             '--output',
@@ -50,7 +48,6 @@ def test_create_main_parser_includes_worldsar_subcommand() -> None:
         ]
     )
 
-    assert args.command == 'worldsar'
     assert args.product_path == '/tmp/product.SAFE'
     assert args.output_dir == '/tmp/output'
     assert args.cuts_outdir == '/tmp/cuts'
@@ -60,33 +57,24 @@ def test_create_main_parser_includes_worldsar_subcommand() -> None:
     assert args.orbit_continue_on_fail is True
 
 
-def test_worldsar_parser_defaults_match_direct_entrypoint() -> None:
-    from sarpyx.cli.worldsar import create_parser as create_worldsar_parser
-
-    top_level_args = create_main_parser().parse_args(['worldsar', '--input', '/tmp/product.SAFE'])
-    direct_args = create_worldsar_parser().parse_args(['--input', '/tmp/product.SAFE'])
+def test_create_parser_defaults_are_stable() -> None:
+    args = create_parser().parse_args(['--input', '/tmp/product.SAFE'])
 
     for field in WORLDSAR_DEFAULT_FIELDS:
-        top_level_value = getattr(top_level_args, field)
-        direct_value = getattr(direct_args, field)
-        assert direct_value == top_level_value
-        assert '/shared/home/vmarsocci' not in str(direct_value)
+        assert '/shared/home/vmarsocci' not in str(getattr(args, field))
 
 
-def test_worldsar_dispatch_uses_top_level_parser_args(monkeypatch: pytest.MonkeyPatch) -> None:
-    from sarpyx.cli import main as cli_main
+def test_main_dispatches_to_run(monkeypatch: pytest.MonkeyPatch) -> None:
+    from sarpyx.cli import worldsar as worldsar_module
 
     calls = []
-    fake_worldsar = types.ModuleType('sarpyx.cli.worldsar')
-    fake_worldsar.run = lambda args: calls.append(args) or 7
 
-    monkeypatch.setitem(sys.modules, 'sarpyx.cli.worldsar', fake_worldsar)
+    monkeypatch.setattr(worldsar_module, 'run', lambda args: calls.append(args) or 7)
     monkeypatch.setattr(
         sys,
         'argv',
         [
             'sarpyx',
-            'worldsar',
             '--input',
             '/tmp/product.SAFE',
             '--output',
@@ -97,7 +85,7 @@ def test_worldsar_dispatch_uses_top_level_parser_args(monkeypatch: pytest.Monkey
     )
 
     with pytest.raises(SystemExit) as excinfo:
-        cli_main.main()
+        main()
 
     assert excinfo.value.code == 7
     assert len(calls) == 1

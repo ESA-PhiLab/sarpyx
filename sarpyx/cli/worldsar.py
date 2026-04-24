@@ -7,9 +7,11 @@ TODO: InSAR support.
 """
 
 import argparse
+import copy
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import xml.etree.ElementTree as ET
@@ -22,7 +24,6 @@ import pandas as pd
 import pyproj
 from dotenv import load_dotenv
 
-from sarpyx.cli.worldsar_args import add_worldsar_arguments
 from sarpyx.snapflow.dim_updater import update_dim_add_bands_from_data_dir
 from sarpyx.snapflow.engine import GPT
 from sarpyx.utils.io import read_h5
@@ -37,6 +38,524 @@ from sarpyx.utils.worldsar_h5 import (
 )
 
 load_dotenv()
+
+DEFAULT_ZARR_CHUNK_SIZE = (32, 32)
+DEFAULT_ORBIT_TYPE = 'Sentinel Precise (Auto Download)'
+
+
+def add_worldsar_arguments(parser: argparse.ArgumentParser) -> None:
+    """Register WorldSAR CLI arguments without importing extra CLI modules."""
+    parser.add_argument(
+        '--input',
+        '-i',
+        dest='product_path',
+        type=str,
+        required=True,
+        help='Path to the input SAR product.'
+    )
+    parser.add_argument(
+        '--output',
+        '-o',
+        dest='output_dir',
+        type=str,
+        required=False,
+        default=None,
+        help='Processed output directory, or target .zarr path in --h5-to-zarr-only mode.'
+    )
+    parser.add_argument(
+        '--cuts-outdir',
+        '--cuts_outdir',
+        dest='cuts_outdir',
+        type=str,
+        required=False,
+        default=None,
+        help='Where to store the tiles after extraction.'
+    )
+    parser.add_argument(
+        '--product-wkt',
+        '--product_wkt',
+        dest='product_wkt',
+        type=str,
+        required=False,
+        default=None,
+        help='WKT string defining the product region of interest.'
+    )
+    parser.add_argument(
+        '--h5-to-zarr-only',
+        dest='h5_to_zarr_only',
+        action='store_true',
+        help='Skip preprocessing/tiling and convert an existing .h5 tile into a Zarr v3 store.'
+    )
+    parser.add_argument(
+        '--zarr-chunk-size',
+        dest='zarr_chunk_size',
+        type=int,
+        nargs=2,
+        metavar=('ROWS', 'COLS'),
+        default=DEFAULT_ZARR_CHUNK_SIZE,
+        help='Chunk size for H5-to-Zarr conversion (default: 32 32).'
+    )
+    parser.add_argument(
+        '--overwrite-zarr',
+        dest='overwrite_zarr',
+        action='store_true',
+        help='Replace an existing output Zarr store when converting H5 tiles.'
+    )
+    parser.add_argument(
+        '--gpt-path',
+        dest='gpt_path',
+        type=str,
+        default=None,
+        help='Override GPT executable path (default: gpt_path env var).'
+    )
+    parser.add_argument(
+        '--grid-path',
+        dest='grid_path',
+        type=str,
+        default=None,
+        help='Override grid GeoJSON path (default: grid_path env var).'
+    )
+    parser.add_argument(
+        '--db-dir',
+        dest='db_dir',
+        type=str,
+        default=None,
+        help='Override database output directory (default: db_dir env var).'
+    )
+    parser.add_argument(
+        '--gpt-memory',
+        dest='gpt_memory',
+        type=str,
+        default=None,
+        help='Override GPT Java heap (e.g., 24G).'
+    )
+    parser.add_argument(
+        '--gpt-parallelism',
+        dest='gpt_parallelism',
+        type=int,
+        default=None,
+        help='Override GPT parallelism (number of tiles).'
+    )
+    parser.add_argument(
+        '--gpt-timeout',
+        dest='gpt_timeout',
+        type=int,
+        default=None,
+        help='Override GPT timeout in seconds for a single invocation.'
+    )
+    parser.add_argument(
+        '--snap-userdir',
+        dest='snap_userdir',
+        type=str,
+        default=None,
+        help='Override SNAP user directory.'
+    )
+    parser.add_argument(
+        '--orbit-type',
+        dest='orbit_type',
+        type=str,
+        default=DEFAULT_ORBIT_TYPE,
+        help='SNAP Apply-Orbit-File orbitType.'
+    )
+    parser.add_argument(
+        '--orbit-continue-on-fail',
+        dest='orbit_continue_on_fail',
+        action='store_true',
+        help='Continue if orbit file cannot be applied.'
+    )
+    parser.add_argument(
+        '--sentinel-swath',
+        dest='sentinel_swath',
+        choices=('IW1', 'IW2', 'IW3'),
+        default=None,
+        help='Limit Sentinel-1 TOPS preprocessing to one IW swath.'
+    )
+    parser.add_argument(
+        '--sentinel-first-burst',
+        dest='sentinel_first_burst',
+        type=int,
+        default=1,
+        help='First Sentinel-1 TOPS burst index to include in TOPSAR-Split.'
+    )
+    parser.add_argument(
+        '--sentinel-last-burst',
+        dest='sentinel_last_burst',
+        type=int,
+        default=9999,
+        help='Last Sentinel-1 TOPS burst index to include in TOPSAR-Split.'
+    )
+    parser.add_argument(
+        '--skip-preprocessing',
+        dest='skip_preprocessing',
+        action='store_true',
+        help='Skip TC preprocessing and reuse existing BEAM-DIMAP intermediate products for tiling.'
+    )
+
+
+def indent_xml(elem: ET.Element, level: int = 0) -> None:
+    indent = "\n" + level * "    "
+    if len(elem):
+        if not elem.text or not elem.text.strip():
+            elem.text = indent + "    "
+        for child in elem:
+            indent_xml(child, level + 1)
+        if not child.tail or not child.tail.strip():
+            child.tail = indent
+    if level and (not elem.tail or not elem.tail.strip()):
+        elem.tail = indent
+
+
+def find_required(parent: ET.Element, tag: str) -> ET.Element:
+    element = parent.find(tag)
+    if element is None:
+        raise RuntimeError(f"Missing <{tag}> inside <{parent.tag}>.")
+    return element
+
+
+def text_required(parent: ET.Element, tag: str) -> str:
+    element = find_required(parent, tag)
+    if element.text is None:
+        raise RuntimeError(f"Tag <{tag}> inside <{parent.tag}> has no text.")
+    return element.text.strip()
+
+
+def get_data_dir_from_dim(dim_path: Path) -> Path:
+    return dim_path.with_suffix("").with_name(dim_path.stem + ".data")
+
+
+def already_has_band(image_interpretation: ET.Element, band_name: str) -> bool:
+    for spectral_band in image_interpretation.findall("Spectral_Band_Info"):
+        existing_name = spectral_band.findtext("BAND_NAME", default="").strip()
+        if existing_name == band_name:
+            return True
+    return False
+
+
+def detect_suffixes_from_src_data(src_data_dir: Path) -> list[str]:
+    i_suffixes = set()
+    q_suffixes = set()
+    for hdr_path in src_data_dir.glob("*.hdr"):
+        stem = hdr_path.stem
+        if stem.startswith("i_"):
+            suffix = stem[2:]
+            if (src_data_dir / f"i_{suffix}.img").exists():
+                i_suffixes.add(suffix)
+        elif stem.startswith("q_"):
+            suffix = stem[2:]
+            if (src_data_dir / f"q_{suffix}.img").exists():
+                q_suffixes.add(suffix)
+    return sorted(i_suffixes & q_suffixes)
+
+
+def build_band_plan(suffixes: list[str], start_index: int) -> list[dict]:
+    bands = []
+    current_index = start_index
+    for suffix in suffixes:
+        i_name = f"i_{suffix}"
+        q_name = f"q_{suffix}"
+        intensity_name = f"Intensity_{suffix}"
+        bands.append(
+            {
+                "band_index": current_index,
+                "band_name": i_name,
+                "physical_unit": "real",
+                "virtual": False,
+                "expr": None,
+                "file_name": f"{i_name}.hdr",
+            }
+        )
+        current_index += 1
+        bands.append(
+            {
+                "band_index": current_index,
+                "band_name": q_name,
+                "physical_unit": "imaginary",
+                "virtual": False,
+                "expr": None,
+                "file_name": f"{q_name}.hdr",
+            }
+        )
+        current_index += 1
+        bands.append(
+            {
+                "band_index": current_index,
+                "band_name": intensity_name,
+                "physical_unit": "intensity",
+                "virtual": True,
+                "expr": f"{i_name} == 0.0 ? 0.0 : {i_name} * {i_name} + {q_name} * {q_name}",
+                "file_name": None,
+            }
+        )
+        current_index += 1
+    return bands
+
+
+def build_data_file(href: str, band_index: int) -> ET.Element:
+    data_file = ET.Element("Data_File")
+    data_file_path = ET.SubElement(data_file, "DATA_FILE_PATH")
+    data_file_path.set("href", href)
+    band_index_el = ET.SubElement(data_file, "BAND_INDEX")
+    band_index_el.text = str(band_index)
+    return data_file
+
+
+def build_spectral_band_info(
+    band_index: int,
+    band_name: str,
+    width: str,
+    height: str,
+    physical_unit: str,
+    virtual: bool = False,
+    expr: str | None = None,
+) -> ET.Element:
+    spectral_band = ET.Element("Spectral_Band_Info")
+
+    def add(tag: str, text: str | None = "") -> ET.Element:
+        child = ET.SubElement(spectral_band, tag)
+        if text is not None:
+            child.text = text
+        return child
+
+    add("BAND_INDEX", str(band_index))
+    add("BAND_DESCRIPTION", "Intensity from complex data" if band_name.startswith("Intensity_") else None)
+    add("BAND_NAME", band_name)
+    add("BAND_RASTER_WIDTH", width)
+    add("BAND_RASTER_HEIGHT", height)
+    add("DATA_TYPE", "float32")
+    add("PHYSICAL_UNIT", physical_unit)
+    add("SOLAR_FLUX", "0.0")
+    add("BAND_WAVELEN", "0.0")
+    add("BAND_ANGULAR_VALUE", "-999.0")
+    add("BANDWIDTH", "0.0")
+    add("SCALING_FACTOR", "1.0")
+    add("SCALING_OFFSET", "0.0")
+    add("LOG10_SCALED", "false")
+    add("NO_DATA_VALUE_USED", "true")
+    add("NO_DATA_VALUE", "0.0")
+    if virtual:
+        add("VIRTUAL_BAND", "true")
+        add("EXPRESSION", expr if expr is not None else "")
+    return spectral_band
+
+
+def clone_crs_geoposition_pair(
+    template_crs: ET.Element,
+    template_geoposition: ET.Element,
+    band_index: int,
+) -> list[ET.Element]:
+    crs_copy = copy.deepcopy(template_crs)
+    geoposition_copy = copy.deepcopy(template_geoposition)
+    band_index_el = geoposition_copy.find("BAND_INDEX")
+    if band_index_el is None:
+        band_index_el = ET.Element("BAND_INDEX")
+        geoposition_copy.insert(0, band_index_el)
+    band_index_el.text = str(band_index)
+    return [crs_copy, geoposition_copy]
+
+
+def copy_src_files(
+    src_data_dir: Path,
+    pdec_data_dir: Path,
+    suffixes: list[str],
+    overwrite: bool = False,
+) -> None:
+    pdec_data_dir.mkdir(parents=True, exist_ok=True)
+    files_to_copy = []
+    for suffix in suffixes:
+        files_to_copy.extend(
+            [
+                f"i_{suffix}.hdr",
+                f"i_{suffix}.img",
+                f"q_{suffix}.hdr",
+                f"q_{suffix}.img",
+            ]
+        )
+    for file_name in files_to_copy:
+        src = src_data_dir / file_name
+        dst = pdec_data_dir / file_name
+        if not src.exists():
+            raise FileNotFoundError(f"Required source file does not exist: {src}")
+        if dst.exists() and not overwrite:
+            print(f"[skip] File already exists: {dst.name}")
+            continue
+        shutil.copy2(src, dst)
+        print(f"[copy] {src.name} -> {dst}")
+
+
+def validate_same_dimensions(src_dim: Path, pdec_dim: Path) -> None:
+    src_root = ET.parse(src_dim).getroot()
+    pdec_root = ET.parse(pdec_dim).getroot()
+    src_raster_dimensions = find_required(src_root, "Raster_Dimensions")
+    pdec_raster_dimensions = find_required(pdec_root, "Raster_Dimensions")
+    src_ncols = text_required(src_raster_dimensions, "NCOLS")
+    src_nrows = text_required(src_raster_dimensions, "NROWS")
+    pdec_ncols = text_required(pdec_raster_dimensions, "NCOLS")
+    pdec_nrows = text_required(pdec_raster_dimensions, "NROWS")
+    if src_ncols != pdec_ncols or src_nrows != pdec_nrows:
+        raise RuntimeError(
+            "Source and PDEC dimensions do not match: "
+            f"SRC=({src_ncols}, {src_nrows}) vs PDEC=({pdec_ncols}, {pdec_nrows})"
+        )
+
+
+def analyze_geoposition_mode(root: ET.Element) -> tuple[bool, ET.Element | None, ET.Element | None]:
+    geopositions = root.findall("Geoposition")
+    first_crs = root.find("Coordinate_Reference_System")
+    if first_crs is None or not geopositions:
+        return False, None, None
+    uses_band_geoposition = any(geoposition.find("BAND_INDEX") is not None for geoposition in geopositions)
+    if uses_band_geoposition:
+        return True, first_crs, geopositions[0]
+    return False, first_crs, geopositions[0]
+
+
+def insert_geoposition_nodes_if_needed(root: ET.Element, bands_to_add: list[dict]) -> None:
+    should_clone, template_crs, template_geoposition = analyze_geoposition_mode(root)
+    if not should_clone:
+        print("[edit] Global Geoposition detected, no CRS/Geoposition blocks will be added")
+        return
+    if template_crs is None or template_geoposition is None:
+        raise RuntimeError("Could not determine a valid CRS/Geoposition template")
+    root_children = list(root)
+    insert_position = 0
+    for index, child in enumerate(root_children):
+        if child.tag == "Geoposition":
+            insert_position = index + 1
+    new_geocoding_nodes = []
+    for band in bands_to_add:
+        new_geocoding_nodes.extend(
+            clone_crs_geoposition_pair(
+                template_crs=template_crs,
+                template_geoposition=template_geoposition,
+                band_index=band["band_index"],
+            )
+        )
+    for offset, node in enumerate(new_geocoding_nodes):
+        root.insert(insert_position + offset, node)
+    print(f"[edit] Added CRS + Geoposition for {len(bands_to_add)} new bands")
+
+
+def edit_pdec_dim(
+    pdec_dim: Path,
+    suffixes: list[str],
+    is_tops: bool,
+    backup: bool = True,
+) -> None:
+    if backup:
+        backup_path = pdec_dim.with_suffix(pdec_dim.suffix + ".bak")
+        shutil.copy2(pdec_dim, backup_path)
+        print(f"[backup] {backup_path}")
+    tree = ET.parse(pdec_dim)
+    root = tree.getroot()
+    raster_dimensions = find_required(root, "Raster_Dimensions")
+    data_access = find_required(root, "Data_Access")
+    image_interpretation = find_required(root, "Image_Interpretation")
+    ncols = text_required(raster_dimensions, "NCOLS")
+    nrows = text_required(raster_dimensions, "NROWS")
+    existing_band_indices = []
+    for spectral_band in image_interpretation.findall("Spectral_Band_Info"):
+        band_index_text = spectral_band.findtext("BAND_INDEX")
+        if band_index_text is not None:
+            existing_band_indices.append(int(band_index_text))
+    start_index = max(existing_band_indices) + 1 if existing_band_indices else 0
+    planned_new_bands = build_band_plan(suffixes, start_index=start_index)
+    bands_to_add = []
+    for band in planned_new_bands:
+        if already_has_band(image_interpretation, band["band_name"]):
+            print(f"[skip] Band already exists in PDEC.dim: {band['band_name']}")
+        else:
+            bands_to_add.append(band)
+    if not bands_to_add:
+        print("[info] No new bands need to be added")
+        return
+    old_nbands = int(text_required(raster_dimensions, "NBANDS"))
+    find_required(raster_dimensions, "NBANDS").text = str(old_nbands + len(bands_to_add))
+    print(f"[edit] NBANDS: {old_nbands} -> {old_nbands + len(bands_to_add)}")
+    print(f"[edit] is_TOPS={is_tops}")
+    insert_geoposition_nodes_if_needed(root, bands_to_add)
+    data_access_children = list(data_access)
+    tie_point_insert_position = None
+    for index, child in enumerate(data_access_children):
+        if child.tag == "Tie_Point_Grid_File":
+            tie_point_insert_position = index
+            break
+    if tie_point_insert_position is None:
+        tie_point_insert_position = len(data_access_children)
+    pdec_data_dir_name = pdec_dim.with_suffix("").name + ".data"
+    data_files_to_add = []
+    for band in bands_to_add:
+        if not band["virtual"]:
+            href = f"{pdec_data_dir_name}/{band['file_name']}"
+            data_files_to_add.append(build_data_file(href, band["band_index"]))
+    for offset, node in enumerate(data_files_to_add):
+        data_access.insert(tie_point_insert_position + offset, node)
+    print(f"[edit] Added {len(data_files_to_add)} Data_File entries")
+    for band in bands_to_add:
+        spectral_band = build_spectral_band_info(
+            band_index=band["band_index"],
+            band_name=band["band_name"],
+            width=ncols,
+            height=nrows,
+            physical_unit=band["physical_unit"],
+            virtual=band["virtual"],
+            expr=band["expr"],
+        )
+        image_interpretation.append(spectral_band)
+    print(f"[edit] Added {len(bands_to_add)} Spectral_Band_Info entries")
+    indent_xml(root)
+    tree.write(pdec_dim, encoding="UTF-8", xml_declaration=False)
+    print(f"[write] {pdec_dim}")
+
+
+def merge_iq_into_pdec(
+    src_dim: str | Path,
+    pdec_dim: str | Path,
+    is_tops: bool = False,
+    overwrite_copied_files: bool = False,
+    backup: bool = True,
+) -> None:
+    """Merge i/q bands from a source DIMAP product into a PDEC DIMAP product."""
+    src_dim = Path(src_dim).resolve()
+    pdec_dim = Path(pdec_dim).resolve()
+    if src_dim == pdec_dim:
+        raise ValueError(f"Source DIM and PDEC DIM resolve to the same DIM product: {src_dim}")
+    if not src_dim.exists():
+        raise FileNotFoundError(f"Source DIM file does not exist: {src_dim}")
+    if not pdec_dim.exists():
+        raise FileNotFoundError(f"PDEC DIM file does not exist: {pdec_dim}")
+    src_data_dir = get_data_dir_from_dim(src_dim)
+    pdec_data_dir = get_data_dir_from_dim(pdec_dim)
+    if not src_data_dir.exists():
+        raise FileNotFoundError(f"Source data directory does not exist: {src_data_dir}")
+    if not pdec_data_dir.exists():
+        raise FileNotFoundError(f"PDEC data directory does not exist: {pdec_data_dir}")
+    suffixes = detect_suffixes_from_src_data(src_data_dir)
+    if not suffixes:
+        raise RuntimeError(
+            f"No valid suffixes were detected in {src_data_dir}. "
+            "Expected paired i_*.hdr/.img and q_*.hdr/.img files."
+        )
+    validate_same_dimensions(src_dim, pdec_dim)
+    print(f"[info] SRC.dim :  {src_dim}")
+    print(f"[info] PDEC.dim:  {pdec_dim}")
+    print(f"[info] SRC.data : {src_data_dir}")
+    print(f"[info] PDEC.data: {pdec_data_dir}")
+    print(f"[info] is_TOPS : {is_tops}")
+    print(f"[info] Autodetected suffixes ({len(suffixes)}): {suffixes}")
+    copy_src_files(
+        src_data_dir=src_data_dir,
+        pdec_data_dir=pdec_data_dir,
+        suffixes=suffixes,
+        overwrite=overwrite_copied_files,
+    )
+    edit_pdec_dim(
+        pdec_dim=pdec_dim,
+        suffixes=suffixes,
+        is_tops=is_tops,
+        backup=backup,
+    )
+    print("\nDone.")
+    print("You can now test the product with a SNAP Read operation or directly run Terrain Correction.")
 
 
 def check_points_in_polygon(*args, **kwargs):
@@ -102,12 +621,6 @@ def NISARReader(*args, **kwargs):
 def NISARCutter(*args, **kwargs):
     from sarpyx.utils.nisar_utils import NISARCutter as _impl
     globals()['NISARCutter'] = _impl
-    return _impl(*args, **kwargs)
-
-
-def merge_iq_into_pdec(*args, **kwargs):
-    from sarpyx.cli.merge_iq_into_pdec import merge_iq_into_pdec as _impl
-    globals()['merge_iq_into_pdec'] = _impl
     return _impl(*args, **kwargs)
 
 
@@ -291,7 +804,11 @@ def pipeline_sentinel(
     product_path, output_dir, is_TOPS=False,
     gpt_memory=None, gpt_parallelism=None, gpt_timeout=None,
     orbit_type='Sentinel Precise (Auto Download)',
-    orbit_continue_on_fail=False, **_,
+    orbit_continue_on_fail=False,
+    sentinel_swath=None,
+    sentinel_first_burst=1,
+    sentinel_last_burst=9999,
+    **_,
 ):
     """Sentinel-1 pipeline.
 
@@ -303,9 +820,14 @@ def pipeline_sentinel(
 
     if is_TOPS:
         results = {}
-        for swath in ('IW1', 'IW2', 'IW3'):
+        swaths = (sentinel_swath,) if sentinel_swath else ('IW1', 'IW2', 'IW3')
+        for swath in swaths:
             sw_op = _create_gpt_operator(Path(op.prod_path), output_dir / swath, 'BEAM-DIMAP', **gpt_kw)
-            split_result = sw_op.TopsarSplit(subswath=swath)  # SPLIT
+            split_result = sw_op.TopsarSplit(
+                subswath=swath,
+                first_burst_index=sentinel_first_burst,
+                last_burst_index=sentinel_last_burst,
+            )  # SPLIT
             if split_result is None:
                 raise RuntimeError(f'TOPSAR-Split failed for {swath}: {sw_op.last_error_summary()}')
             if not Path(split_result).exists():
@@ -909,6 +1431,15 @@ def _validate_runtime_args(args):
         raise ValueError(f'--gpt-timeout must be >= 0, got {args.gpt_timeout}')
     if len(args.zarr_chunk_size) != 2 or any(size <= 0 for size in args.zarr_chunk_size):
         raise ValueError(f'--zarr-chunk-size must contain two positive integers, got {args.zarr_chunk_size}')
+    if args.sentinel_first_burst < 1:
+        raise ValueError(f'--sentinel-first-burst must be >= 1, got {args.sentinel_first_burst}')
+    if args.sentinel_last_burst < 1:
+        raise ValueError(f'--sentinel-last-burst must be >= 1, got {args.sentinel_last_burst}')
+    if args.sentinel_last_burst < args.sentinel_first_burst:
+        raise ValueError(
+            '--sentinel-last-burst must be greater than or equal to '
+            f'--sentinel-first-burst, got {args.sentinel_last_burst} < {args.sentinel_first_burst}'
+        )
 
 
 def _resolve_db_dir(cuts_outdir=None):
@@ -960,7 +1491,20 @@ def _find_existing_intermediates(output_dir: Path, product_mode: str) -> dict | 
     return dims[0]
 
 
-def _run_preprocessing(product_path, output_dir, product_mode, orbit_type, orbit_continue_on_fail, gpt_memory, gpt_parallelism, gpt_timeout, skip=False):
+def _run_preprocessing(
+    product_path,
+    output_dir,
+    product_mode,
+    orbit_type,
+    orbit_continue_on_fail,
+    gpt_memory,
+    gpt_parallelism,
+    gpt_timeout,
+    sentinel_swath=None,
+    sentinel_first_burst=1,
+    sentinel_last_burst=9999,
+    skip=False,
+):
     if not prepro or skip:
         if skip:
             return _find_existing_intermediates(output_dir, product_mode)
@@ -968,6 +1512,9 @@ def _run_preprocessing(product_path, output_dir, product_mode, orbit_type, orbit
     result = ROUTER[product_mode](
         product_path, output_dir,
         orbit_type=orbit_type, orbit_continue_on_fail=orbit_continue_on_fail,
+        sentinel_swath=sentinel_swath,
+        sentinel_first_burst=sentinel_first_burst,
+        sentinel_last_burst=sentinel_last_burst,
         gpt_memory=gpt_memory, gpt_parallelism=gpt_parallelism, gpt_timeout=gpt_timeout,
     )
     # TOPS returns {IW1: path, IW2: path, IW3: path}; others return a single path.
@@ -1268,6 +1815,9 @@ def run(args) -> int:
         product_path, output_dir, product_mode,
         orbit_type=args.orbit_type,
         orbit_continue_on_fail=args.orbit_continue_on_fail,
+        sentinel_swath=args.sentinel_swath,
+        sentinel_first_burst=args.sentinel_first_burst,
+        sentinel_last_burst=args.sentinel_last_burst,
         skip=args.skip_preprocessing,
         **gpt_kwargs,
     )
