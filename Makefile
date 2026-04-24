@@ -228,8 +228,6 @@ push: check-docker recreate ## Push image configured by DOCKER_IMAGE/DOCKER_TAG
 
 push-to-hpc: ## Run HPC upload script
 	bash /shared/home/rdelprete/PythonProjects/srp/scripts/upload_sif.sh
-
-
 # ---------- Backward-compatible aliases ----------
 clean_venv: clean-venv
 install_deps: install-deps

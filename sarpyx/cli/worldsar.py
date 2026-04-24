@@ -7,7 +7,6 @@ TODO: InSAR support.
 """
 
 import argparse
-import importlib.util
 import json
 import os
 import re
@@ -23,17 +22,12 @@ import pandas as pd
 import pyproj
 from dotenv import load_dotenv
 
-from sarpyx.processor.core.dim_updater import update_dim_add_bands_from_data_dir
+from sarpyx.cli.worldsar_args import add_worldsar_arguments
+from sarpyx.snapflow.dim_updater import update_dim_add_bands_from_data_dir
 from sarpyx.snapflow.engine import GPT
-from sarpyx.utils.geos import (
-    check_points_in_polygon, grid_cell_utm_bbox, rectangle_to_wkt, rectanglify,
-)
 from sarpyx.utils.io import read_h5
 from sarpyx.utils.meta import normalize_sar_timestamp
-from sarpyx.utils.nisar_utils import NISARCutter, NISARReader
-from sarpyx.utils.wkt_utils import nisar_wkt_extractor, sentinel1_wkt_extractor_cdse, sentinel1_wkt_extractor_manifest
 from sarpyx.utils.worldsar_h5 import (
-    DEFAULT_ZARR_CHUNK_SIZE,
     convert_tile_h5_to_zarr,
     enrich_validation_results_with_h5_structure,
     normalize_expected_tile_geometries as _shared_normalize_expected_tile_geometries,
@@ -48,6 +42,12 @@ load_dotenv()
 def check_points_in_polygon(*args, **kwargs):
     from sarpyx.utils.geos import check_points_in_polygon as _impl
     globals()['check_points_in_polygon'] = _impl
+    return _impl(*args, **kwargs)
+
+
+def grid_cell_utm_bbox(*args, **kwargs):
+    from sarpyx.utils.geos import grid_cell_utm_bbox as _impl
+    globals()['grid_cell_utm_bbox'] = _impl
     return _impl(*args, **kwargs)
 
 
@@ -81,22 +81,32 @@ def sentinel1_wkt_extractor_manifest(*args, **kwargs):
     return _impl(*args, **kwargs)
 
 
+def terrasar_wkt_extractor(*args, **kwargs):
+    from sarpyx.utils.wkt_utils import terrasar_wkt_extractor as _impl
+    globals()['terrasar_wkt_extractor'] = _impl
+    return _impl(*args, **kwargs)
+
+
+def nisar_wkt_extractor(*args, **kwargs):
+    from sarpyx.utils.wkt_utils import nisar_wkt_extractor as _impl
+    globals()['nisar_wkt_extractor'] = _impl
+    return _impl(*args, **kwargs)
+
+
+def NISARReader(*args, **kwargs):
+    from sarpyx.utils.nisar_utils import NISARReader as _impl
+    globals()['NISARReader'] = _impl
+    return _impl(*args, **kwargs)
+
+
+def NISARCutter(*args, **kwargs):
+    from sarpyx.utils.nisar_utils import NISARCutter as _impl
+    globals()['NISARCutter'] = _impl
+    return _impl(*args, **kwargs)
+
+
 def merge_iq_into_pdec(*args, **kwargs):
-    try:
-        from src.merge_iq_into_pdec import merge_iq_into_pdec as _impl
-    except ModuleNotFoundError as exc:
-        if getattr(exc, 'name', None) != 'merge_iq_into_pdec':
-            raise
-        module_file = globals().get('__file__')
-        candidate = Path(module_file).with_name('merge_iq_into_pdec.py') if module_file else None
-        if candidate is None or not candidate.exists():
-            raise
-        spec = importlib.util.spec_from_file_location('worldsar_merge_iq_into_pdec', candidate)
-        if spec is None or spec.loader is None:
-            raise ImportError(f'Could not load merge_iq_into_pdec from {candidate}')
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
-        _impl = module.merge_iq_into_pdec
+    from sarpyx.cli.merge_iq_into_pdec import merge_iq_into_pdec as _impl
     globals()['merge_iq_into_pdec'] = _impl
     return _impl(*args, **kwargs)
 
@@ -358,7 +368,8 @@ def pipeline_sentinel(
 
 def pipeline_tsx_csg(product_path, output_dir, gpt_memory=None, gpt_parallelism=None, gpt_timeout=None, **_):
     """TerraSAR-X / COSMO-SkyMed: calibration → terrain correction."""
-    op = _create_gpt_operator(product_path, output_dir, 'BEAM-DIMAP', gpt_memory, gpt_parallelism, gpt_timeout)
+    gpt_product_path = _resolve_terrasar_product_xml(product_path) if _is_terrasar_product(product_path) else product_path
+    op = _create_gpt_operator(gpt_product_path, output_dir, 'BEAM-DIMAP', gpt_memory, gpt_parallelism, gpt_timeout)
     if op.Calibration(output_complex=True) is None:
         raise RuntimeError('Calibration failed.')
     # TODO: Add subaperture.
@@ -397,36 +408,9 @@ ROUTER = {
 #  CLI
 # ══════════════════════════════════════════════════════════════════════════════
 
-_PARSER_ARGS = [
-    # (['--input', '-i'],                dict(dest='product_path', type=str, required=True, help='Path to the input SAR product.')),
-    (['--input', '-i'],                dict(dest='product_path', type=str, default='/shared/home/vmarsocci/S1C_IW_SLC__1SDV_20260130T152608_20260130T152634_006135_00C4FA_664F.SAFE', required=False, help='Path to the input SAR product.')),
-    # (['--output', '-o'],               dict(dest='output_dir', type=str, default=None, help='Processed output directory, or target .zarr path in --h5-to-zarr-only mode.')),
-    (['--output', '-o'],               dict(dest='output_dir', type=str, default='/shared/home/vmarsocci/WORLDSAR/outputs/worldsar-output', required=False, help='Directory to save the processed output.')),
-    # (['--cuts-outdir', '--cuts_outdir'], dict(dest='cuts_outdir', type=str, default=None, help='Where to store the tiles after extraction.')),
-    (['--cuts-outdir', '--cuts_outdir'], dict(dest='cuts_outdir', type=str, default='/shared/home/vmarsocci/WORLDSAR/outputs/tiles', help='Where to store the tiles after extraction.')),
-    (['--product-wkt', '--product_wkt'], dict(dest='product_wkt', type=str, default=None, help='WKT string defining the product region of interest.')),
-    (['--h5-to-zarr-only'],            dict(dest='h5_to_zarr_only', action='store_true', help='Skip preprocessing/tiling and convert an existing .h5 tile into a Zarr v3 store.')),
-    (['--zarr-chunk-size'],            dict(dest='zarr_chunk_size', type=int, nargs=2, metavar=('ROWS', 'COLS'), default=DEFAULT_ZARR_CHUNK_SIZE, help='Chunk size for H5-to-Zarr conversion. Defaults to 32 32.')),
-    (['--overwrite-zarr'],             dict(dest='overwrite_zarr', action='store_true', help='Replace an existing output Zarr store when converting H5 tiles.')),
-    # (['--gpt-path'],                   dict(dest='gpt_path', type=str, default=None, help='Override GPT executable path.')),
-    (['--gpt-path'],                   dict(dest='gpt_path', type=str, default='/shared/home/vmarsocci/WORLDSAR/gpt-wrapper.sh', help='Override GPT executable path.')),
-    (['--grid-path'],                  dict(dest='grid_path', type=str, default='/shared/home/vmarsocci/WORLDSAR/grid/grid_10km.geojson', help='Override grid GeoJSON path.')),
-    # (['--grid-path'],                  dict(dest='grid_path', type=str, default=None, help='Override grid GeoJSON path.')),
-    (['--db-dir'],                     dict(dest='db_dir', type=str, default='/shared/home/vmarsocci/WORLDSAR/outputs/DB', help='Override database output directory.')),
-    # (['--db-dir'],                     dict(dest='db_dir', type=str, default=None, help='Override database output directory.')),
-    (['--gpt-memory'],                 dict(dest='gpt_memory', type=str, default='16G', help='GPT Java heap (e.g., 24G).')),
-    (['--gpt-parallelism'],            dict(dest='gpt_parallelism', type=int, default=16, help='GPT parallelism (number of tiles).')),
-    (['--gpt-timeout'],                dict(dest='gpt_timeout', type=int, default=0, help='GPT timeout in seconds. Use 0 to disable timeout (recommended for long TOPS flows).')),
-    (['--snap-userdir'],               dict(dest='snap_userdir', type=str, default=None, help='Override SNAP user directory.')),
-    (['--orbit-type'],                 dict(dest='orbit_type', type=str, default='Sentinel Precise (Auto Download)', help='SNAP Apply-Orbit-File orbitType.')),
-    (['--orbit-continue-on-fail'],     dict(dest='orbit_continue_on_fail', action='store_true', help='Continue if orbit file cannot be applied.')),
-    (['--skip-preprocessing'],         dict(dest='skip_preprocessing', action='store_true', help='Skip TC preprocessing and reuse existing BEAM-DIMAP intermediate products for tiling.')),
-]
-
 def create_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description='Process SAR data using SNAP GPT and sarpyx pipelines.')
-    for flags, kwargs in _PARSER_ARGS:
-        parser.add_argument(*flags, **kwargs)
+    add_worldsar_arguments(parser)
     return parser
 
 
@@ -470,6 +454,49 @@ def extract_product_id(path: str) -> str | None:
     """Extract product ID from BEAM-DIMAP path."""
     match = re.search(r'/([^/]+?)_[^/_]+\.dim$', path)
     return match.group(1) if match else None
+
+
+def _is_terrasar_product(product_path) -> bool:
+    as_path = Path(product_path).as_posix().upper()
+    return any(token in as_path for token in ('TSX', 'TDX', 'TERRASAR', 'TANDEMX'))
+
+
+def _xml_has_scene_corners(xml_path: Path) -> bool:
+    try:
+        root = ET.parse(xml_path).getroot()
+    except ET.ParseError:
+        return False
+    corners = root.findall('.//sceneCornerCoord')
+    valid_corners = [
+        corner for corner in corners
+        if corner.findtext('lon') is not None and corner.findtext('lat') is not None
+    ]
+    return len(valid_corners) >= 3
+
+
+def _resolve_terrasar_product_xml(product_path) -> Path:
+    """Return the TerraSAR-X/TanDEM-X product XML for a file or product directory."""
+    product_path = Path(product_path)
+    if product_path.is_file():
+        if product_path.suffix.lower() != '.xml':
+            raise ValueError(f'TerraSAR-X/TanDEM-X products must be an XML metadata file or directory, got: {product_path}')
+        return product_path
+    if not product_path.is_dir():
+        raise FileNotFoundError(f'TerraSAR-X/TanDEM-X product path does not exist: {product_path}')
+
+    candidates = sorted(path for path in product_path.rglob('*.xml') if _xml_has_scene_corners(path))
+    if len(candidates) == 1:
+        return candidates[0]
+    if not candidates:
+        raise FileNotFoundError(
+            f'No TerraSAR-X/TanDEM-X metadata XML with sceneCornerCoord found under {product_path}. '
+            'Pass the product XML path directly or provide --product-wkt.'
+        )
+    candidate_list = ', '.join(str(path) for path in candidates)
+    raise ValueError(
+        f'Multiple TerraSAR-X/TanDEM-X metadata XML files with sceneCornerCoord found under {product_path}: '
+        f'{candidate_list}. Pass the intended XML path directly.'
+    )
 
 
 def infer_product_mode(product_path: Path) -> str:
@@ -1165,12 +1192,39 @@ def _run_h5_to_zarr_only(product_path, output_path, chunk_size, overwrite):
     return converted
 
 
+def _resolve_product_wkt(args, product_path, product_mode):
+    product_wkt_value = args.product_wkt if args.product_wkt is not None else _env('PRODUCT_WKT', 'product_wkt')
+    if product_wkt_value is not None:
+        product_wkt = product_wkt_value.strip()
+        if not product_wkt:
+            raise ValueError('--product-wkt/PRODUCT_WKT cannot be blank.')
+        return product_wkt
+
+    if product_mode in {'S1TOPS', 'S1STRIP'}:
+        product_wkt = sentinel1_wkt_extractor_manifest(product_path, display_results=False)
+        if product_wkt is None:
+            product_wkt = sentinel1_wkt_extractor_cdse(product_path.name, display_results=False)
+        if product_wkt is None:
+            raise ValueError(f'Failed to extract Sentinel-1 WKT for product: {product_path}')
+        return product_wkt
+
+    if product_mode == 'NISAR':
+        return nisar_wkt_extractor(product_path)
+
+    if product_mode == 'TSX':
+        return terrasar_wkt_extractor(_resolve_terrasar_product_xml(product_path))
+
+    raise ValueError(
+        'No --product-wkt/PRODUCT_WKT provided and automatic WKT extraction is only available '
+        'for Sentinel-1, NISAR, and TerraSAR-X/TanDEM-X products.'
+    )
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 #  Main
 # ══════════════════════════════════════════════════════════════════════════════
 
-def main():
-    args = create_parser().parse_args()
+def run(args) -> int:
     _validate_runtime_args(args)
     _apply_runtime_overrides(args)
 
@@ -1182,7 +1236,7 @@ def main():
             chunk_size=args.zarr_chunk_size,
             overwrite=args.overwrite_zarr,
         )
-        sys.exit(0)
+        return 0
 
     if not args.output_dir:
         raise ValueError('--output is required unless --h5-to-zarr-only is set.')
@@ -1206,20 +1260,7 @@ def main():
     product_mode = infer_product_mode(product_path)
     print(f'Inferred product mode: {product_mode}')
 
-    if args.product_wkt is not None:
-        product_wkt = args.product_wkt.strip()
-        if not product_wkt:
-            raise ValueError('--product-wkt cannot be blank.')
-    elif product_mode in {'S1TOPS', 'S1STRIP'}:
-        product_wkt = sentinel1_wkt_extractor_manifest(product_path, display_results=False)
-        if product_wkt is None:
-            product_wkt = sentinel1_wkt_extractor_cdse(product_path.name, display_results=False)
-        if product_wkt is None:
-            raise ValueError(f'Failed to extract Sentinel-1 WKT for product: {product_path}')
-    elif product_mode == 'NISAR':
-        product_wkt = nisar_wkt_extractor(product_path)
-    else:
-        raise ValueError('No --product-wkt provided and automatic WKT extraction is only available for Sentinel-1 and NISAR.')
+    product_wkt = _resolve_product_wkt(args, product_path, product_mode)
 
     gpt_kwargs = dict(gpt_memory=args.gpt_memory, gpt_parallelism=args.gpt_parallelism, gpt_timeout=args.gpt_timeout)
 
@@ -1274,7 +1315,12 @@ def main():
             if any(result['status'] != 'success' for result in validation_group['results']):
                 raise RuntimeError(f'H5 validation failed; report: {pdf_path}')
 
-    sys.exit(0)
+    return 0
+
+
+def main(argv=None):
+    args = create_parser().parse_args(argv)
+    sys.exit(run(args))
 
 
 if __name__ == '__main__':
