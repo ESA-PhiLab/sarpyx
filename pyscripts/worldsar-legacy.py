@@ -24,7 +24,7 @@ from sarpyx.utils.io import read_h5
 from sarpyx.utils.nisar_utils import NISARCutter, NISARReader
 from sarpyx.utils.wkt_utils import sentinel1_wkt_extractor_cdse, sentinel1_wkt_extractor_manifest
 
-from merge_iq_into_pdec import merge_iq_into_pdec
+from sarpyx.cli.merge_iq_into_pdec import merge_iq_into_pdec
 
 load_dotenv()
 

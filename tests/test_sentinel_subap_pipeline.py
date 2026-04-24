@@ -3,13 +3,13 @@ from __future__ import annotations
 import ast
 import copy
 import importlib.util
+import re
 import sys
 import types
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
 import pytest
-from shapely import wkt as shapely_wkt
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -58,7 +58,7 @@ def _load_functions_from_file(path: Path, names: list[str], extra_globals: dict[
 ENGINE_MOD = _load_module_from_path("_engine_for_tests", REPO_ROOT / "sarpyx" / "snapflow" / "engine.py")
 DIM_UPDATER_MOD = _load_module_from_path(
     "_dim_updater_for_tests",
-    REPO_ROOT / "sarpyx" / "processor" / "core" / "dim_updater.py",
+    REPO_ROOT / "sarpyx" / "snapflow" / "dim_updater.py",
 )
 WKT_UTILS_MOD = _load_module_from_path("_wkt_utils_for_tests", REPO_ROOT / "sarpyx" / "utils" / "wkt_utils.py")
 GPT = ENGINE_MOD.GPT
@@ -203,6 +203,14 @@ def _spectral_band_map(root: ET.Element) -> dict[str, ET.Element]:
         (sbi.findtext("BAND_NAME") or "").strip(): sbi
         for sbi in root.findall(".//Image_Interpretation/Spectral_Band_Info")
     }
+
+
+def _wkt_bounds(wkt: str) -> tuple[float, float, float, float]:
+    values = [float(value) for value in re.findall(r"-?\d+(?:\.\d+)?", wkt)]
+    coords = list(zip(values[0::2], values[1::2], strict=True))
+    xs = [x for x, _ in coords]
+    ys = [y for _, y in coords]
+    return min(xs), min(ys), max(xs), max(ys)
 
 
 def test_gpt_do_subaps_forwards_update_dim(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
@@ -538,12 +546,7 @@ def test_pipeline_sentinel_strip_forwards_orbit_settings(tmp_path: Path):
     assert len(merge_calls) == 1
 
 
-@pytest.mark.skipif(
-    not (REPO_ROOT / "pyscripts" / "merge_iq_into_pdec.py").exists(),
-    reason="merge_iq_into_pdec implementation is not present in this checkout",
-)
 def test_merge_iq_into_pdec_rejects_same_dim_product(tmp_path: Path):
-    pytest.importorskip("merge_iq_into_pdec")
     dim_path = _touch(tmp_path / "same.dim")
 
     with pytest.raises(ValueError, match="resolve to the same DIM product"):
@@ -608,11 +611,9 @@ def test_sentinel1_swath_wkt_extractor_safe_reads_annotation_geolocation_points(
         ],
     )
 
-    polygon = shapely_wkt.loads(
-        sentinel1_swath_wkt_extractor_safe(safe_dir, "IW1")
+    assert _wkt_bounds(sentinel1_swath_wkt_extractor_safe(safe_dir, "IW1")) == pytest.approx(
+        (12.0, 45.6, 12.4, 46.0)
     )
-
-    assert polygon.bounds == pytest.approx((12.0, 45.6, 12.4, 46.0))
 
 
 def test_resolve_tiling_wkt_prefers_swath_dim_footprint_and_falls_back(tmp_path: Path):
