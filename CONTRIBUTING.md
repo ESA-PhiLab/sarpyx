@@ -37,8 +37,8 @@ git clone https://github.com/ESA-PhiLab/sarpyx.git
 cd sarpyx
 uv venv .venv
 source .venv/bin/activate
-uv sync --extra dev --extra test --extra docs --extra copernicus
-pytest -q
+uv sync --group dev --extra copernicus
+uv run pytest -q
 ```
 
 SNAP + Java are required for SNAP-dependent commands such as `worldsar` and `shipdet`.

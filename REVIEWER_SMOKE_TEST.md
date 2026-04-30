@@ -15,8 +15,6 @@ source .venv/bin/activate
 uv sync
 python -m pip install -e .
 sarpyx --help
-sarpyx decode --help
-sarpyx focus --help
 pytest -q tests/test_docker.py
 ```
 
