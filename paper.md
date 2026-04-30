@@ -33,120 +33,163 @@ bibliography: paper.bib
 
 # Summary
 
-Synthetic aperture radar (SAR) products are central to Earth observation, but routine
-processing still tends to be split across mission-specific utilities, SNAP graphs, shell
-scripts, and ad hoc notebook code. `sarpyx` is a Python toolkit that packages this work
-into reproducible command-line and Python workflows. It supports decoding and focusing
-steps, SNAP-backed preprocessing, tiled exports for large scenes, and sub-aperture
-decomposition for analysis of directional content and motion sensitivity. The toolkit is
-designed for researchers and engineers who need to move from raw or higher-level SAR
-products to analysis-ready outputs without rewriting orchestration code for each mission
-or platform.
+Synthetic aperture radar (SAR) satellites provide all-weather, day-and-night observations
+of the Earth. These data are used in applications such as land monitoring, disaster
+response, ocean surveillance, cryosphere analysis, and infrastructure assessment.
+However, transforming SAR products into analysis-ready data often requires a sequence of
+mission-specific tools, processing graphs, shell scripts, and custom notebook code. This
+fragmentation makes experiments difficult to reproduce and operational workflows
+difficult to maintain.
 
-`sarpyx` combines a CLI for operational runs with importable Python modules for notebooks
-and services. The implementation is oriented toward repeatability: environment-based
-configuration, container-friendly execution, chunked array storage, and modular
-interfaces for orchestration, processing algorithms, scientific metrics, and utility
-layers. This makes the same codebase suitable for local prototyping, reproducible batch
-processing, and integration into larger research workflows.
+`sarpyx` is a Python package for building reproducible SAR processing workflows. It
+combines command-line entry points with importable Python modules so that the same
+processing components can be used in local experiments, batch workflows, and larger
+research systems. The package supports decoding and focusing workflows, SNAP-backed
+preprocessing, tiled export of large products, chunked array access, and sub-aperture
+decomposition. Sub-aperture decomposition is useful for studying directional scattering
+behaviour, azimuth-dependent signatures, and motion-sensitive SAR observables.
+
+The package is designed for researchers and engineers who need to move from raw or
+higher-level SAR products to reusable outputs without rewriting orchestration code for
+each experiment. Its implementation emphasizes environment-based configuration,
+container-compatible execution, modular processing interfaces, and data products that
+can be inspected, sliced, exported, and reused across downstream geospatial or machine
+learning workflows.
 
 # Statement of need
 
-Large-scale SAR processing often mixes mature external engines with custom glue code. In
-practice, research groups need to chain ingestion, decoding or focusing, calibration,
-geocoding, tiling, and post-processing while preserving metadata and keeping runs
-reproducible across machines. SNAP provides a rich graph processing framework and
-mission toolboxes [@snap], but research teams still need additional orchestration,
-configuration management, chunked output handling, and automation-friendly interfaces.
-`sarpyx` addresses this gap by wrapping end-to-end workflows in Python and CLI entry
-points, while exposing the same building blocks to both interactive and batch use.
+SAR processing workflows commonly combine mature external engines with project-specific
+automation. A typical workflow may involve product ingestion, decoding or focusing,
+radiometric processing, geocoding, metadata preservation, tiling, and export to formats
+suitable for later analysis. In many research environments these steps are implemented
+through a mixture of SNAP graphs, scripts, notebooks, and local conventions. This makes
+it hard to reproduce results across machines, compare experiments consistently, or
+transfer prototype code into operational processing.
 
-The target audience is remote-sensing researchers, SAR engineers, and platform teams
-that operate preprocessing pipelines. The toolkit is especially useful when experiments
-need both production-oriented orchestration and research-oriented derived products, such
-as sub-aperture decomposition and tiling for downstream geospatial analytics or machine
-learning. In the current public implementation, `sarpyx` exposes decode and focus
-commands, a multi-step `worldsar` workflow, and Python interfaces for chunked product
-access and export. By keeping these pieces in one package, the toolkit reduces
-duplication between exploratory scripts and repeatable operational pipelines.
+SNAP provides a broad and mature processing framework for Earth observation data
+[@snap], but many research teams still need additional tooling around workflow
+orchestration, configuration management, chunked output handling, product tiling, and
+automation-friendly execution. `sarpyx` addresses this integration gap. It does not
+attempt to replace mature SAR operators already available in SNAP. Instead, it exposes a
+Python and CLI workflow layer that coordinates external processing, scientific
+extensions, and analysis-oriented outputs.
+
+The target users are remote-sensing researchers, SAR algorithm developers, and platform
+teams that operate reproducible preprocessing pipelines. The package is particularly
+useful when the same project requires both production-oriented orchestration and
+research-oriented derived products, such as sub-aperture stacks or tiled exports for
+downstream geospatial analytics. In the current implementation, `sarpyx` provides
+decode and focus commands, a multi-step `worldsar` workflow, and Python interfaces for
+chunked product access and export. Keeping these capabilities in one package reduces
+duplication between exploratory scripts, reviewer-facing examples, and repeatable
+processing pipelines.
 
 # State of the field
 
-Several open tools address related needs, but with different emphases. SNAP [@snap] is
-the underlying general-purpose processing platform and supplies many core operators.
-`pyroSAR` focuses on large-scale SAR satellite data processing and analysis-ready
-backscatter preparation [@truckenbrodt2019pyrosar; @truckenbrodt2019ard]. Open SAR
-Toolkit emphasizes high-level Sentinel-1 inventory, download, and land-focused
-preprocessing into analysis-ready products [@ost]. `snapista` is intentionally thin: it
-provides a Pythonic layer around SNAP GPT graph creation and execution [@snapista]. The
-ISCE/ISCE3 line targets interferometric and NISAR-oriented science processing with a
-flexible scientific computing framework [@rosen2018isce3].
+Several open-source projects address related parts of the SAR processing ecosystem.
+SNAP is the underlying general-purpose processing platform and provides many core
+operators used by the community [@snap]. `pyroSAR` supports large-scale SAR data
+processing and analysis-ready backscatter preparation, with particular emphasis on
+automated handling of SAR satellite data and integration with geospatial processing
+workflows [@truckenbrodt2019pyrosar; @truckenbrodt2019ard]. The Open SAR Toolkit
+focuses on Sentinel-1 inventory, download, and land-oriented preprocessing into
+analysis-ready data products [@ost]. `snapista` provides a Pythonic interface for
+constructing and executing SNAP GPT graphs [@snapista]. ISCE and ISCE3 support
+interferometric SAR and NISAR-oriented science processing through a flexible scientific
+computing framework [@rosen2018isce3].
 
-`sarpyx` was created because the research requirement here is not met by any single one
-of these choices. Contributing only to a thin SNAP wrapper would not provide the
-mission-aware command-line workflows, chunked array outputs, or integrated scientific
-modules needed for this project. Building only on a Sentinel-1 ARD package would not
-address the same combination of decode or focus stages, SNAP orchestration,
-sub-aperture analysis, and tile-oriented exports. Reimplementing the mature
-preprocessing operators already available in SNAP would also have been a poor use of
-effort. The contribution of `sarpyx` is therefore the integration layer and research
-abstraction: a Python toolkit that couples mature external operators to reproducible
-orchestration, modular scientific extensions, and analysis-friendly outputs in one
-workflow surface.
+`sarpyx` occupies a different position in this landscape. It is not only a SNAP graph
+wrapper, and it is not limited to Sentinel-1 analysis-ready backscatter generation. Its
+purpose is to provide mission-aware command-line workflows, Python-accessible
+processing modules, chunked product interfaces, tiled exports, and research modules such
+as sub-aperture analysis within one reproducible workflow surface.
+
+The main build-versus-contribute justification is therefore architectural. Contributing
+only to a thin SNAP wrapper would not provide the higher-level orchestration,
+mission-aware workflow entry points, chunked storage abstractions, and scientific
+modules required by this project. Building solely on an existing Sentinel-1 ARD package
+would not cover the same combination of decode or focus stages, SNAP orchestration,
+sub-aperture decomposition, and tile-oriented export. Conversely, reimplementing mature
+SNAP operators would duplicate well-tested functionality and increase maintenance
+burden. `sarpyx` instead contributes an integration and research abstraction layer that
+connects mature external processing with reproducible Python workflows and
+analysis-ready downstream products.
 
 # Software design
 
-Three design decisions shape `sarpyx`. First, the package adopts a hybrid architecture:
-domain-specific orchestration is written in Python, while mature preprocessing steps are
-delegated to SNAP where that is the most robust and maintainable choice. This avoids
-re-implementing well-established operators, at the cost of carrying Java and SNAP
-runtime requirements for some workflows. Second, the codebase is split into separate
-layers for command-line interfaces, workflow orchestration, processing algorithms,
-scientific metrics, and utility modules. This separation makes the project usable both
-as an operator-facing CLI and as a library that can be imported into notebooks or
-services.
+The design of `sarpyx` is based on three architectural choices.
 
-Third, the toolkit emphasizes chunked outputs and tile-based processing. SAR scenes can
-be large enough that monolithic in-memory handling becomes brittle for iterative
-research, derived products, or downstream machine-learning pipelines. `sarpyx`
-therefore exposes interfaces centered on chunked storage and selective slicing, and
-includes parallel-friendly paths for large-product tiling. The trade-off is additional
-I/O and metadata management complexity, but the gain is that the same outputs are easier
-to reuse across experiments, quality-control routines, and downstream geospatial
-systems. Together, these design choices favor reproducibility, extensibility, and
-practical deployment over a minimal wrapper around external commands.
+First, the package uses a hybrid processing model. Workflow orchestration,
+configuration, data access, and scientific extensions are implemented in Python, while
+selected preprocessing stages are delegated to SNAP when mature SNAP operators are the
+most robust choice. This design avoids unnecessary reimplementation of established SAR
+processing steps. The cost is an additional runtime dependency on Java and SNAP for
+workflows that require those operators. The benefit is that `sarpyx` can combine
+well-established external processing with reproducible Python automation and
+experiment-specific extensions.
+
+Second, the package separates command-line interfaces, workflow orchestration,
+processing algorithms, scientific metrics, and utility layers. This separation allows
+the same functionality to be used in different execution contexts. Operators can run
+predefined workflows through the CLI, while researchers can import the same modules in
+notebooks, services, or batch-processing code. This structure also reduces coupling
+between mission-specific workflow logic and reusable processing components.
+
+Third, `sarpyx` emphasizes chunked outputs and tile-based processing. SAR scenes are
+often too large for brittle monolithic in-memory workflows, especially when generating
+derived products, running repeated quality checks, or preparing data for machine
+learning pipelines. The package therefore exposes interfaces for chunked storage,
+selective slicing, and parallel-friendly export. This introduces additional metadata and
+I/O-management complexity, but it makes outputs easier to inspect, reuse, and integrate
+with downstream geospatial systems.
+
+These choices prioritize reproducibility, extensibility, and operational reuse over a
+minimal command wrapper. They also support the research use case that motivated the
+package: moving consistently from mission data and external processing engines to
+derived SAR products that can be analysed, validated, and reused across experiments.
 
 # Research impact statement
 
-At minimum, `sarpyx` already demonstrates community-readiness signals through public
-packaging, public documentation, and a reusable open repository with multi-author
-development history. These properties matter for research software because they lower
-the cost of installation, inspection, citation, and reuse.
+The current impact of `sarpyx` is supported by both a reusable public implementation and
+active use in collaborative SAR research. The software has been used in the ESA
+WORLDSAR project, carried out in collaboration with NASA and DLR, where reproducible SAR
+processing, workflow orchestration, and derived-product generation are required across
+institutional and technical boundaries.
 
-The submitted repository includes a public documentation site, containerized execution
-path, test suite, and reviewer smoke-test guide that make the current workflows
-inspectable and repeatable from a fresh checkout. This is important for SAR research
-software because the value of preprocessing and sub-aperture tooling depends on more
-than algorithm availability: reviewers and downstream users must be able to reproduce
-the software environment, locate the workflow entry points, and validate basic behavior
-before applying the package to mission data. The JOSS review branch therefore includes
-top-level citation, contribution, security, paper, bibliography, and reviewer-smoke-test
-metadata alongside the software snapshot, so the reviewed artifact is directly reusable
-and citable.
+The repository provides installable software, public documentation, container-compatible
+execution, tests, and reviewer smoke-test material. These elements make the package
+inspectable and repeatable from a fresh checkout, which is essential for SAR processing
+software where scientific value depends on both algorithmic behavior and reproducible
+execution.
+
+The submitted JOSS branch includes citation, contribution, security, paper,
+bibliography, and reviewer-smoke-test metadata alongside the software snapshot. This
+helps reviewers and downstream users identify the workflow entry points, reproduce the
+software environment, and verify basic behavior before applying the package to mission
+data. The package also provides a practical bridge between interactive research code and
+repeatable processing workflows, reducing the cost of moving SAR experiments from local
+prototypes to reusable pipelines.
+
+By combining SNAP-backed processing, Python workflow orchestration, chunked data access,
+tiled export, and sub-aperture analysis, `sarpyx` supports research groups that need
+more than isolated operators but less than a fully bespoke processing platform. Its
+research value is in making SAR preprocessing and derived-product generation more
+reproducible, inspectable, and reusable across experiments and collaborative projects.
 
 # AI usage disclosure
 
-`sarpyx` development included limited use of generative AI assistance via GitHub
-Copilot for selected code and repository-maintenance tasks. This submission pack was
-also drafted with assistance from a generative AI system during paper and metadata
-authoring. In all cases, the human authors defined the requirements, reviewed and
-edited the generated material, executed tests or smoke checks where applicable, and
-remained responsible for the technical correctness, scientific validity, licensing, and
-final wording of the submission.
+Development of `sarpyx` included limited use of generative AI assistance through GitHub
+Copilot for selected coding and repository-maintenance tasks. Generative AI assistance
+was also used during preparation of the JOSS submission materials, including drafting and
+editing of paper and metadata text.
+
+In all cases, the human authors defined the requirements, reviewed and edited generated
+material, ran tests or smoke checks where applicable, and retained responsibility for
+technical correctness, scientific validity, licensing, and final wording.
 
 # Acknowledgements
 
-The authors acknowledge support from ESA Φ-lab and the open-source SAR and geospatial
-Python ecosystems that `sarpyx` builds upon.
+The authors acknowledge support from ESA Φ-lab and from the open-source SAR, Earth
+observation, and geospatial Python communities that `sarpyx` builds upon.
 
 # References
