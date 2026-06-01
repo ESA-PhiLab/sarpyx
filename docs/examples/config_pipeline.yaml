@@ -1,0 +1,58 @@
+version: 1
+
+defaults:
+  format: BEAM-DIMAP
+  gpt_path: /usr/local/snap/bin/gpt
+  memory: 24G
+  parallelism: 8
+  timeout: 7200
+  resume: false
+  overwrite: false
+  keep_graphs: true
+
+pipelines:
+  preprocess:
+    inputs:
+      product: null
+    steps:
+      - id: calibration
+        op: Calibration
+        source: product
+        params:
+          outputSigmaBand: true
+          outputImageScaleInDb: false
+
+      - id: terrain_correction
+        op: Terrain-Correction
+        params:
+          demName: SRTM 3Sec
+          pixelSpacingInMeter: 10.0
+
+  insar_pair:
+    inputs:
+      master: null
+      slave: null
+    steps:
+      - id: master_pre
+        use: preprocess
+        inputs:
+          product: master
+
+      - id: slave_pre
+        use: preprocess
+        inputs:
+          product: slave
+
+      - id: coreg
+        method: topsar_coregistration
+        sources:
+          master_product: master_pre
+          slave_product: slave_pre
+        params:
+          use_esd: true
+
+      - id: interferogram
+        method: interferogram
+        source: coreg
+        params:
+          include_coherence: true

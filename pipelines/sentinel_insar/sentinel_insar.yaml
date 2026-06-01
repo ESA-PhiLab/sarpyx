@@ -1,0 +1,240 @@
+# Sentinel-1 InSAR config-pipeline definitions for sarpyx-pipeline.
+#
+# Run examples:
+#   uv run sarpyx-pipeline validate pipelines/sentinel_insar/sentinel_insar.yaml
+#   uv run sarpyx-pipeline run pipelines/sentinel_insar/sentinel_insar.yaml \
+#     --pipeline sentinel_insar \
+#     --set-input master=/data/master.SAFE \
+#     --set-input slave=/data/slave.SAFE \
+#     --outdir data/output/sentinel_insar
+#
+# Edit the TOPSAR-Split subswath and Subset region/sourceBands before real runs.
+
+version: 1
+
+defaults:
+  format: BEAM-DIMAP
+  gpt_path: /usr/local/snap/bin/gpt
+  memory: 24G
+  parallelism: 8
+  timeout: 7200
+  resume: false
+  overwrite: false
+  keep_graphs: true
+
+pipelines:
+  sentinel_safe_preprocess:
+    inputs:
+      product: null
+    steps:
+      - id: topsar_split_vv_vh
+        op: TOPSAR-Split
+        source: product
+        params:
+          subswath: IW1
+          selectedPolarisations: VV,VH
+
+      - id: apply_orbit
+        op: Apply-Orbit-File
+        params:
+          orbitType: Sentinel Precise (Auto Download)
+          polyDegree: 3
+          continueOnFail: false
+
+      - id: calibration_complex_vv_vh
+        op: Calibration
+        params:
+          selectedPolarisations: VV,VH
+          outputImageInComplex: true
+          outputSigmaBand: false
+          outputGammaBand: false
+          outputBetaBand: false
+          outputImageScaleInDb: false
+
+  sentinel_insar_pair_coreg_deburst:
+    inputs:
+      master: null
+      slave: null
+    steps:
+      - id: master_pre
+        use: sentinel_safe_preprocess
+        inputs:
+          product: master
+
+      - id: slave_pre
+        use: sentinel_safe_preprocess
+        inputs:
+          product: slave
+
+      - id: pair_coreg
+        method: topsar_coregistration
+        sources:
+          master_product: master_pre
+          slave_product: slave_pre
+        params:
+          use_esd: true
+          dem_name: SRTM 3Sec
+          output_name: pair_coreg
+          keep_graph: true
+
+      - id: pair_coreg_DEB
+        method: deburst
+        source: pair_coreg
+        params:
+          pols:
+            - VV
+            - VH
+          output_name: pair_coreg_DEB
+
+  branch_a:
+    inputs:
+      pair_coreg_DEB: null
+    steps:
+      - id: pair_coreg_gslc_full
+        method: terrain_correction
+        source: pair_coreg_DEB
+        params:
+          dem_name: SRTM 3Sec
+          pixel_spacing_in_meter: 10.0
+          map_projection: AUTO:42001
+          save_selected_source_band: true
+          output_name: pair_coreg_gslc_full
+
+      - id: pair_coreg_gslc
+        op: Subset
+        source: pair_coreg_gslc_full
+        params:
+          copyMetadata: true
+          # Replace with a real pixel window, for example "0,0,4096,4096".
+          region: 0,0,0,0
+
+      - id: master_iq_vv_vh
+        op: BandSelect
+        source: pair_coreg_gslc
+        params:
+          # Adjust exact band names after inspecting the generated stack.
+          sourceBands: i_VV_mst,q_VV_mst,i_VH_mst,q_VH_mst
+
+      - id: slave_iq_vv_vh
+        op: BandSelect
+        source: pair_coreg_gslc
+        params:
+          # Adjust exact band names after inspecting the generated stack.
+          sourceBands: i_VV_slv,q_VV_slv,i_VH_slv,q_VH_slv
+
+      - id: master_amplitude_vv_vh
+        op: BandSelect
+        source: pair_coreg_gslc
+        params:
+          # SNAP band names vary by product. Use Amplitude_* or Intensity_* bands present in the stack.
+          sourceBands: Amplitude_VV_mst,Amplitude_VH_mst
+
+      - id: slave_amplitude_vv_vh
+        op: BandSelect
+        source: pair_coreg_gslc
+        params:
+          # SNAP band names vary by product. Use Amplitude_* or Intensity_* bands present in the stack.
+          sourceBands: Amplitude_VV_slv,Amplitude_VH_slv
+
+  branch_b:
+    inputs:
+      pair_coreg_DEB: null
+    steps:
+      - id: pair_coreg_ifg
+        method: interferogram
+        source: pair_coreg_DEB
+        params:
+          subtract_flat_earth_phase: true
+          include_coherence: true
+          output_name: pair_coreg_ifg
+
+      - id: pair_coreg_ifg_DEB
+        method: deburst
+        source: pair_coreg_ifg
+        params:
+          output_name: pair_coreg_ifg_DEB
+
+      - id: pair_coreg_ifg_DEB_topo
+        method: topo_phase_removal
+        source: pair_coreg_ifg_DEB
+        params:
+          dem_name: SRTM 3Sec
+          output_name: pair_coreg_ifg_DEB_topo
+
+      - id: pair_coreg_ifg_gslc_full
+        method: terrain_correction
+        source: pair_coreg_ifg_DEB_topo
+        params:
+          dem_name: SRTM 3Sec
+          pixel_spacing_in_meter: 10.0
+          map_projection: AUTO:42001
+          save_selected_source_band: true
+          output_name: pair_coreg_ifg_gslc_full
+
+      - id: pair_coreg_ifg_gslc
+        op: Subset
+        source: pair_coreg_ifg_gslc_full
+        params:
+          copyMetadata: true
+          # Replace with a real pixel window, for example "0,0,4096,4096".
+          region: 0,0,0,0
+
+      - id: ifg_amplitude_previews
+        op: BandSelect
+        source: pair_coreg_ifg_gslc
+        params:
+          # Keep preview-only amplitude/coherence bands; adjust exact names per output product.
+          sourceBands: coh_VV,coh_VH,Intensity_VV_mst,Intensity_VV_slv,Intensity_VH_mst,Intensity_VH_slv
+
+  sentinel_insar:
+    inputs:
+      master: null
+      slave: null
+    steps:
+      - id: pair_coreg_DEB
+        use: sentinel_insar_pair_coreg_deburst
+        inputs:
+          master: master
+          slave: slave
+
+      - id: branch_a
+        use: branch_a
+        inputs:
+          pair_coreg_DEB: pair_coreg_DEB
+
+      - id: branch_b
+        use: branch_b
+        inputs:
+          pair_coreg_DEB: pair_coreg_DEB
+
+  sentinel_insar_branch_a_gslc:
+    inputs:
+      master: null
+      slave: null
+    steps:
+      - id: pair_coreg_DEB
+        use: sentinel_insar_pair_coreg_deburst
+        inputs:
+          master: master
+          slave: slave
+
+      - id: branch_a
+        use: branch_a
+        inputs:
+          pair_coreg_DEB: pair_coreg_DEB
+
+  sentinel_insar_branch_b_ifg:
+    inputs:
+      master: null
+      slave: null
+    steps:
+      - id: pair_coreg_DEB
+        use: sentinel_insar_pair_coreg_deburst
+        inputs:
+          master: master
+          slave: slave
+
+      - id: branch_b
+        use: branch_b
+        inputs:
+          pair_coreg_DEB: pair_coreg_DEB
