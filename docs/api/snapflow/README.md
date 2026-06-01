@@ -149,14 +149,14 @@ Applies land-sea masking using coastline data.
 - `invert_geometry` (bool): Invert the geometry mask
 - `land_mask` (bool): Create land mask (True) or sea mask (False)
 
-#### CFAR Ship Detection
+#### Adaptive Thresholding
 ```python
 gpt.AdaptiveThresholding(background_window_m=800,
                         guard_window_m=500, 
                         target_window_m=50,
                         pfa=6.5)
 ```
-Applies Constant False Alarm Rate (CFAR) detection for ships.
+Wraps SNAP's `AdaptiveThresholding` operator.
 
 **Parameters:**
 - `background_window_m` (float): Background window size in meters
@@ -237,11 +237,11 @@ result = (gpt.Calibration(['HH'], output_complex=False)
                               pixelSpacingInMeter=5))
 ```
 
-### Ship Detection Workflow
+### Adaptive Thresholding Workflow
 
 ```python
-# Complete ship detection pipeline
-gpt = GPT(product='sentinel1_product.SAFE', outdir='ship_detection/')
+# Thresholding pipeline using wrapped SNAP operators
+gpt = GPT(product='sentinel1_product.SAFE', outdir='thresholding/')
 
 # Preprocessing
 preprocessed = (gpt.Calibration(['VV'])
@@ -249,21 +249,21 @@ preprocessed = (gpt.Calibration(['VV'])
                    .Deburst(['VV'])
                    .Calibration(['VV']))
 
-# Apply land mask to focus on ocean areas
-land_masked = gpt.LandMask(land_mask=False,  # Create sea mask
+# Apply land/sea mask when the scene requires it
+land_masked = gpt.LandMask(land_mask=False,
                           shoreline_extension=500,
                           use_srtm=True)
 
-# CFAR detection
-cfar_detected = gpt.AdaptiveThresholding(background_window_m=1000,
-                                        guard_window_m=600,
-                                        target_window_m=80,
-                                        pfa=6.5)
+# Adaptive thresholding
+thresholded = gpt.AdaptiveThresholding(background_window_m=1000,
+                                      guard_window_m=600,
+                                      target_window_m=80,
+                                      pfa=6.5)
 
-# Filter by ship size
-ships = gpt.ObjectDiscrimination(min_target_m=30, max_target_m=1000)
+# Optional object-size filtering
+objects = gpt.ObjectDiscrimination(min_target_m=30, max_target_m=1000)
 
-print(f"Ship detection results: {ships}")
+print(f"Thresholding result: {objects}")
 ```
 
 ### Multi-Temporal Processing
@@ -314,21 +314,7 @@ for roi in areas_of_interest:
     print(f"Processed {roi['name']}: {subset_result}")
 ```
 
-## Batch Processing Functions
-
-### CFAR Batch Processing
-```python
-from sarpyx.snapflow.engine import CFAR
-
-# Process single product with multiple thresholds
-result = CFAR(
-    prod='sentinel1_product.SAFE',
-    mask_shp_path='coastline.shp', 
-    mode='MacOS',
-    Thresh=[6.5, 8.0, 10.0],  # Multiple PFA thresholds
-    DELETE=True  # Clean up intermediate files
-)
-```
+## Batch Processing
 
 ### Batch Processing Multiple Products
 ```python

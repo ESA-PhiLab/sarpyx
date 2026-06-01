@@ -39,10 +39,10 @@ def test_data_and_processor_utils_exports_are_explicit() -> None:
 
     assert 'read_tif' in data.__all__
     assert data.read_tif.__name__ == 'read_tif'
-    assert 'write_geotiff' in data.__all__
-    assert data.write_geotiff.__name__ == 'write_geotiff'
-    assert 'format_converter' in data.__all__
-    assert data.format_converter.__name__ == 'format_converter'
+    assert 'read_zarr_file' in data.__all__
+    assert data.read_zarr_file.__name__ == 'read_zarr_file'
+    assert 'write_geotiff' not in data.__all__
+    assert 'format_converter' not in data.__all__
 
     assert 'summarize_2d_array' in utils.__all__
     assert utils.summarize_2d_array.__name__ == 'summarize_2d_array'
@@ -61,3 +61,18 @@ def test_package_tree_has_no_backup_named_python_modules() -> None:
     ]
 
     assert bad_modules == []
+
+
+def test_placeholder_public_modules_are_not_packaged() -> None:
+    package_root = Path(__file__).resolve().parents[1] / 'sarpyx'
+
+    removed_public_placeholders = (
+        package_root / 'cli' / 'focus.py',
+        package_root / 'cli' / 'shipdet.py',
+        package_root / 'processor' / 'algorithms' / 'rda.py',
+        package_root / 'processor' / 'algorithms' / 'backprojection.py',
+        package_root / 'processor' / 'data' / 'writers.py',
+        package_root / 'processor' / 'data' / 'formatters.py',
+    )
+
+    assert [path for path in removed_public_placeholders if path.exists()] == []

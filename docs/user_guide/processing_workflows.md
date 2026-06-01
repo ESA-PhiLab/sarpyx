@@ -1,15 +1,17 @@
 # Processing Workflows
 
-This guide covers the various processing workflows available in sarpyx, from basic sub-look analysis to advanced SNAP-integrated processing chains for ship detection and scientific applications.
+This guide covers the processing workflows currently implemented in sarpyx: WorldSAR/SNAP preprocessing, sub-aperture analysis, H5/Zarr tile conversion and validation, SNAP2StaMPS-style graph orchestration, and scientific index utilities.
 
 ## Overview
 
 sarpyx provides several processing pathways depending on your objectives:
 
-1. **Sub-Look Analysis (SLA)**: Core functionality for azimuthal/range frequency decomposition
-2. **SNAP Integration**: SAR preprocessing using SNAP GPT (Graph Processing Tool)
-3. **Scientific Applications**: Vegetation indices, polarimetric analysis
-4. **Object Detection**: CFAR-based ship detection workflows
+1. **WorldSAR CLI**: mission-specific preprocessing, tiling, validation reports, and H5-to-Zarr conversion
+2. **Config-Driven SNAP Pipelines**: YAML-defined alternate CLI pipelines with reusable mini-pipelines and pair inputs
+3. **SNAP Integration**: SAR preprocessing using SNAP GPT (Graph Processing Tool)
+4. **Sub-Aperture Analysis**: Sentinel-style BEAM-DIMAP sub-aperture generation
+5. **SNAP2StaMPS Orchestration**: TOPSAR and Stripmap graph workflows
+6. **Scientific Applications**: implemented SAR index formulas
 
 ## Sub-Look Analysis Workflow
 
@@ -244,97 +246,6 @@ def preprocess_cosmo_skymed(input_path, output_dir):
     cal_product = gpt.Calibration(Pols=['HH'], output_complex=True)
     
     return cal_product
-```
-
-## Ship Detection Workflow (CFAR)
-
-sarpyx provides automated ship detection using Constant False Alarm Rate (CFAR) algorithms.
-
-### Single Product CFAR
-
-```python
-from sarpyx.snapflow.engine import CFAR
-
-# Basic ship detection
-first_product, excel_results = CFAR(
-    prod="S1A_IW_GRDH_product.zip",
-    mask_shp_path="land_mask.shp",
-    mode="MacOS",
-    Thresh=12.5,  # PFA threshold
-    DELETE=False  # Keep intermediate products
-)
-
-print(f"Processed product: {first_product}")
-print(f"Detection results: {excel_results}")
-```
-
-### Multi-threshold CFAR
-
-```python
-# Test multiple PFA thresholds
-pfa_thresholds = [6.5, 9.5, 12.5, 15.5]
-
-first_product, excel_results = CFAR(
-    prod="input_product.zip",
-    mask_shp_path="coastline.shp",
-    Thresh=pfa_thresholds,
-    DELETE=True  # Clean up intermediate files
-)
-
-# Results will include detection files for each threshold
-```
-
-### Custom CFAR Workflow
-
-```python
-def advanced_ship_detection(product_path, mask_path, output_dir):
-    """Advanced ship detection with custom parameters."""
-    
-    # Initialize GPT
-    gpt = GPT(product_path=product_path, outdir=output_dir)
-    
-    # Preprocessing based on product type
-    prod_type = mode_identifier(Path(product_path).name)
-    
-    if prod_type == "SEN":
-        # Sentinel-1 preprocessing
-        deb_product = gpt.Deburst()
-        cal_product = gpt.Calibration(Pols=['VH'])
-        
-        # Import and apply mask
-        vector_product = gpt.ImportVector(vector_data=mask_path)
-        masked_product = gpt.LandMask()
-        
-        start_product = masked_product
-        
-    elif prod_type == "CSK":
-        # COSMO-SkyMed preprocessing
-        ml_product = gpt.Multilook(nRgLooks=2, nAzLooks=2)
-        cal_product = gpt.Calibration(Pols=['HH'])
-        start_product = cal_product
-    
-    # Adaptive thresholding
-    detection_products = []
-    pfa_values = [6.5, 9.5, 12.5, 15.5]
-    
-    for pfa in pfa_values:
-        gpt_det = GPT(product=start_product, outdir=output_dir)
-        
-        at_product = gpt_det.AdaptiveThresholding(
-            background_window_m=800,
-            guard_window_m=500,
-            target_window_m=50,
-            pfa=pfa
-        )
-        
-        od_product = gpt_det.ObjectDiscrimination(
-            min_target_m=35,
-            max_target_m=500
-        )
-        
-        detection_products.append(od_product)
-    
-    return detection_products
 ```
 
 ## Scientific Applications Workflow

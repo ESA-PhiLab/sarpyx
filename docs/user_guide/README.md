@@ -18,11 +18,11 @@ This guide provides comprehensive information for users of sarpyx, from installa
 
 sarpyx is designed to provide researchers and developers with powerful tools for SAR data processing. The package is organized into several main modules:
 
-- **`sarpyx.processor`**: Core processing algorithms and utilities
-- **`sarpyx.science`**: Scientific analysis tools and indices
-- **`sarpyx.sla`**: Sub-Look Analysis for aperture decomposition
-- **`sarpyx.snapflow`**: Integration with ESA's SNAP platform
-- **`sarpyx.utils`**: General utilities and visualization tools
+- **`sarpyx.cli.worldsar`**: WorldSAR preprocessing, tiling, validation, H5-to-Zarr conversion
+- **`sarpyx.snapflow`**: ESA SNAP GPT integration and SNAP2StaMPS-style pipeline orchestration
+- **`sarpyx.processor.core`**: implemented decode, focus primitives, signal helpers, and sub-aperture processing
+- **`sarpyx.science`**: implemented SAR index formulas
+- **`sarpyx.utils`**: geospatial, H5/Zarr, DEM, plotting, metrics, and upload utilities
 
 ## Quick Navigation
 

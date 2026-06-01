@@ -1,6 +1,6 @@
 # sarpyx Documentation
 
-Welcome to the sarpyx documentation! sarpyx is a specialized Python package for advanced Synthetic Aperture Radar (SAR) data processing, sub-aperture decomposition, and full integration with ESA's SNAP (Sentinel Application Platform) engine.
+Welcome to the sarpyx documentation. sarpyx is a Python package for Synthetic Aperture Radar (SAR) processing focused on the currently implemented WorldSAR/SNAP workflow surface: product preprocessing, tiling, sub-aperture generation, H5/Zarr validation, and selected science utilities.
 
 <p align="center">
     <img src="../assets/sarpyx_logo.png" alt="sarpyx logo" width="1200"/>
@@ -47,11 +47,11 @@ ndpoll = calculate_ndpoll(sigma_vv, sigma_vh)
 
 ## Key Features
 
-- 🛰️ **Sub-Aperture Decomposition**: Azimuthal sub-band partitioning for enhanced resolution
-- ⚙️ **SNAP Engine Integration**: Direct interface with SNAP Graph Processing Tool (GPT)
-- 🗂️ **Modular Processing Pipeline**: Customizable preprocessing and analysis workflows
-- 📦 **Data Compatibility**: Support for Sentinel-1, COSMO-SkyMed, and other SAR missions
-- 🔌 **Extensible Architecture**: Designed for interoperability with geospatial libraries
+- **WorldSAR CLI**: mission-specific preprocessing, tiling, validation reports, and H5-to-Zarr conversion
+- **SNAP Engine Integration**: direct interface with SNAP Graph Processing Tool (GPT)
+- **Sub-Aperture Decomposition**: implemented Sentinel-style BEAM-DIMAP sub-aperture workflows
+- **Data Compatibility**: Sentinel-1, TerraSAR-X, NISAR helper paths, H5, Zarr, BEAM-DIMAP, GeoTIFF
+- **Geospatial Utilities**: helpers built around rasterio, geopandas, shapely, pyproj, h5py, zarr, and dask
 
 ## Installation
 

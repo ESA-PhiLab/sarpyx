@@ -514,7 +514,7 @@ You now have processed SAR data that is:
 
 **Advanced topics to explore:**
 - Interferometric processing with SNAP
-- CFAR ship detection workflows
+- SNAP AdaptiveThresholding and ObjectDiscrimination operators
 - Custom XML graph processing
 - Integration with cloud processing platforms
 

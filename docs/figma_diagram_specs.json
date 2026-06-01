@@ -53,12 +53,12 @@
       {
         "source": "cli",
         "target": "core",
-        "label": "decode/focus"
+        "label": "decode"
       },
       {
         "source": "cli",
         "target": "snapflow",
-        "label": "shipdet/worldsar"
+        "label": "worldsar"
       },
       {
         "source": "core",
@@ -108,11 +108,6 @@
     "purpose": "Show coupling between high-traffic modules.",
     "nodes": [
       {
-        "id": "cli_main",
-        "label": "sarpyx.cli.main",
-        "type": "module"
-      },
-      {
         "id": "cli_worldsar",
         "label": "sarpyx.cli.worldsar",
         "type": "module"
@@ -144,11 +139,6 @@
       }
     ],
     "edges": [
-      {
-        "source": "cli_main",
-        "target": "cli_worldsar",
-        "label": "dispatch"
-      },
       {
         "source": "cli_worldsar",
         "target": "snap_engine",
@@ -200,8 +190,8 @@
         "type": "data"
       },
       {
-        "id": "focus",
-        "label": "Focus (CoarseRDA)",
+        "id": "subaps",
+        "label": "Sub-aperture Processing",
         "type": "process"
       },
       {
@@ -233,11 +223,11 @@
       },
       {
         "source": "zarr",
-        "target": "focus",
+        "target": "subaps",
         "label": "load"
       },
       {
-        "source": "focus",
+        "source": "subaps",
         "target": "focused",
         "label": "persist"
       },
@@ -261,7 +251,7 @@
       "edge": "#86a8ff",
       "text": "#e6edf3"
     },
-    "component_grouping_guidance": "Group decode/focus as core processing stage; keep analysis/export as downstream stage."
+    "component_grouping_guidance": "Group decode and sub-aperture processing as core stages; keep analysis/export as downstream stages."
   },
   {
     "diagram_name": "Request lifecycle",

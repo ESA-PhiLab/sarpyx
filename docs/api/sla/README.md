@@ -414,5 +414,5 @@ sla.Generation(VERBOSE=False)  # Faster execution
 
 See also:
 - [`sarpyx.utils`](../utils/README.md) for visualization functions
-- [`sarpyx.processor.autofocus.metrics`](../processor/README.md) for quality assessment
+- [`sarpyx.sla.metrics`](../../sarpyx/sla/metrics.py) for sub-look quality metrics
 - [`sarpyx.science.indices`](../science/README.md) for analysis applications

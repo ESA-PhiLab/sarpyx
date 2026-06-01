@@ -34,7 +34,6 @@
 <a href="../tutorials/04_multitemporal_analysis.html">04 – Multi-temporal</a>
 <a href="../tutorials/05_polarimetric_analysis.html">05 – Polarimetry</a>
 <a href="../tutorials/06_custom_workflows.html">06 – Custom Workflows</a>
-<a href="../tutorials/07_ship_detection.html">07 – Ship Detection</a>
 <a href="../tutorials/08_interferometric_analysis.html">08 – InSAR</a>
 <h3>API Reference</h3>
 <a href="../api/index.html">Overview</a>
@@ -139,15 +138,11 @@
 <span class="n">focused_data</span> <span class="o">=</span> <span class="n">focus</span><span class="o">.</span><span class="n">range_compression</span><span class="p">(</span><span class="n">processed_data</span><span class="p">)</span>
 <span class="n">focused_data</span> <span class="o">=</span> <span class="n">focus</span><span class="o">.</span><span class="n">azimuth_compression</span><span class="p">(</span><span class="n">focused_data</span><span class="p">)</span>
 </code></pre>
-<h4 id="3-autofocus-if-needed">3. Autofocus (if needed)</h4>
-<pre class="codehilite"><code><span class="c1"># Check focus quality</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">sarpyx.processor.autofocus</span><span class="w"> </span><span class="kn">import</span> <span class="n">metrics</span>
-<span class="n">focus_quality</span> <span class="o">=</span> <span class="n">metrics</span><span class="o">.</span><span class="n">calculate_entropy</span><span class="p">(</span><span class="n">focused_data</span><span class="p">)</span>
+<h4 id="3-quality-metrics">3. Quality Metrics</h4>
+<pre class="codehilite"><code><span class="kn">from</span><span class="w"> </span><span class="nn">sarpyx.sla.metrics</span><span class="w"> </span><span class="kn">import</span> <span class="n">enl</span><span class="p">,</span> <span class="n">dispersion_ratio</span>
 
-<span class="c1"># Apply autofocus if necessary</span>
-<span class="k">if</span> <span class="n">focus_quality</span> <span class="o">&lt;</span> <span class="n">threshold</span><span class="p">:</span>
-    <span class="kn">from</span><span class="w"> </span><span class="nn">sarpyx.processor.autofocus</span><span class="w"> </span><span class="kn">import</span> <span class="n">compressor</span>
-    <span class="n">autofocused</span> <span class="o">=</span> <span class="n">compressor</span><span class="o">.</span><span class="n">autofocus</span><span class="p">(</span><span class="n">focused_data</span><span class="p">)</span>
+<span class="n">equivalent_looks</span> <span class="o">=</span> <span class="n">enl</span><span class="p">(</span><span class="n">focused_data</span><span class="p">)</span>
+<span class="n">normalized_variance</span> <span class="o">=</span> <span class="n">dispersion_ratio</span><span class="p">(</span><span class="n">focused_data</span><span class="p">)</span>
 </code></pre>
 <h2 id="frequency-domain-processing">Frequency Domain Processing</h2>
 <h3 id="discrete-fourier-transform-dft">Discrete Fourier Transform (DFT)</h3>
@@ -216,19 +211,13 @@
 <span class="p">)</span>
 </code></pre>
 <h2 id="quality-metrics">Quality Metrics</h2>
-<h3 id="focus-quality-assessment">Focus Quality Assessment</h3>
-<pre class="codehilite"><code><span class="kn">from</span><span class="w"> </span><span class="nn">sarpyx.processor.autofocus.metrics</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
-    <span class="n">calculate_entropy</span><span class="p">,</span>
-    <span class="n">calculate_contrast</span><span class="p">,</span>
-    <span class="n">calculate_sharpness</span>
-<span class="p">)</span>
+<h3 id="sub-look-quality-assessment">Sub-Look Quality Assessment</h3>
+<pre class="codehilite"><code><span class="kn">from</span><span class="w"> </span><span class="nn">sarpyx.sla.metrics</span><span class="w"> </span><span class="kn">import</span> <span class="n">enl</span><span class="p">,</span> <span class="n">dispersion_ratio</span>
 
-<span class="c1"># Assess image focus quality</span>
-<span class="n">entropy</span> <span class="o">=</span> <span class="n">calculate_entropy</span><span class="p">(</span><span class="n">sar_image</span><span class="p">)</span>
-<span class="n">contrast</span> <span class="o">=</span> <span class="n">calculate_contrast</span><span class="p">(</span><span class="n">sar_image</span><span class="p">)</span>
-<span class="n">sharpness</span> <span class="o">=</span> <span class="n">calculate_sharpness</span><span class="p">(</span><span class="n">sar_image</span><span class="p">)</span>
+<span class="n">equivalent_looks</span> <span class="o">=</span> <span class="n">enl</span><span class="p">(</span><span class="n">sar_image</span><span class="p">)</span>
+<span class="n">variance_ratio</span> <span class="o">=</span> <span class="n">dispersion_ratio</span><span class="p">(</span><span class="n">sar_image</span><span class="p">)</span>
 
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Focus Quality - Entropy: </span><span class="si">{</span><span class="n">entropy</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2">, Contrast: </span><span class="si">{</span><span class="n">contrast</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;ENL: </span><span class="si">{</span><span class="n">equivalent_looks</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2">, dispersion ratio: </span><span class="si">{</span><span class="n">variance_ratio</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 </code></pre>
 <h3 id="statistical-measures">Statistical Measures</h3>
 <pre class="codehilite"><code><span class="c1"># Common SAR statistics</span>
@@ -299,11 +288,12 @@
     <span class="n">sla</span><span class="o">.</span><span class="n">SpectrumComputation</span><span class="p">()</span>
 
     <span class="c1"># Calculate quality metrics</span>
-    <span class="n">entropy</span> <span class="o">=</span> <span class="n">calculate_entropy</span><span class="p">(</span><span class="n">sla</span><span class="o">.</span><span class="n">Box</span><span class="p">)</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">sarpyx.sla.metrics</span><span class="w"> </span><span class="kn">import</span> <span class="n">enl</span>
+    <span class="n">equivalent_looks</span> <span class="o">=</span> <span class="n">enl</span><span class="p">(</span><span class="n">sla</span><span class="o">.</span><span class="n">Box</span><span class="p">)</span>
 
     <span class="c1"># Generate report</span>
     <span class="k">return</span> <span class="p">{</span>
-        <span class="s1">&#39;entropy&#39;</span><span class="p">:</span> <span class="n">entropy</span><span class="p">,</span>
+        <span class="s1">&#39;enl&#39;</span><span class="p">:</span> <span class="n">equivalent_looks</span><span class="p">,</span>
         <span class="s1">&#39;mean_intensity&#39;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">sla</span><span class="o">.</span><span class="n">Box</span><span class="p">)</span><span class="o">**</span><span class="mi">2</span><span class="p">),</span>
         <span class="s1">&#39;data_shape&#39;</span><span class="p">:</span> <span class="n">sla</span><span class="o">.</span><span class="n">Box</span><span class="o">.</span><span class="n">shape</span>
     <span class="p">}</span>

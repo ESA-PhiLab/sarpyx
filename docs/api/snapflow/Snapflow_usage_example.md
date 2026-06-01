@@ -110,7 +110,7 @@ masked_product = op.LandMask(
 ### 5. Adaptive Thresholding (CFAR)
 
 ```python
-# Apply CFAR detection
+# Apply SNAP adaptive thresholding
 cfar_product = op.AdaptiveThresholding(
     background_window_m=800,
     guard_window_m=500,
@@ -263,17 +263,16 @@ print("✓ All operations successful!")
 
 ## Complete Processing Workflows
 
-### Workflow 1: Ship Detection for Sentinel-1
+### Workflow 1: Adaptive Thresholding for Sentinel-1
 
 ```python
 from pathlib import Path
-from sarpyx.snapflow.engine import GPT, CFAR
-import pandas as pd
+from sarpyx.snapflow.engine import GPT
 
 # Input data
 product = Path('./data/S1A_IW_GRDH_20240503.SAFE')
 land_mask = Path('./masks/coastline.shp')
-output_dir = Path('./ship_detection/')
+output_dir = Path('./thresholding/')
 output_dir.mkdir(exist_ok=True)
 
 # Initialize
@@ -286,8 +285,8 @@ op.Calibration(Pols=['VH'], output_complex=False)
 op.ImportVector(vector_data=land_mask)
 op.LandMask(use_srtm=True, invert_geometry=True)
 
-# Ship detection
-print("Detecting ships...")
+# Adaptive thresholding
+print("Applying adaptive thresholding...")
 op.AdaptiveThresholding(
     background_window_m=800,
     guard_window_m=500,
@@ -295,64 +294,13 @@ op.AdaptiveThresholding(
     pfa=6.5
 )
 
-# Filter detections
+# Optional object-size filtering
 final_product = op.ObjectDiscrimination(
     min_target_m=35,
     max_target_m=500
 )
 
-# Extract results
-product_path = Path(final_product)
-data_dir = product_path.with_suffix('.data')
-csv_files = list(data_dir.glob('*ship*.csv'))
-
-if csv_files:
-    detections = pd.read_csv(csv_files[0], header=1, sep='\t')
-    excel_output = output_dir / 'ship_detections.xlsx'
-    detections.to_excel(excel_output, index=False)
-    print(f"✓ Detections saved: {excel_output}")
-    print(f"✓ Found {len(detections)} ships")
-```
-
-### Workflow 2: Using the High-Level CFAR Function
-
-```python
-from pathlib import Path
-from sarpyx.snapflow.engine import CFAR
-
-# Single PFA threshold
-first_product, excel_file = CFAR(
-    prod='./data/S1A_IW_GRDH_product.SAFE',
-    mask_shp_path='./masks/land_mask.shp',
-    mode='Ubuntu',
-    Thresh=6.5,
-    DELETE=True  # Delete intermediate products
-)
-
-print(f"Processed product: {first_product}")
-print(f"Detection results: {excel_file}")
-```
-
-### Workflow 3: Multiple PFA Thresholds
-
-```python
-from sarpyx.snapflow.engine import CFAR
-
-# Test multiple PFA values
-pfa_values = [4.5, 6.5, 8.5, 10.5, 12.5]
-
-first_product, last_excel = CFAR(
-    prod='./data/COSMO_SkyMed_product.h5',
-    mask_shp_path='./masks/mediterranean.shp',
-    mode='Ubuntu',
-    Thresh=pfa_values,
-    DELETE=False  # Keep all intermediate products
-)
-
-# This creates 5 Excel files with different detection thresholds:
-# - COSMO_SkyMed_product_pfa_4.5.xlsx
-# - COSMO_SkyMed_product_pfa_6.5.xlsx
-# - ...
+print(f"✓ Thresholded product: {final_product}")
 ```
 
 ---
@@ -460,7 +408,7 @@ print("Land masking...")
 op.ImportVector(vector_data='./masks/land.shp')
 op.LandMask()
 
-print("CFAR detection...")
+print("Adaptive thresholding...")
 op.AdaptiveThresholding(
     background_window_m=650,
     guard_window_m=400,
@@ -569,6 +517,6 @@ The `GPT` class provides a clean Python interface to SNAP processing:
 2. **Chain operations** by calling methods sequentially
 3. **Each method** updates the internal product path automatically
 4. **Check results** - methods return output path or `None` on failure
-5. **Use high-level functions** like `CFAR()` for complete workflows
+5. **Build workflows** by composing the wrapped `GPT` operations that exist in `sarpyx.snapflow.engine`
 
 For more information, see the [SNAP documentation](https://step.esa.int/main/doc/) and the source code.

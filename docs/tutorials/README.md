@@ -44,12 +44,6 @@ Build custom processing pipelines for specific applications.
 
 ## Advanced Tutorials
 
-### [Tutorial 7: Ship Detection with CFAR](07_ship_detection_cfar.md)
-Implement ship detection using Constant False Alarm Rate algorithms.
-- **Duration**: 45 minutes
-- **Prerequisites**: Tutorial 2
-- **Data**: Maritime Sentinel-1 data
-
 ### [Tutorial 8: Interferometric Processing](08_interferometric_processing.md)
 Create interferograms and analyze surface deformation.
 - **Duration**: 50 minutes
@@ -104,7 +98,6 @@ We provide sample datasets for all tutorials:
 - **Sentinel-1 GRD**: Ground Range Detected data for SNAP workflows  
 - **Multi-temporal**: Time series for change detection
 - **Dual-pol**: VV+VH data for polarimetric analysis
-- **Maritime**: Ocean scenes for ship detection
 - **Forest**: Vegetation areas for monitoring
 - **Urban**: City areas for built-up analysis
 - **Coastal**: Shoreline areas for change detection
@@ -126,7 +119,6 @@ tutorials/
 │   ├── sentinel1_grd/
 │   ├── multitemporal/
 │   ├── dualpol/
-│   ├── maritime/
 │   ├── forest/
 │   ├── urban/
 │   └── coastal/
@@ -144,9 +136,8 @@ tutorials/
 
 ### For SNAP Users
 1. Tutorial 2: SNAP Integration Basics
-2. Tutorial 7: Ship Detection with CFAR
-3. Tutorial 6: Custom Processing Workflows
-4. Tutorial 9: Performance Optimization
+2. Tutorial 6: Custom Processing Workflows
+3. Tutorial 9: Performance Optimization
 
 ### For Research Applications
 1. Tutorial 4: Multi-temporal Analysis
@@ -157,8 +148,7 @@ tutorials/
 ### For Production Systems
 1. Tutorial 6: Custom Processing Workflows
 2. Tutorial 9: Performance Optimization
-3. Tutorial 7: Ship Detection with CFAR
-4. Tutorial 12: Coastal Monitoring
+3. Tutorial 12: Coastal Monitoring
 
 ## Interactive Formats
 

@@ -34,7 +34,6 @@
 <a href="../../tutorials/04_multitemporal_analysis.html">04 – Multi-temporal</a>
 <a href="../../tutorials/05_polarimetric_analysis.html">05 – Polarimetry</a>
 <a href="../../tutorials/06_custom_workflows.html">06 – Custom Workflows</a>
-<a href="../../tutorials/07_ship_detection.html">07 – Ship Detection</a>
 <a href="../../tutorials/08_interferometric_analysis.html">08 – InSAR</a>
 <h3>API Reference</h3>
 <a href="../../api/index.html">Overview</a>
@@ -167,13 +166,13 @@
 - <code>use_srtm</code> (bool): Use SRTM for elevation-based masking
 - <code>invert_geometry</code> (bool): Invert the geometry mask
 - <code>land_mask</code> (bool): Create land mask (True) or sea mask (False)</p>
-<h4 id="cfar-ship-detection">CFAR Ship Detection</h4>
+<h4 id="adaptive-thresholding">Adaptive Thresholding</h4>
 <pre class="codehilite"><code><span class="n">gpt</span><span class="o">.</span><span class="n">AdaptiveThresholding</span><span class="p">(</span><span class="n">background_window_m</span><span class="o">=</span><span class="mi">800</span><span class="p">,</span>
                         <span class="n">guard_window_m</span><span class="o">=</span><span class="mi">500</span><span class="p">,</span> 
                         <span class="n">target_window_m</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span>
                         <span class="n">pfa</span><span class="o">=</span><span class="mf">6.5</span><span class="p">)</span>
 </code></pre>
-<p>Applies Constant False Alarm Rate (CFAR) detection for ships.</p>
+<p>Wraps SNAP&rsquo;s <code>AdaptiveThresholding</code> operator.</p>
 <p><strong>Parameters:</strong>
 - <code>background_window_m</code> (float): Background window size in meters
 - <code>guard_window_m</code> (float): Guard window size in meters
@@ -235,9 +234,9 @@
              <span class="o">.</span><span class="n">TerrainCorrection</span><span class="p">(</span><span class="n">demName</span><span class="o">=</span><span class="s1">&#39;SRTM 1Sec&#39;</span><span class="p">,</span> 
                               <span class="n">pixelSpacingInMeter</span><span class="o">=</span><span class="mi">5</span><span class="p">))</span>
 </code></pre>
-<h3 id="ship-detection-workflow">Ship Detection Workflow</h3>
-<pre class="codehilite"><code><span class="c1"># Complete ship detection pipeline</span>
-<span class="n">gpt</span> <span class="o">=</span> <span class="n">GPT</span><span class="p">(</span><span class="n">product</span><span class="o">=</span><span class="s1">&#39;sentinel1_product.SAFE&#39;</span><span class="p">,</span> <span class="n">outdir</span><span class="o">=</span><span class="s1">&#39;ship_detection/&#39;</span><span class="p">)</span>
+<h3 id="adaptive-thresholding-workflow">Adaptive Thresholding Workflow</h3>
+<pre class="codehilite"><code><span class="c1"># Thresholding pipeline using wrapped SNAP operators</span>
+<span class="n">gpt</span> <span class="o">=</span> <span class="n">GPT</span><span class="p">(</span><span class="n">product</span><span class="o">=</span><span class="s1">&#39;sentinel1_product.SAFE&#39;</span><span class="p">,</span> <span class="n">outdir</span><span class="o">=</span><span class="s1">&#39;thresholding/&#39;</span><span class="p">)</span>
 
 <span class="c1"># Preprocessing</span>
 <span class="n">preprocessed</span> <span class="o">=</span> <span class="p">(</span><span class="n">gpt</span><span class="o">.</span><span class="n">Calibration</span><span class="p">([</span><span class="s1">&#39;VV&#39;</span><span class="p">])</span>
@@ -245,21 +244,21 @@
                    <span class="o">.</span><span class="n">Deburst</span><span class="p">([</span><span class="s1">&#39;VV&#39;</span><span class="p">])</span>
                    <span class="o">.</span><span class="n">Calibration</span><span class="p">([</span><span class="s1">&#39;VV&#39;</span><span class="p">]))</span>
 
-<span class="c1"># Apply land mask to focus on ocean areas</span>
-<span class="n">land_masked</span> <span class="o">=</span> <span class="n">gpt</span><span class="o">.</span><span class="n">LandMask</span><span class="p">(</span><span class="n">land_mask</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>  <span class="c1"># Create sea mask</span>
+<span class="c1"># Apply land/sea mask when the scene requires it</span>
+<span class="n">land_masked</span> <span class="o">=</span> <span class="n">gpt</span><span class="o">.</span><span class="n">LandMask</span><span class="p">(</span><span class="n">land_mask</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
                           <span class="n">shoreline_extension</span><span class="o">=</span><span class="mi">500</span><span class="p">,</span>
                           <span class="n">use_srtm</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 
-<span class="c1"># CFAR detection</span>
-<span class="n">cfar_detected</span> <span class="o">=</span> <span class="n">gpt</span><span class="o">.</span><span class="n">AdaptiveThresholding</span><span class="p">(</span><span class="n">background_window_m</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span>
-                                        <span class="n">guard_window_m</span><span class="o">=</span><span class="mi">600</span><span class="p">,</span>
-                                        <span class="n">target_window_m</span><span class="o">=</span><span class="mi">80</span><span class="p">,</span>
-                                        <span class="n">pfa</span><span class="o">=</span><span class="mf">6.5</span><span class="p">)</span>
+<span class="c1"># Adaptive thresholding</span>
+<span class="n">thresholded</span> <span class="o">=</span> <span class="n">gpt</span><span class="o">.</span><span class="n">AdaptiveThresholding</span><span class="p">(</span><span class="n">background_window_m</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span>
+                                      <span class="n">guard_window_m</span><span class="o">=</span><span class="mi">600</span><span class="p">,</span>
+                                      <span class="n">target_window_m</span><span class="o">=</span><span class="mi">80</span><span class="p">,</span>
+                                      <span class="n">pfa</span><span class="o">=</span><span class="mf">6.5</span><span class="p">)</span>
 
-<span class="c1"># Filter by ship size</span>
-<span class="n">ships</span> <span class="o">=</span> <span class="n">gpt</span><span class="o">.</span><span class="n">ObjectDiscrimination</span><span class="p">(</span><span class="n">min_target_m</span><span class="o">=</span><span class="mi">30</span><span class="p">,</span> <span class="n">max_target_m</span><span class="o">=</span><span class="mi">1000</span><span class="p">)</span>
+<span class="c1"># Optional object-size filtering</span>
+<span class="n">objects</span> <span class="o">=</span> <span class="n">gpt</span><span class="o">.</span><span class="n">ObjectDiscrimination</span><span class="p">(</span><span class="n">min_target_m</span><span class="o">=</span><span class="mi">30</span><span class="p">,</span> <span class="n">max_target_m</span><span class="o">=</span><span class="mi">1000</span><span class="p">)</span>
 
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Ship detection results: </span><span class="si">{</span><span class="n">ships</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Thresholding result: </span><span class="si">{</span><span class="n">objects</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 </code></pre>
 <h3 id="multi-temporal-processing">Multi-Temporal Processing</h3>
 <pre class="codehilite"><code><span class="c1"># Process time series of SAR data</span>
@@ -303,19 +302,7 @@
 
     <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Processed </span><span class="si">{</span><span class="n">roi</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">subset_result</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 </code></pre>
-<h2 id="batch-processing-functions">Batch Processing Functions</h2>
-<h3 id="cfar-batch-processing">CFAR Batch Processing</h3>
-<pre class="codehilite"><code><span class="kn">from</span><span class="w"> </span><span class="nn">sarpyx.snapflow.engine</span><span class="w"> </span><span class="kn">import</span> <span class="n">CFAR</span>
-
-<span class="c1"># Process single product with multiple thresholds</span>
-<span class="n">result</span> <span class="o">=</span> <span class="n">CFAR</span><span class="p">(</span>
-    <span class="n">prod</span><span class="o">=</span><span class="s1">&#39;sentinel1_product.SAFE&#39;</span><span class="p">,</span>
-    <span class="n">mask_shp_path</span><span class="o">=</span><span class="s1">&#39;coastline.shp&#39;</span><span class="p">,</span> 
-    <span class="n">mode</span><span class="o">=</span><span class="s1">&#39;MacOS&#39;</span><span class="p">,</span>
-    <span class="n">Thresh</span><span class="o">=</span><span class="p">[</span><span class="mf">6.5</span><span class="p">,</span> <span class="mf">8.0</span><span class="p">,</span> <span class="mf">10.0</span><span class="p">],</span>  <span class="c1"># Multiple PFA thresholds</span>
-    <span class="n">DELETE</span><span class="o">=</span><span class="kc">True</span>  <span class="c1"># Clean up intermediate files</span>
-<span class="p">)</span>
-</code></pre>
+<h2 id="batch-processing">Batch Processing</h2>
 <h3 id="batch-processing-multiple-products">Batch Processing Multiple Products</h3>
 <pre class="codehilite"><code><span class="c1"># Process multiple products automatically</span>
 <span class="n">products</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;product1.SAFE&#39;</span><span class="p">,</span> <span class="s1">&#39;product2.SAFE&#39;</span><span class="p">,</span> <span class="s1">&#39;product3.SAFE&#39;</span><span class="p">]</span>

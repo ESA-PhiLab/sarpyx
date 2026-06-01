@@ -196,6 +196,13 @@ def add_worldsar_arguments(parser: argparse.ArgumentParser) -> None:
         help='Optional single Sentinel band name to keep during Terrain-Correction for smoke-test runs.'
     )
     parser.add_argument(
+        '--sentinel-subaps',
+        dest='sentinel_subaps',
+        type=int,
+        default=None,
+        help='Number of Sentinel subapertures to generate (default: 2 for TOPS, 3 for STRIP).'
+    )
+    parser.add_argument(
         '--skip-preprocessing',
         dest='skip_preprocessing',
         action='store_true',
@@ -668,8 +675,46 @@ DB_DIR       = _env('db_dir', 'DB_DIR')
 CUTS_OUTDIR  = _env('cuts_outdir', 'OUTPUT_CUTS_DIR')
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 BASE_PATH    = _env('base_path', 'BASE_PATH', default=str(PROJECT_ROOT))
-SNAP_USERDIR = _env('SNAP_USERDIR', 'snap_userdir', default=str(PROJECT_ROOT / '.snap'))
-os.environ.setdefault('SNAP_USERDIR', SNAP_USERDIR)
+
+
+def _snap_userdir_is_usable(path_value) -> bool:
+    """Return True when SNAP can write its HDF native loader cache below path."""
+    try:
+        path = _expand_path(path_value)
+        native_dir = path / 'auxdata' / 'hdf_natives'
+        native_dir.mkdir(parents=True, exist_ok=True)
+        probe = native_dir / '.sarpyx-write-test'
+        probe.write_text('ok', encoding='utf-8')
+        if probe.read_text(encoding='utf-8') != 'ok':
+            return False
+        probe.unlink(missing_ok=True)
+        loader = native_dir / 'NativeLibraryLoader.jar'
+        if loader.exists() and not os.access(loader, os.R_OK | os.W_OK):
+            return False
+        return os.access(native_dir, os.R_OK | os.W_OK | os.X_OK)
+    except OSError:
+        return False
+
+
+def _resolve_snap_userdir(path_value=None) -> str:
+    """Choose a SNAP userdir that is writable in Docker/Apptainer and local runs."""
+    candidates = []
+    if path_value:
+        candidates.append(path_value)
+    tmp_root = Path(os.getenv('TMPDIR') or '/tmp')
+    candidates.extend([
+        tmp_root / f'sarpyx-snap-userdir-{os.getuid()}',
+        Path.home() / '.snap',
+        PROJECT_ROOT / '.snap',
+    ])
+    for candidate in candidates:
+        if _snap_userdir_is_usable(candidate):
+            return str(_expand_path(candidate))
+    return str(_expand_path(tmp_root / f'sarpyx-snap-userdir-{os.getuid()}'))
+
+
+SNAP_USERDIR = _resolve_snap_userdir(_env('SNAP_USERDIR', 'snap_userdir'))
+os.environ['SNAP_USERDIR'] = SNAP_USERDIR
 
 prepro      = True
 tiling      = True
@@ -748,6 +793,7 @@ def _sentinel_post_chain(
     orbit_type='Sentinel Precise (Auto Download)',
     orbit_continue_on_fail=False,
     sentinel_tc_source_band=None,
+    sentinel_subaps=2,
 ):
     """Calibration → DerampDemod → Deburst → PolDecomp → TC  (shared by each swath)."""
     fp_orb = _apply_sentinel_orbit_file(
@@ -768,7 +814,7 @@ def _sentinel_post_chain(
     op.do_subaps(
         dim_path=op.prod_path,
         safe_path=product_path,
-        n_decompositions=[2],
+        n_decompositions=[sentinel_subaps],
         byte_order=1,
         VERBOSE=False,
         update_dim=False,
@@ -823,6 +869,7 @@ def pipeline_sentinel(
     sentinel_first_burst=1,
     sentinel_last_burst=9999,
     sentinel_tc_source_band=None,
+    sentinel_subaps=None,
     **_,
 ):
     """Sentinel-1 pipeline.
@@ -836,6 +883,7 @@ def pipeline_sentinel(
     if is_TOPS:
         results = {}
         swaths = (sentinel_swath,) if sentinel_swath else ('IW1', 'IW2', 'IW3')
+        tops_subaps = sentinel_subaps if sentinel_subaps is not None else 2
         for swath in swaths:
             sw_op = _create_gpt_operator(Path(op.prod_path), output_dir / swath, 'BEAM-DIMAP', **gpt_kw)
             split_result = sw_op.TopsarSplit(
@@ -853,6 +901,7 @@ def pipeline_sentinel(
                 orbit_type=orbit_type,
                 orbit_continue_on_fail=orbit_continue_on_fail,
                 sentinel_tc_source_band=sentinel_tc_source_band,
+                sentinel_subaps=tops_subaps,
             )
         return results                    # {IW1: path, IW2: path, IW3: path}
     
@@ -869,7 +918,7 @@ def pipeline_sentinel(
     op.do_subaps(
         safe_path=product_path,
         dim_path=op.prod_path,
-        n_decompositions=[3],
+        n_decompositions=[sentinel_subaps if sentinel_subaps is not None else 3],
         byte_order=1,
         VERBOSE=False,
         update_dim=False,
@@ -1818,7 +1867,7 @@ def _apply_runtime_overrides(args):
     if args.db_dir:
         DB_DIR = args.db_dir
     if args.snap_userdir:
-        SNAP_USERDIR = args.snap_userdir
+        SNAP_USERDIR = _resolve_snap_userdir(args.snap_userdir)
         os.environ['SNAP_USERDIR'] = SNAP_USERDIR
 
 
@@ -1838,6 +1887,8 @@ def _validate_runtime_args(args):
             '--sentinel-last-burst must be greater than or equal to '
             f'--sentinel-first-burst, got {args.sentinel_last_burst} < {args.sentinel_first_burst}'
         )
+    if args.sentinel_subaps is not None and args.sentinel_subaps < 2:
+        raise ValueError(f'--sentinel-subaps must be >= 2, got {args.sentinel_subaps}')
 
 
 def _resolve_db_dir(cuts_outdir=None):
@@ -1903,6 +1954,7 @@ def _run_preprocessing(
     sentinel_first_burst=1,
     sentinel_last_burst=9999,
     sentinel_tc_source_band=None,
+    sentinel_subaps=None,
     skip=False,
 ):
     if not prepro or skip:
@@ -1916,6 +1968,7 @@ def _run_preprocessing(
         sentinel_first_burst=sentinel_first_burst,
         sentinel_last_burst=sentinel_last_burst,
         sentinel_tc_source_band=sentinel_tc_source_band,
+        sentinel_subaps=sentinel_subaps,
         gpt_memory=gpt_memory, gpt_parallelism=gpt_parallelism, gpt_timeout=gpt_timeout,
     )
     # TOPS returns {IW1: path, IW2: path, IW3: path}; others return a single path.
@@ -2235,6 +2288,7 @@ def run(args) -> int:
         sentinel_first_burst=args.sentinel_first_burst,
         sentinel_last_burst=args.sentinel_last_burst,
         sentinel_tc_source_band=args.sentinel_tc_source_band,
+        sentinel_subaps=args.sentinel_subaps,
         skip=args.skip_preprocessing,
         **gpt_kwargs,
     )

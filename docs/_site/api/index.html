@@ -34,7 +34,6 @@
 <a href="../tutorials/04_multitemporal_analysis.html">04 – Multi-temporal</a>
 <a href="../tutorials/05_polarimetric_analysis.html">05 – Polarimetry</a>
 <a href="../tutorials/06_custom_workflows.html">06 – Custom Workflows</a>
-<a href="../tutorials/07_ship_detection.html">07 – Ship Detection</a>
 <a href="../tutorials/08_interferometric_analysis.html">08 – InSAR</a>
 <h3>API Reference</h3>
 <a href="../api/index.html" class="active">Overview</a>
@@ -114,11 +113,6 @@
 <td>Radar Vegetation Index calculation</td>
 </tr>
 <tr>
-<td><code>calculate_entropy()</code></td>
-<td><code>sarpyx.processor.autofocus.metrics</code></td>
-<td>Image focus quality metric</td>
-</tr>
-<tr>
 <td><code>calculate_ndpoll()</code></td>
 <td><code>sarpyx.science.indices</code></td>
 <td>Normalized Difference Polarization Index</td>
@@ -154,9 +148,8 @@
 <pre><code>sarpyx/
 ├── processor/          # Core processing algorithms
 │   ├── core/          # Focus, decode, transforms
-│   ├── autofocus/     # Autofocus algorithms and metrics
-│   ├── algorithms/    # High-level processing algorithms
-│   ├── data/          # Data I/O and format conversion
+│   ├── algorithms/    # Implemented algorithm support modules
+│   ├── data/          # Implemented readers
 │   └── utils/         # Processing utilities
 ├── sla/               # Sub-Look Analysis
 │   ├── core/          # Main SLA implementation
@@ -189,7 +182,6 @@
 
 <span class="c1"># Import specific functions</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">sarpyx.science.indices</span><span class="w"> </span><span class="kn">import</span> <span class="n">calculate_rvi</span><span class="p">,</span> <span class="n">calculate_ndpoll</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">sarpyx.processor.autofocus.metrics</span><span class="w"> </span><span class="kn">import</span> <span class="n">calculate_entropy</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">sarpyx.utils.dem_utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">tiles_from_wkt</span><span class="p">,</span> <span class="n">build_vrt</span>
 </code></pre>
 <h3 id="common-api-patterns">Common API Patterns</h3>

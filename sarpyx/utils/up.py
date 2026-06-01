@@ -6,7 +6,6 @@ Script to upload models/datasets to Hugging Face Hub
 import argparse
 import os
 from pathlib import Path
-from huggingface_hub import HfApi, upload_folder, upload_file
 
 
 def upload_to_hf(
@@ -26,6 +25,8 @@ def upload_to_hf(
         token: HF token (if not provided, will use cached token)
         commit_message: Commit message
     """
+    from huggingface_hub import HfApi, upload_folder, upload_file
+
     api = HfApi(token=token)
     local_path = Path(local_path)
     

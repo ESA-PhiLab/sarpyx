@@ -14,7 +14,6 @@ try:
 except ImportError:
     torch = None
     TensorType = Any
-    print('Warning: PyTorch not available. Some functionality will be limited.')
 
 # Physical constants
 SPEED_OF_LIGHT_MPS = 299792458.0  # m/s

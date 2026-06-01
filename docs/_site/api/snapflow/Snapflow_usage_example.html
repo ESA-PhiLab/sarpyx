@@ -34,7 +34,6 @@
 <a href="../../tutorials/04_multitemporal_analysis.html">04 – Multi-temporal</a>
 <a href="../../tutorials/05_polarimetric_analysis.html">05 – Polarimetry</a>
 <a href="../../tutorials/06_custom_workflows.html">06 – Custom Workflows</a>
-<a href="../../tutorials/07_ship_detection.html">07 – Ship Detection</a>
 <a href="../../tutorials/08_interferometric_analysis.html">08 – InSAR</a>
 <h3>API Reference</h3>
 <a href="../../api/index.html">Overview</a>
@@ -137,7 +136,7 @@
 <span class="p">)</span>
 </code></pre>
 <h3 id="5-adaptive-thresholding-cfar">5. Adaptive Thresholding (CFAR)</h3>
-<pre class="codehilite"><code><span class="c1"># Apply CFAR detection</span>
+<pre class="codehilite"><code><span class="c1"># Apply SNAP adaptive thresholding</span>
 <span class="n">cfar_product</span> <span class="o">=</span> <span class="n">op</span><span class="o">.</span><span class="n">AdaptiveThresholding</span><span class="p">(</span>
     <span class="n">background_window_m</span><span class="o">=</span><span class="mi">800</span><span class="p">,</span>
     <span class="n">guard_window_m</span><span class="o">=</span><span class="mi">500</span><span class="p">,</span>
@@ -263,15 +262,14 @@
 </code></pre>
 <hr>
 <h2 id="complete-processing-workflows">Complete Processing Workflows</h2>
-<h3 id="workflow-1-ship-detection-for-sentinel-1">Workflow 1: Ship Detection for Sentinel-1</h3>
+<h3 id="workflow-1-adaptive-thresholding-for-sentinel-1">Workflow 1: Adaptive Thresholding for Sentinel-1</h3>
 <pre class="codehilite"><code><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">sarpyx.snapflow.engine</span><span class="w"> </span><span class="kn">import</span> <span class="n">GPT</span><span class="p">,</span> <span class="n">CFAR</span>
-<span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sarpyx.snapflow.engine</span><span class="w"> </span><span class="kn">import</span> <span class="n">GPT</span>
 
 <span class="c1"># Input data</span>
 <span class="n">product</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="s1">&#39;./data/S1A_IW_GRDH_20240503.SAFE&#39;</span><span class="p">)</span>
 <span class="n">land_mask</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="s1">&#39;./masks/coastline.shp&#39;</span><span class="p">)</span>
-<span class="n">output_dir</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="s1">&#39;./ship_detection/&#39;</span><span class="p">)</span>
+<span class="n">output_dir</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="s1">&#39;./thresholding/&#39;</span><span class="p">)</span>
 <span class="n">output_dir</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 
 <span class="c1"># Initialize</span>
@@ -284,8 +282,8 @@
 <span class="n">op</span><span class="o">.</span><span class="n">ImportVector</span><span class="p">(</span><span class="n">vector_data</span><span class="o">=</span><span class="n">land_mask</span><span class="p">)</span>
 <span class="n">op</span><span class="o">.</span><span class="n">LandMask</span><span class="p">(</span><span class="n">use_srtm</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">invert_geometry</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 
-<span class="c1"># Ship detection</span>
-<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Detecting ships...&quot;</span><span class="p">)</span>
+<span class="c1"># Adaptive thresholding</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Applying adaptive thresholding...&quot;</span><span class="p">)</span>
 <span class="n">op</span><span class="o">.</span><span class="n">AdaptiveThresholding</span><span class="p">(</span>
     <span class="n">background_window_m</span><span class="o">=</span><span class="mi">800</span><span class="p">,</span>
     <span class="n">guard_window_m</span><span class="o">=</span><span class="mi">500</span><span class="p">,</span>
@@ -293,58 +291,13 @@
     <span class="n">pfa</span><span class="o">=</span><span class="mf">6.5</span>
 <span class="p">)</span>
 
-<span class="c1"># Filter detections</span>
+<span class="c1"># Optional object-size filtering</span>
 <span class="n">final_product</span> <span class="o">=</span> <span class="n">op</span><span class="o">.</span><span class="n">ObjectDiscrimination</span><span class="p">(</span>
     <span class="n">min_target_m</span><span class="o">=</span><span class="mi">35</span><span class="p">,</span>
     <span class="n">max_target_m</span><span class="o">=</span><span class="mi">500</span>
 <span class="p">)</span>
 
-<span class="c1"># Extract results</span>
-<span class="n">product_path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">final_product</span><span class="p">)</span>
-<span class="n">data_dir</span> <span class="o">=</span> <span class="n">product_path</span><span class="o">.</span><span class="n">with_suffix</span><span class="p">(</span><span class="s1">&#39;.data&#39;</span><span class="p">)</span>
-<span class="n">csv_files</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">data_dir</span><span class="o">.</span><span class="n">glob</span><span class="p">(</span><span class="s1">&#39;*ship*.csv&#39;</span><span class="p">))</span>
-
-<span class="k">if</span> <span class="n">csv_files</span><span class="p">:</span>
-    <span class="n">detections</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">csv_files</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">header</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">sep</span><span class="o">=</span><span class="s1">&#39;</span><span class="se">\t</span><span class="s1">&#39;</span><span class="p">)</span>
-    <span class="n">excel_output</span> <span class="o">=</span> <span class="n">output_dir</span> <span class="o">/</span> <span class="s1">&#39;ship_detections.xlsx&#39;</span>
-    <span class="n">detections</span><span class="o">.</span><span class="n">to_excel</span><span class="p">(</span><span class="n">excel_output</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;✓ Detections saved: </span><span class="si">{</span><span class="n">excel_output</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;✓ Found </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">detections</span><span class="p">)</span><span class="si">}</span><span class="s2"> ships&quot;</span><span class="p">)</span>
-</code></pre>
-<h3 id="workflow-2-using-the-high-level-cfar-function">Workflow 2: Using the High-Level CFAR Function</h3>
-<pre class="codehilite"><code><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">sarpyx.snapflow.engine</span><span class="w"> </span><span class="kn">import</span> <span class="n">CFAR</span>
-
-<span class="c1"># Single PFA threshold</span>
-<span class="n">first_product</span><span class="p">,</span> <span class="n">excel_file</span> <span class="o">=</span> <span class="n">CFAR</span><span class="p">(</span>
-    <span class="n">prod</span><span class="o">=</span><span class="s1">&#39;./data/S1A_IW_GRDH_product.SAFE&#39;</span><span class="p">,</span>
-    <span class="n">mask_shp_path</span><span class="o">=</span><span class="s1">&#39;./masks/land_mask.shp&#39;</span><span class="p">,</span>
-    <span class="n">mode</span><span class="o">=</span><span class="s1">&#39;Ubuntu&#39;</span><span class="p">,</span>
-    <span class="n">Thresh</span><span class="o">=</span><span class="mf">6.5</span><span class="p">,</span>
-    <span class="n">DELETE</span><span class="o">=</span><span class="kc">True</span>  <span class="c1"># Delete intermediate products</span>
-<span class="p">)</span>
-
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Processed product: </span><span class="si">{</span><span class="n">first_product</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Detection results: </span><span class="si">{</span><span class="n">excel_file</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-</code></pre>
-<h3 id="workflow-3-multiple-pfa-thresholds">Workflow 3: Multiple PFA Thresholds</h3>
-<pre class="codehilite"><code><span class="kn">from</span><span class="w"> </span><span class="nn">sarpyx.snapflow.engine</span><span class="w"> </span><span class="kn">import</span> <span class="n">CFAR</span>
-
-<span class="c1"># Test multiple PFA values</span>
-<span class="n">pfa_values</span> <span class="o">=</span> <span class="p">[</span><span class="mf">4.5</span><span class="p">,</span> <span class="mf">6.5</span><span class="p">,</span> <span class="mf">8.5</span><span class="p">,</span> <span class="mf">10.5</span><span class="p">,</span> <span class="mf">12.5</span><span class="p">]</span>
-
-<span class="n">first_product</span><span class="p">,</span> <span class="n">last_excel</span> <span class="o">=</span> <span class="n">CFAR</span><span class="p">(</span>
-    <span class="n">prod</span><span class="o">=</span><span class="s1">&#39;./data/COSMO_SkyMed_product.h5&#39;</span><span class="p">,</span>
-    <span class="n">mask_shp_path</span><span class="o">=</span><span class="s1">&#39;./masks/mediterranean.shp&#39;</span><span class="p">,</span>
-    <span class="n">mode</span><span class="o">=</span><span class="s1">&#39;Ubuntu&#39;</span><span class="p">,</span>
-    <span class="n">Thresh</span><span class="o">=</span><span class="n">pfa_values</span><span class="p">,</span>
-    <span class="n">DELETE</span><span class="o">=</span><span class="kc">False</span>  <span class="c1"># Keep all intermediate products</span>
-<span class="p">)</span>
-
-<span class="c1"># This creates 5 Excel files with different detection thresholds:</span>
-<span class="c1"># - COSMO_SkyMed_product_pfa_4.5.xlsx</span>
-<span class="c1"># - COSMO_SkyMed_product_pfa_6.5.xlsx</span>
-<span class="c1"># - ...</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;✓ Thresholded product: </span><span class="si">{</span><span class="n">final_product</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 </code></pre>
 <hr>
 <h2 id="advanced-examples">Advanced Examples</h2>
@@ -438,7 +391,7 @@
 <span class="n">op</span><span class="o">.</span><span class="n">ImportVector</span><span class="p">(</span><span class="n">vector_data</span><span class="o">=</span><span class="s1">&#39;./masks/land.shp&#39;</span><span class="p">)</span>
 <span class="n">op</span><span class="o">.</span><span class="n">LandMask</span><span class="p">()</span>
 
-<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;CFAR detection...&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Adaptive thresholding...&quot;</span><span class="p">)</span>
 <span class="n">op</span><span class="o">.</span><span class="n">AdaptiveThresholding</span><span class="p">(</span>
     <span class="n">background_window_m</span><span class="o">=</span><span class="mi">650</span><span class="p">,</span>
     <span class="n">guard_window_m</span><span class="o">=</span><span class="mi">400</span><span class="p">,</span>
@@ -518,7 +471,7 @@
 <li><strong>Chain operations</strong> by calling methods sequentially</li>
 <li><strong>Each method</strong> updates the internal product path automatically</li>
 <li><strong>Check results</strong> - methods return output path or <code>None</code> on failure</li>
-<li><strong>Use high-level functions</strong> like <code>CFAR()</code> for complete workflows</li>
+<li><strong>Build workflows</strong> by composing the wrapped <code>GPT</code> operations that exist in <code>sarpyx.snapflow.engine</code></li>
 </ol>
 <p>For more information, see the <a href="https://step.esa.int/main/doc/">SNAP documentation</a> and the source code.</p>
     <div class="footer">

@@ -1551,7 +1551,7 @@ In this tutorial, you learned:
 
 ## Next Steps
 
-- **Tutorial 7**: Ship detection with CFAR algorithms
+- **Tutorial 8**: Interferometric processing
 - **Tutorial 8**: Advanced interferometric analysis
 - Adapt workflows to your specific applications
 - Integrate with cloud processing platforms

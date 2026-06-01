@@ -34,7 +34,6 @@
 <a href="../tutorials/04_multitemporal_analysis.html">04 – Multi-temporal</a>
 <a href="../tutorials/05_polarimetric_analysis.html">05 – Polarimetry</a>
 <a href="../tutorials/06_custom_workflows.html">06 – Custom Workflows</a>
-<a href="../tutorials/07_ship_detection.html">07 – Ship Detection</a>
 <a href="../tutorials/08_interferometric_analysis.html">08 – InSAR</a>
 <h3>API Reference</h3>
 <a href="../api/index.html">Overview</a>
@@ -55,10 +54,10 @@
   </nav>
   <main class="main">
     <h1 id="data-formats-and-compatibility">Data Formats and Compatibility</h1>
-<p>This guide covers the data formats supported by sarpyx for input and output operations, along with format-specific considerations and best practices.</p>
+<p>This guide covers the data formats currently handled by implemented sarpyx workflows. Mission-specific support is concentrated in the WorldSAR CLI, SNAP GPT wrapper, H5/Zarr utilities, and sub-aperture BEAM-DIMAP helpers.</p>
 <h2 id="supported-input-formats">Supported Input Formats</h2>
 <h3 id="sar-product-formats">SAR Product Formats</h3>
-<p>sarpyx supports the following SAR mission data formats:</p>
+<p>sarpyx currently has implemented paths for the following SAR mission data formats:</p>
 <h4 id="sentinel-1-copernicus">Sentinel-1 (Copernicus)</h4>
 <ul>
 <li><strong>Format</strong>: SAFE (Standard Archive Format for Europe)</li>
@@ -75,29 +74,16 @@
 <span class="c1"># Input: ZIP file containing SAFE format</span>
 <span class="n">sla</span> <span class="o">=</span> <span class="n">SubLookAnalysis</span><span class="p">(</span><span class="s2">&quot;S1A_IW_SLC_1SDV_20230101T120000_20230101T120030_046123_058A2B_1234.zip&quot;</span><span class="p">)</span>
 </code></pre>
-<h4 id="cosmo-skymed-italian-space-agency">COSMO-SkyMed (Italian Space Agency)</h4>
+<h4 id="terrasar-x">TerraSAR-X</h4>
 <ul>
-<li><strong>Format</strong>: HDF5-based proprietary format</li>
-<li><strong>File Extension</strong>: Various (<code>.h5</code>, custom extensions)</li>
-<li><strong>Product Types</strong>: SCS (Single Look Complex Slant Range)</li>
-<li><strong>Polarizations</strong>: HH, HV, VH, VV</li>
-<li><strong>Processing Levels</strong>: Level-1A, Level-1B</li>
+<li><strong>Format</strong>: TerraSAR-X product directories and ZIP/SIP ZIP archives</li>
+<li><strong>Product Types</strong>: geocoded EEC/GEC, complex SSC/SLC, detected MGD/GRD variants</li>
+<li><strong>Usage</strong>: WorldSAR mode inference, product XML resolution, footprint extraction, and SNAP preprocessing dispatch</li>
 </ul>
-<pre class="codehilite"><code><span class="c1"># Example: COSMO-SkyMed processing</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">sarpyx.snapflow.engine</span><span class="w"> </span><span class="kn">import</span> <span class="n">GPT</span>
-
-<span class="c1"># Initialize with COSMO-SkyMed product</span>
-<span class="n">gpt</span> <span class="o">=</span> <span class="n">GPT</span><span class="p">(</span><span class="n">product_path</span><span class="o">=</span><span class="s2">&quot;CSK_product.h5&quot;</span><span class="p">,</span> 
-          <span class="n">outdir</span><span class="o">=</span><span class="s2">&quot;output/&quot;</span><span class="p">,</span> 
-          <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;MacOS&quot;</span><span class="p">)</span>  <span class="c1"># or &quot;Ubuntu&quot;</span>
-</code></pre>
-<h4 id="alos-palsar-alos-2-palsar-2-jaxa">ALOS PALSAR / ALOS-2 PALSAR-2 (JAXA)</h4>
+<h4 id="nisar">NISAR</h4>
 <ul>
-<li><strong>Format</strong>: CEOS (Committee on Earth Observation Satellites)</li>
-<li><strong>File Extension</strong>: Various (directory structures)</li>
-<li><strong>Product Types</strong>: Level 1.1, Level 1.5</li>
-<li><strong>Polarizations</strong>: HH, HV, VH, VV</li>
-<li><strong>Band</strong>: L-band</li>
+<li><strong>Format</strong>: HDF5-based products</li>
+<li><strong>Usage</strong>: metadata reading, footprint extraction, and cut helpers in <code>sarpyx.utils.nisar_utils</code></li>
 </ul>
 <h3 id="derived-data-formats">Derived Data Formats</h3>
 <h4 id="complex-sar-data">Complex SAR Data</h4>
@@ -137,10 +123,10 @@
 <pre class="codehilite"><code><span class="kn">from</span><span class="w"> </span><span class="nn">sarpyx.snapflow.engine</span><span class="w"> </span><span class="kn">import</span> <span class="n">GPT</span>
 
 <span class="c1"># Example SNAP processing chain</span>
-<span class="n">gpt</span> <span class="o">=</span> <span class="n">GPT</span><span class="p">(</span><span class="n">product_path</span><span class="o">=</span><span class="s2">&quot;input.zip&quot;</span><span class="p">,</span> <span class="n">outdir</span><span class="o">=</span><span class="s2">&quot;output/&quot;</span><span class="p">)</span>
+<span class="n">gpt</span> <span class="o">=</span> <span class="n">GPT</span><span class="p">(</span><span class="n">product</span><span class="o">=</span><span class="s2">&quot;input.zip&quot;</span><span class="p">,</span> <span class="n">outdir</span><span class="o">=</span><span class="s2">&quot;output/&quot;</span><span class="p">)</span>
 
 <span class="c1"># Calibration (outputs BEAM-DIMAP by default)</span>
-<span class="n">cal_product</span> <span class="o">=</span> <span class="n">gpt</span><span class="o">.</span><span class="n">Calibration</span><span class="p">(</span><span class="n">Pols</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;VV&#39;</span><span class="p">,</span> <span class="s1">&#39;VH&#39;</span><span class="p">])</span>
+<span class="n">cal_product</span> <span class="o">=</span> <span class="n">gpt</span><span class="o">.</span><span class="n">calibration</span><span class="p">(</span><span class="n">pols</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;VV&#39;</span><span class="p">,</span> <span class="s1">&#39;VH&#39;</span><span class="p">])</span>
 
 <span class="c1"># Export to GeoTIFF for external use</span>
 <span class="n">gpt</span><span class="o">.</span><span class="n">format</span> <span class="o">=</span> <span class="s1">&#39;GeoTIFF&#39;</span>

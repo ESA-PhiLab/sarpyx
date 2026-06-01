@@ -34,7 +34,6 @@
 <a href="../tutorials/04_multitemporal_analysis.html">04 – Multi-temporal</a>
 <a href="../tutorials/05_polarimetric_analysis.html">05 – Polarimetry</a>
 <a href="../tutorials/06_custom_workflows.html">06 – Custom Workflows</a>
-<a href="../tutorials/07_ship_detection.html">07 – Ship Detection</a>
 <a href="../tutorials/08_interferometric_analysis.html">08 – InSAR</a>
 <h3>API Reference</h3>
 <a href="../api/index.html">Overview</a>
@@ -66,15 +65,16 @@
 <li><a href="science_applications.html">Science Applications</a></li>
 <li><a href="snap_integration.html">SNAP Integration</a></li>
 <li><a href="troubleshooting.html">Troubleshooting</a></li>
+<li><a href="snap2stamps_guide.html">SNAP2StaMPS Guide</a></li>
 </ol>
 <h2 id="overview">Overview</h2>
 <p>sarpyx is designed to provide researchers and developers with powerful tools for SAR data processing. The package is organized into several main modules:</p>
 <ul>
-<li><strong><code>sarpyx.processor</code></strong>: Core processing algorithms and utilities</li>
-<li><strong><code>sarpyx.science</code></strong>: Scientific analysis tools and indices</li>
-<li><strong><code>sarpyx.sla</code></strong>: Sub-Look Analysis for aperture decomposition</li>
-<li><strong><code>sarpyx.snapflow</code></strong>: Integration with ESA&rsquo;s SNAP platform</li>
-<li><strong><code>sarpyx.utils</code></strong>: General utilities and visualization tools</li>
+<li><strong><code>sarpyx.cli.worldsar</code></strong>: WorldSAR preprocessing, tiling, validation, H5-to-Zarr conversion</li>
+<li><strong><code>sarpyx.snapflow</code></strong>: ESA SNAP GPT integration and SNAP2StaMPS-style pipeline orchestration</li>
+<li><strong><code>sarpyx.processor.core</code></strong>: implemented decode, focus primitives, signal helpers, and sub-aperture processing</li>
+<li><strong><code>sarpyx.science</code></strong>: implemented SAR index formulas</li>
+<li><strong><code>sarpyx.utils</code></strong>: geospatial, H5/Zarr, DEM, plotting, metrics, and upload utilities</li>
 </ul>
 <h2 id="quick-navigation">Quick Navigation</h2>
 <ul>

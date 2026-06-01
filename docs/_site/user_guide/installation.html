@@ -34,7 +34,6 @@
 <a href="../tutorials/04_multitemporal_analysis.html">04 – Multi-temporal</a>
 <a href="../tutorials/05_polarimetric_analysis.html">05 – Polarimetry</a>
 <a href="../tutorials/06_custom_workflows.html">06 – Custom Workflows</a>
-<a href="../tutorials/07_ship_detection.html">07 – Ship Detection</a>
 <a href="../tutorials/08_interferometric_analysis.html">08 – InSAR</a>
 <h3>API Reference</h3>
 <a href="../api/index.html">Overview</a>
@@ -76,6 +75,23 @@
 <li>GDAL libraries (for geospatial data handling)</li>
 </ul>
 <h2 id="installation-methods">Installation Methods</h2>
+<h3 id="containerized-execution-optional">Containerized execution (optional)</h3>
+<p>If you run <code>sarpyx</code> via the provided container, the entrypoint uses this order:</p>
+<ol>
+<li><code>GRID_PATH</code> (or <code>grid_path</code>) if it points to an existing in-container <code>*.geojson</code></li>
+<li>first <code>*.geojson</code> found under <code>/workspace/grid</code></li>
+</ol>
+<p>If neither is available, the container exits with an error. Startup-time grid
+generation has been removed.</p>
+<p>To use your own mounted grid, place any GeoJSON in <code>./grid</code>:</p>
+<pre class="codehilite"><code>mkdir<span class="w"> </span>-p<span class="w"> </span>./grid
+<span class="c1"># Example: cp my_region.geojson ./grid/</span>
+docker<span class="w"> </span>compose<span class="w"> </span>up
+</code></pre>
+<p>If you use <code>docker-compose</code>, mount the grid directory and optionally set <code>GRID_PATH</code> to choose a specific file:</p>
+<pre class="codehilite"><code>-<span class="w"> </span>./grid:/workspace/grid:ro
+-<span class="w"> </span><span class="nv">GRID_PATH</span><span class="o">=</span>/workspace/grid/my_region.geojson
+</code></pre>
 <h3 id="1-using-pip-recommended-for-users">1. Using pip (Recommended for Users)</h3>
 <p>Once sarpyx is published to PyPI, you can install it using:</p>
 <pre class="codehilite"><code>pip<span class="w"> </span>install<span class="w"> </span>sarpyx
@@ -125,6 +141,10 @@ uv<span class="w"> </span>sync<span class="w"> </span>--group<span class="w"> </
 <span class="kn">from</span><span class="w"> </span><span class="nn">sarpyx.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">show_image</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">sarpyx.sla</span><span class="w"> </span><span class="kn">import</span> <span class="n">SubLookAnalysis</span>
 <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Installation successful!&quot;</span><span class="p">)</span>
+</code></pre>
+<p>For the managed <code>uv</code> environment:</p>
+<pre class="codehilite"><code>uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;import sarpyx; print(sarpyx.__version__)&quot;</span>
+uv<span class="w"> </span>run<span class="w"> </span>sarpyx<span class="w"> </span>--help
 </code></pre>
 <h2 id="optional-dependencies">Optional Dependencies</h2>
 <h3 id="snap-integration">SNAP Integration</h3>
@@ -197,10 +217,11 @@ conda<span class="w"> </span>create<span class="w"> </span>-n<span class="w"> </
 conda<span class="w"> </span>activate<span class="w"> </span>sarpyx
 </code></pre>
 <h3 id="development-environment">Development Environment</h3>
-<p>For development work, also install development tools:</p>
-<pre class="codehilite"><code>pip<span class="w"> </span>install<span class="w"> </span>pytest<span class="w"> </span>black<span class="w"> </span>flake8<span class="w"> </span>mypy<span class="w"> </span>sphinx
+<p>For development work, use the managed toolchain:</p>
+<pre class="codehilite"><code>uv<span class="w"> </span>sync<span class="w"> </span>--group<span class="w"> </span>dev
+uv<span class="w"> </span>run<span class="w"> </span>pytest<span class="w"> </span>-q
+uv<span class="w"> </span>build
 </code></pre>
-<p>This ensures you have all tools needed for testing, linting, and documentation generation.</p>
     <div class="footer">
       sarpyx Documentation &nbsp;·&nbsp; built with <code>build_site.py</code>
     </div>

@@ -663,8 +663,8 @@ def figma_specs() -> list[dict[str, Any]]:
                 {"id": "ext_io", "label": "Filesystem / Zarr", "type": "external"},
             ],
             "edges": [
-                {"source": "cli", "target": "core", "label": "decode/focus"},
-                {"source": "cli", "target": "snapflow", "label": "shipdet/worldsar"},
+                {"source": "cli", "target": "core", "label": "decode"},
+                {"source": "cli", "target": "snapflow", "label": "worldsar"},
                 {"source": "core", "target": "utils", "label": "shared helpers"},
                 {"source": "science", "target": "utils", "label": "array ops"},
                 {"source": "sla", "target": "utils", "label": "metrics/io"},
@@ -688,7 +688,6 @@ def figma_specs() -> list[dict[str, Any]]:
             "diagram_name": "Module dependency graph",
             "purpose": "Show coupling between high-traffic modules.",
             "nodes": [
-                {"id": "cli_main", "label": "sarpyx.cli.main", "type": "module"},
                 {"id": "cli_worldsar", "label": "sarpyx.cli.worldsar", "type": "module"},
                 {"id": "snap_engine", "label": "sarpyx.snapflow.engine", "type": "module"},
                 {"id": "focus_core", "label": "sarpyx.processor.core.focus", "type": "module"},
@@ -697,7 +696,6 @@ def figma_specs() -> list[dict[str, Any]]:
                 {"id": "geos", "label": "sarpyx.utils.geos", "type": "module"},
             ],
             "edges": [
-                {"source": "cli_main", "target": "cli_worldsar", "label": "dispatch"},
                 {"source": "cli_worldsar", "target": "snap_engine", "label": "GPT wrapper"},
                 {"source": "cli_worldsar", "target": "geos", "label": "tiling geometry"},
                 {"source": "decode_core", "target": "zarr_utils", "label": "persist decode output"},
@@ -720,7 +718,7 @@ def figma_specs() -> list[dict[str, Any]]:
                 {"id": "input", "label": "Input Product (.SAFE/.dat/.zip)", "type": "data"},
                 {"id": "decode", "label": "Decode", "type": "process"},
                 {"id": "zarr", "label": "Decoded Zarr", "type": "data"},
-                {"id": "focus", "label": "Focus (CoarseRDA)", "type": "process"},
+                {"id": "subaps", "label": "Sub-aperture Processing", "type": "process"},
                 {"id": "focused", "label": "Focused Arrays", "type": "data"},
                 {"id": "analysis", "label": "SLA/Science Metrics", "type": "process"},
                 {"id": "outputs", "label": "Exports (GeoTIFF/HDF5/Zarr)", "type": "data"},
@@ -728,8 +726,8 @@ def figma_specs() -> list[dict[str, Any]]:
             "edges": [
                 {"source": "input", "target": "decode", "label": "read"},
                 {"source": "decode", "target": "zarr", "label": "write"},
-                {"source": "zarr", "target": "focus", "label": "load"},
-                {"source": "focus", "target": "focused", "label": "persist"},
+                {"source": "zarr", "target": "subaps", "label": "load"},
+                {"source": "subaps", "target": "focused", "label": "persist"},
                 {"source": "focused", "target": "analysis", "label": "compute"},
                 {"source": "analysis", "target": "outputs", "label": "export"},
             ],
@@ -742,7 +740,7 @@ def figma_specs() -> list[dict[str, Any]]:
                 "edge": "#86a8ff",
                 "text": "#e6edf3",
             },
-            "component_grouping_guidance": "Group decode/focus as core processing stage; keep analysis/export as downstream stage.",
+            "component_grouping_guidance": "Group decode and sub-aperture processing as core stages; keep analysis/export as downstream stages.",
         },
         {
             "diagram_name": "Request lifecycle",
@@ -826,7 +824,7 @@ def make_index_page(project: dict[str, Any], highlights: list[str], module_items
     return f"""
 <section>
   <h1 id=\"project-overview\">Project Overview</h1>
-  <p><strong>{h(project.get('name', 'sarpyx'))}</strong> is a Python SAR processing toolkit with CLI workflows for decoding, focusing, SNAP-based processing, tiling, and scientific metrics.</p>
+  <p><strong>{h(project.get('name', 'sarpyx'))}</strong> is a Python SAR processing toolkit with CLI workflows for WorldSAR/SNAP preprocessing, tiling, validation, H5-to-Zarr conversion, Sentinel-1 decode wrapping, and scientific metrics.</p>
   <h2 id=\"problem-statement\">Problem Statement</h2>
   <p>The repository addresses repeatable processing of large SAR products across multiple missions while preserving metadata and providing automation-friendly CLI and Python APIs.</p>
   <h2 id=\"target-audience\">Target Audience</h2>
@@ -838,7 +836,7 @@ def make_index_page(project: dict[str, Any], highlights: list[str], module_items
   <h2 id=\"key-features\">Key Features</h2>
   <ul>{feature_items}</ul>
   <h2 id=\"high-level-architecture-summary\">High-Level Architecture Summary</h2>
-  <p>The package is split into `cli`, `processor`, `snapflow`, `sla`, `science`, and `utils` namespaces. The CLI layer orchestrates decode/focus/tiling flows, while core modules process arrays and persist results (for example to Zarr). SNAP integration wraps GPT command execution for mission-specific pipelines.</p>
+  <p>The package is split into <code>cli</code>, <code>processor</code>, <code>snapflow</code>, <code>sla</code>, <code>science</code>, and <code>utils</code> namespaces. The CLI layer currently exposes WorldSAR processing, Sentinel-1 decode wrapping, unzip, and upload commands. SNAP integration wraps GPT command execution for mission-specific pipelines.</p>
   <div class=\"card-grid\">
     <section class=\"card\" data-searchable data-search=\"primary language dependencies\">
       <h3 id=\"primary-languages\">Primary Languages</h3>
@@ -879,7 +877,7 @@ def make_installation_page(project: dict[str, Any]) -> str:
   <ul>
     <li>Python <code>{h(project.get('requires-python', '>=3.11'))}</code>.</li>
     <li><code>uv</code> (recommended by repository tooling).</li>
-    <li>SNAP + Java when running SNAP-dependent commands (<code>shipdet</code>, <code>worldsar</code>).</li>
+    <li>SNAP + Java when running SNAP-dependent commands such as <code>sarpyx</code> / WorldSAR processing.</li>
     <li>Docker Engine if using container workflows.</li>
   </ul>
 
@@ -943,25 +941,24 @@ def make_quickstart_page() -> str:
 <section>
   <h1 id=\"quick-start\">Quick Start</h1>
   <h2 id=\"minimal-example\">Minimal Example</h2>
-  <pre><code class=\"language-bash\"># 1) decode
-sarpyx decode --input /data/product.dat --output /data/decoded
+  <pre><code class=\"language-bash\"># WorldSAR help
+sarpyx --help
 
-# 2) focus
-sarpyx focus --input /data/decoded/product.zarr --output /data/focused
+# H5 tile to Zarr conversion
+sarpyx --input /data/tile.h5 --output /data/tile.zarr --h5-to-zarr-only --overwrite-zarr
 </code></pre>
 
   <h2 id=\"cli-usage\">CLI Usage</h2>
   <pre><code class=\"language-bash\">sarpyx --help
-sarpyx decode --help
-sarpyx focus --help
-sarpyx shipdet --help
-sarpyx worldsar --help
+sarpyx-decode --help
+sarpyx-unzip --help
+sarpyx-upload --help
 </code></pre>
 
   <h2 id=\"common-workflow\">Common Workflow</h2>
   <ol>
     <li>Prepare input products and grid files.</li>
-    <li>Run decode/focus (or mission pipeline via worldsar).</li>
+    <li>Run the WorldSAR mission pipeline or H5-to-Zarr conversion.</li>
     <li>Export products and inspect metrics.</li>
     <li>Optionally upload outputs using <code>sarpyx upload</code>.</li>
   </ol>
@@ -974,7 +971,7 @@ arr = manager.load()
 print(arr.shape)
 </code></pre>
 
-  <p>Behavior and imports above are inferred from implementation and current public exports.</p>
+  <p>The commands above are the shipped console scripts. Placeholder focus and ship-detection commands are intentionally not exposed.</p>
 </section>
 """
 
@@ -1029,7 +1026,7 @@ def make_architecture_page(module_items: list[dict[str, Any]], specs: list[dict[
 
   <h2 id=\"design-patterns\">Design Patterns</h2>
   <ul>
-    <li>Command-style CLI dispatch in <code>sarpyx.cli.main</code>.</li>
+    <li>Command-style CLI entry points through <code>pyproject.toml</code> console scripts.</li>
     <li>Wrapper abstraction for external GPT execution in <code>sarpyx.snapflow.engine.GPT</code>.</li>
     <li>Pipeline orchestration helpers in <code>sarpyx.snapflow.snap2stamps</code> with a deprecated compatibility alias at <code>sarpyx.snapflow.snap2stamps_pipelines</code>.</li>
     <li>Manager-style APIs for structured Zarr data access in <code>sarpyx.utils.zarr_utils</code>.</li>
@@ -1731,6 +1728,10 @@ h4:hover .anchor-link {
 
 
 def generate_api_pages(module_items: list[dict[str, Any]]) -> tuple[dict[str, list[tuple[str, str]]], dict[str, Any]]:
+    API_DIR.mkdir(parents=True, exist_ok=True)
+    for stale_page in API_DIR.glob("sarpyx_*.html"):
+        stale_page.unlink()
+
     module_nav: dict[str, list[tuple[str, str]]] = defaultdict(list)
     # Precompute complete module navigation so every generated page gets the full sidebar.
     for item in module_items:

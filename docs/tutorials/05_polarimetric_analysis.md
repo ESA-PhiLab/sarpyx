@@ -1003,7 +1003,7 @@ In this tutorial, you learned:
 ## Next Steps
 
 - **Tutorial 6**: Custom processing workflows for specific applications
-- **Tutorial 7**: Ship detection with CFAR algorithms
+- **Tutorial 8**: Interferometric processing
 - Experiment with full polarimetric data (quad-pol)
 - Apply to different land cover types
 - Integrate with optical data for enhanced analysis

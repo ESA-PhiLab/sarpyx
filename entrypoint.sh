@@ -3,6 +3,14 @@ set -euo pipefail
 
 echo "=== Container Startup Script ==="
 
+SNAP_USERDIR="${SNAP_USERDIR:-/tmp/sarpyx-snap-userdir}"
+if ! mkdir -p "${SNAP_USERDIR}/auxdata/hdf_natives" 2>/dev/null; then
+    echo "Warning: SNAP_USERDIR=${SNAP_USERDIR} is not writable; falling back to /tmp/sarpyx-snap-userdir" >&2
+    SNAP_USERDIR="/tmp/sarpyx-snap-userdir"
+    mkdir -p "${SNAP_USERDIR}/auxdata/hdf_natives"
+fi
+export SNAP_USERDIR
+
 # Update SNAP
 echo "Updating SNAP..."
 if [ -d "${SNAP_HOME}/bin" ]; then

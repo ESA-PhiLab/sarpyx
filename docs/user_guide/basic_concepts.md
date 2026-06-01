@@ -109,16 +109,12 @@ focused_data = focus.range_compression(processed_data)
 focused_data = focus.azimuth_compression(focused_data)
 ```
 
-#### 3. Autofocus (if needed)
+#### 3. Quality Metrics
 ```python
-# Check focus quality
-from sarpyx.processor.autofocus import metrics
-focus_quality = metrics.calculate_entropy(focused_data)
+from sarpyx.sla.metrics import enl, dispersion_ratio
 
-# Apply autofocus if necessary
-if focus_quality < threshold:
-    from sarpyx.processor.autofocus import compressor
-    autofocused = compressor.autofocus(focused_data)
+equivalent_looks = enl(focused_data)
+normalized_variance = dispersion_ratio(focused_data)
 ```
 
 ## Frequency Domain Processing
@@ -209,21 +205,15 @@ geocoded = gpt.TerrainCorrection(
 
 ## Quality Metrics
 
-### Focus Quality Assessment
+### Sub-Look Quality Assessment
 
 ```python
-from sarpyx.processor.autofocus.metrics import (
-    calculate_entropy,
-    calculate_contrast,
-    calculate_sharpness
-)
+from sarpyx.sla.metrics import enl, dispersion_ratio
 
-# Assess image focus quality
-entropy = calculate_entropy(sar_image)
-contrast = calculate_contrast(sar_image)
-sharpness = calculate_sharpness(sar_image)
+equivalent_looks = enl(sar_image)
+variance_ratio = dispersion_ratio(sar_image)
 
-print(f"Focus Quality - Entropy: {entropy:.3f}, Contrast: {contrast:.3f}")
+print(f"ENL: {equivalent_looks:.3f}, dispersion ratio: {variance_ratio:.3f}")
 ```
 
 ### Statistical Measures
@@ -314,11 +304,12 @@ def assess_sar_quality(product_path):
     sla.SpectrumComputation()
     
     # Calculate quality metrics
-    entropy = calculate_entropy(sla.Box)
+    from sarpyx.sla.metrics import enl
+    equivalent_looks = enl(sla.Box)
     
     # Generate report
     return {
-        'entropy': entropy,
+        'enl': equivalent_looks,
         'mean_intensity': np.mean(np.abs(sla.Box)**2),
         'data_shape': sla.Box.shape
     }

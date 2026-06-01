@@ -34,7 +34,6 @@
 <a href="../tutorials/04_multitemporal_analysis.html">04 – Multi-temporal</a>
 <a href="../tutorials/05_polarimetric_analysis.html">05 – Polarimetry</a>
 <a href="../tutorials/06_custom_workflows.html">06 – Custom Workflows</a>
-<a href="../tutorials/07_ship_detection.html">07 – Ship Detection</a>
 <a href="../tutorials/08_interferometric_analysis.html">08 – InSAR</a>
 <h3>API Reference</h3>
 <a href="../api/index.html">Overview</a>
@@ -276,94 +275,6 @@ gpt.exe<span class="w"> </span>--help<span class="w">  </span><span class="c1">#
     <span class="s2">&quot;calibrated_product.dim&quot;</span><span class="p">,</span>
     <span class="s2">&quot;mediterranean_coastline.shp&quot;</span>
 <span class="p">)</span>
-</code></pre>
-<h2 id="object-detection-workflows">Object Detection Workflows</h2>
-<h3 id="cfar-ship-detection">CFAR Ship Detection</h3>
-<p>Constant False Alarm Rate (CFAR) detection for ship monitoring:</p>
-<pre class="codehilite"><code><span class="c1"># Single threshold detection</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">sarpyx.snapflow.engine</span><span class="w"> </span><span class="kn">import</span> <span class="n">CFAR</span>
-
-<span class="n">first_product</span><span class="p">,</span> <span class="n">excel_results</span> <span class="o">=</span> <span class="n">CFAR</span><span class="p">(</span>
-    <span class="n">prod</span><span class="o">=</span><span class="s2">&quot;S1A_IW_GRDH_1SDV_20231101.zip&quot;</span><span class="p">,</span>
-    <span class="n">mask_shp_path</span><span class="o">=</span><span class="s2">&quot;land_mask.shp&quot;</span><span class="p">,</span>
-    <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;MacOS&quot;</span><span class="p">,</span>
-    <span class="n">Thresh</span><span class="o">=</span><span class="mf">12.5</span><span class="p">,</span>  <span class="c1"># False alarm rate threshold  </span>
-    <span class="n">DELETE</span><span class="o">=</span><span class="kc">False</span>  <span class="c1"># Keep intermediate products for analysis</span>
-<span class="p">)</span>
-
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Detection results saved to: </span><span class="si">{</span><span class="n">excel_results</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-</code></pre>
-<h3 id="advanced-cfar-with-multiple-thresholds">Advanced CFAR with Multiple Thresholds</h3>
-<pre class="codehilite"><code><span class="c1"># Test multiple sensitivity levels</span>
-<span class="n">pfa_thresholds</span> <span class="o">=</span> <span class="p">[</span><span class="mf">6.5</span><span class="p">,</span> <span class="mf">9.5</span><span class="p">,</span> <span class="mf">12.5</span><span class="p">,</span> <span class="mf">15.5</span><span class="p">]</span>
-
-<span class="n">first_product</span><span class="p">,</span> <span class="n">excel_results</span> <span class="o">=</span> <span class="n">CFAR</span><span class="p">(</span>
-    <span class="n">prod</span><span class="o">=</span><span class="s2">&quot;sentinel1_product.zip&quot;</span><span class="p">,</span>
-    <span class="n">mask_shp_path</span><span class="o">=</span><span class="s2">&quot;coastline.shp&quot;</span><span class="p">,</span>
-    <span class="n">Thresh</span><span class="o">=</span><span class="n">pfa_thresholds</span><span class="p">,</span>
-    <span class="n">DELETE</span><span class="o">=</span><span class="kc">True</span>  <span class="c1"># Clean up intermediate files</span>
-<span class="p">)</span>
-
-<span class="c1"># Results include detection files for each threshold</span>
-<span class="c1"># Lower thresholds = more sensitive detection</span>
-<span class="c1"># Higher thresholds = fewer false alarms</span>
-</code></pre>
-<h3 id="custom-cfar-parameters">Custom CFAR Parameters</h3>
-<pre class="codehilite"><code><span class="k">def</span><span class="w"> </span><span class="nf">custom_cfar_detection</span><span class="p">(</span><span class="n">input_product</span><span class="p">,</span> <span class="n">mask_shapefile</span><span class="p">,</span> <span class="n">output_dir</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Custom CFAR detection with fine-tuned parameters.&quot;&quot;&quot;</span>
-
-    <span class="n">gpt</span> <span class="o">=</span> <span class="n">GPT</span><span class="p">(</span><span class="n">product</span><span class="o">=</span><span class="n">input_product</span><span class="p">,</span> <span class="n">outdir</span><span class="o">=</span><span class="n">output_dir</span><span class="p">)</span>
-
-    <span class="c1"># Preprocessing (product-specific)</span>
-    <span class="kn">from</span><span class="w"> </span><span class="nn">sarpyx.utils.io</span><span class="w"> </span><span class="kn">import</span> <span class="n">mode_identifier</span>
-    <span class="n">prod_type</span> <span class="o">=</span> <span class="n">mode_identifier</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="n">input_product</span><span class="p">)</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
-
-    <span class="k">if</span> <span class="n">prod_type</span> <span class="o">==</span> <span class="s2">&quot;SEN&quot;</span><span class="p">:</span>
-        <span class="c1"># Sentinel-1 preprocessing</span>
-        <span class="n">deb_product</span> <span class="o">=</span> <span class="n">gpt</span><span class="o">.</span><span class="n">Deburst</span><span class="p">()</span>
-        <span class="n">cal_product</span> <span class="o">=</span> <span class="n">gpt</span><span class="o">.</span><span class="n">Calibration</span><span class="p">(</span><span class="n">Pols</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;VH&#39;</span><span class="p">])</span>
-
-        <span class="c1"># Import land mask</span>
-        <span class="n">vector_product</span> <span class="o">=</span> <span class="n">gpt</span><span class="o">.</span><span class="n">ImportVector</span><span class="p">(</span><span class="n">vector_data</span><span class="o">=</span><span class="n">mask_shapefile</span><span class="p">)</span>
-        <span class="n">masked_product</span> <span class="o">=</span> <span class="n">gpt</span><span class="o">.</span><span class="n">LandMask</span><span class="p">()</span>
-
-        <span class="n">start_product</span> <span class="o">=</span> <span class="n">masked_product</span>
-
-    <span class="k">elif</span> <span class="n">prod_type</span> <span class="o">==</span> <span class="s2">&quot;CSK&quot;</span><span class="p">:</span>  
-        <span class="c1"># COSMO-SkyMed preprocessing</span>
-        <span class="n">ml_product</span> <span class="o">=</span> <span class="n">gpt</span><span class="o">.</span><span class="n">Multilook</span><span class="p">(</span><span class="n">nRgLooks</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">nAzLooks</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
-        <span class="n">cal_product</span> <span class="o">=</span> <span class="n">gpt</span><span class="o">.</span><span class="n">Calibration</span><span class="p">(</span><span class="n">Pols</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;HH&#39;</span><span class="p">])</span>
-
-        <span class="n">start_product</span> <span class="o">=</span> <span class="n">cal_product</span>
-
-    <span class="c1"># CFAR Detection</span>
-    <span class="n">detection_results</span> <span class="o">=</span> <span class="p">[]</span>
-
-    <span class="k">for</span> <span class="n">pfa</span> <span class="ow">in</span> <span class="p">[</span><span class="mf">8.5</span><span class="p">,</span> <span class="mf">12.5</span><span class="p">,</span> <span class="mf">16.5</span><span class="p">]:</span>
-        <span class="c1"># Initialize new GPT instance for each threshold</span>
-        <span class="n">gpt_det</span> <span class="o">=</span> <span class="n">GPT</span><span class="p">(</span><span class="n">product</span><span class="o">=</span><span class="n">start_product</span><span class="p">,</span> <span class="n">outdir</span><span class="o">=</span><span class="n">output_dir</span><span class="p">)</span>
-
-        <span class="c1"># Adaptive thresholding</span>
-        <span class="n">at_product</span> <span class="o">=</span> <span class="n">gpt_det</span><span class="o">.</span><span class="n">AdaptiveThresholding</span><span class="p">(</span>
-            <span class="n">background_window_m</span><span class="o">=</span><span class="mi">800</span><span class="p">,</span>  <span class="c1"># Background estimation window</span>
-            <span class="n">guard_window_m</span><span class="o">=</span><span class="mi">500</span><span class="p">,</span>       <span class="c1"># Guard band around targets</span>
-            <span class="n">target_window_m</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span>       <span class="c1"># Target detection window</span>
-            <span class="n">pfa</span><span class="o">=</span><span class="n">pfa</span>                   <span class="c1"># False alarm probability</span>
-        <span class="p">)</span>
-
-        <span class="c1"># Object discrimination</span>
-        <span class="n">od_product</span> <span class="o">=</span> <span class="n">gpt_det</span><span class="o">.</span><span class="n">ObjectDiscrimination</span><span class="p">(</span>
-            <span class="n">min_target_m</span><span class="o">=</span><span class="mi">35</span><span class="p">,</span>   <span class="c1"># Minimum target size (meters)</span>
-            <span class="n">max_target_m</span><span class="o">=</span><span class="mi">500</span>   <span class="c1"># Maximum target size (meters)</span>
-        <span class="p">)</span>
-
-        <span class="n">detection_results</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
-            <span class="s1">&#39;pfa&#39;</span><span class="p">:</span> <span class="n">pfa</span><span class="p">,</span>
-            <span class="s1">&#39;at_product&#39;</span><span class="p">:</span> <span class="n">at_product</span><span class="p">,</span>
-            <span class="s1">&#39;od_product&#39;</span><span class="p">:</span> <span class="n">od_product</span>
-        <span class="p">})</span>
-
-    <span class="k">return</span> <span class="n">detection_results</span>
 </code></pre>
 <h2 id="advanced-snap-integration">Advanced SNAP Integration</h2>
 <h3 id="xml-graph-processing">XML Graph Processing</h3>

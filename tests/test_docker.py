@@ -68,8 +68,6 @@ class TestCLIEntryPoints:
     @pytest.mark.parametrize("cmd", [
         "sarpyx",
         "sarpyx-decode",
-        "sarpyx-focus",
-        "sarpyx-shipdet",
         "sarpyx-unzip",
         "sarpyx-upload",
     ])

@@ -4073,8 +4073,6 @@ dependencies = [
     { name = "huggingface-hub" },
     { name = "joblib" },
     { name = "jupyter" },
-    { name = "kornia" },
-    { name = "lightning" },
     { name = "lxml" },
     { name = "matplotlib" },
     { name = "numba" },
@@ -4094,10 +4092,7 @@ dependencies = [
     { name = "seaborn" },
     { name = "shapely" },
     { name = "six" },
-    { name = "tensorboard" },
-    { name = "tensorboardx" },
     { name = "tifffile" },
-    { name = "wandb" },
     { name = "zarr" },
 ]
 
@@ -4105,9 +4100,19 @@ dependencies = [
 copernicus = [
     { name = "phidown" },
 ]
+torch = [
+    { name = "kornia" },
+    { name = "lightning" },
+    { name = "tensorboard" },
+    { name = "tensorboardx" },
+    { name = "torch" },
+    { name = "wandb" },
+]
 
 [package.dev-dependencies]
 dev = [
+    { name = "markdown" },
+    { name = "pygments" },
     { name = "pytest" },
 ]
 
@@ -4124,8 +4129,8 @@ requires-dist = [
     { name = "huggingface-hub", specifier = ">=0.34.1" },
     { name = "joblib", specifier = ">=1.5.1" },
     { name = "jupyter" },
-    { name = "kornia", specifier = ">=0.8.1" },
-    { name = "lightning", specifier = ">=2.5.3" },
+    { name = "kornia", marker = "extra == 'torch'", specifier = ">=0.8.1" },
+    { name = "lightning", marker = "extra == 'torch'", specifier = ">=2.5.3" },
     { name = "lxml", specifier = ">=5.4.0" },
     { name = "matplotlib" },
     { name = "numba" },
@@ -4146,16 +4151,21 @@ requires-dist = [
     { name = "seaborn", specifier = ">=0.13.2" },
     { name = "shapely" },
     { name = "six", specifier = ">=1.16.0" },
-    { name = "tensorboard", specifier = ">=2.20.0" },
-    { name = "tensorboardx", specifier = ">=2.6.4" },
+    { name = "tensorboard", marker = "extra == 'torch'", specifier = ">=2.20.0" },
+    { name = "tensorboardx", marker = "extra == 'torch'", specifier = ">=2.6.4" },
     { name = "tifffile", specifier = ">=2025.6.11" },
-    { name = "wandb", specifier = ">=0.21.3" },
+    { name = "torch", marker = "extra == 'torch'", specifier = ">=2.0.0" },
+    { name = "wandb", marker = "extra == 'torch'", specifier = ">=0.21.3" },
     { name = "zarr", specifier = ">=3.0.0" },
 ]
-provides-extras = ["copernicus"]
+provides-extras = ["copernicus", "torch"]
 
 [package.metadata.requires-dev]
-dev = [{ name = "pytest", specifier = "==8.4.0" }]
+dev = [
+    { name = "markdown", specifier = ">=3.10.1" },
+    { name = "pygments", specifier = ">=2.19.2" },
+    { name = "pytest", specifier = "==8.4.0" },
+]
 
 [[package]]
 name = "scikit-image"

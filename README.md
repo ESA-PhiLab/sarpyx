@@ -17,15 +17,28 @@
 
 ##
 
-**sarpyx** is a specialized Python toolkit for **Synthetic Aperture Radar (SAR)** processing with tight integration to ESA **SNAP**. It focuses on reproducible pipelines, fast tiling workflows, and advanced research features like **sub-aperture decomposition**.
+**sarpyx** is a specialized Python toolkit for **Synthetic Aperture Radar (SAR)** processing with tight integration to ESA **SNAP**. The supported surface is centered on WorldSAR preprocessing and tiling, SNAP GPT orchestration, sub-aperture decomposition, H5/Zarr tile validation, and SAR science utilities.
 
 ## Highlights
 
+- WorldSAR CLI for mission-specific preprocessing, tiling, validation reports, and H5-to-Zarr conversion.
 - SNAP GPT integration with configurable graphs and operator chaining.
-- Sub-aperture decomposition for squint-angle diversity and motion sensitivity.
-- Parallel tiling and batch processing for large product volumes.
-- Geocoded outputs ready for GIS and downstream ML.
-- Extensible architecture compatible with `rasterio`, `geopandas`, and `pyproj`.
+- Sub-aperture decomposition for Sentinel-style BEAM-DIMAP products.
+- Geocoded H5/Zarr outputs ready for GIS and downstream ML.
+- Utilities compatible with `rasterio`, `geopandas`, `pyproj`, `h5py`, `zarr`, and `dask`.
+
+## Commands
+
+Installed console scripts:
+
+```bash
+sarpyx --help          # WorldSAR preprocessing, tiling, validation, H5->Zarr
+sarpyx-decode --help   # Sentinel-1 Level-0 decode wrapper
+sarpyx-unzip --help    # Extract Sentinel-1 ZIP products
+sarpyx-upload --help   # Upload artifacts to Hugging Face Hub
+```
+
+Reserved placeholder commands such as `sarpyx-focus` and `sarpyx-shipdet` are not shipped.
 
 ## Install
 
@@ -94,7 +107,7 @@ docker run --rm \
   /usr/local/bin/start-jupyter.sh
 ```
 
-You can also pass `--grid-path` to the `worldsar` CLI command.
+You can also pass `--grid-path` to the `worldsar` CLI command. For Sentinel preprocessing, pass `--sentinel-subaps N` to override the subaperture count; defaults are `2` for TOPS products and `3` for STRIP products, and `N` must be at least `2`.
 
 ##
 <div align="center">

@@ -23,13 +23,13 @@ show_image(enhanced_data, title="Enhanced SAR Data", cmap='gray')
 
 ## Basic Workflow Overview
 
-sarpyx follows a modular approach to SAR processing:
+sarpyx follows a modular approach around the implemented workflow surface:
 
-1. **Data Loading**: Import SAR data from various formats
-2. **Preprocessing**: Apply calibration, filtering, and corrections
-3. **Core Processing**: Execute focusing, autofocus, or analysis algorithms
-4. **Analysis**: Perform sub-look analysis, interferometry, or scientific applications
-5. **Visualization**: Display results and generate reports
+1. **WorldSAR CLI**: run mission-specific SNAP preprocessing, tiling, validation, and H5-to-Zarr conversion
+2. **SNAP Integration**: call SNAP GPT operators and graph workflows from Python
+3. **Sub-Aperture Processing**: generate sub-aperture bands from BEAM-DIMAP products
+4. **Analysis**: compute implemented SAR indices and quality metrics
+5. **Utilities**: handle grids, WKT geometry, DEM support, H5/Zarr stores, upload, and reports
 
 ## Working with Real SAR Data
 
@@ -117,12 +117,11 @@ show_image(ndpoll, title="NDPOLL Index", cmap='RdBu')
 sarpyx is organized into several main modules:
 
 ### `sarpyx.processor`
-Core SAR processing algorithms:
-- `core`: Focus algorithms, transforms, decoding
-- `autofocus`: Quality metrics and autofocus methods
-- `algorithms`: High-level algorithms (RDA, back-projection)
-- `data`: Data I/O and format conversion
-- `utils`: Processing utilities
+Core SAR processing primitives:
+- `core`: decode helpers, focus primitives, transforms, signal utilities, sub-aperture processing
+- `algorithms`: currently has no public high-level wrappers; use implemented `core` modules
+- `data`: implemented `read_tif` and `read_zarr_file` readers
+- `utils`: processing utilities
 
 ### `sarpyx.sla`
 Sub-Look Analysis for aperture decomposition:

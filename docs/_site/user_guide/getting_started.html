@@ -34,7 +34,6 @@
 <a href="../tutorials/04_multitemporal_analysis.html">04 – Multi-temporal</a>
 <a href="../tutorials/05_polarimetric_analysis.html">05 – Polarimetry</a>
 <a href="../tutorials/06_custom_workflows.html">06 – Custom Workflows</a>
-<a href="../tutorials/07_ship_detection.html">07 – Ship Detection</a>
 <a href="../tutorials/08_interferometric_analysis.html">08 – InSAR</a>
 <h3>API Reference</h3>
 <a href="../api/index.html">Overview</a>
@@ -72,13 +71,13 @@
 <span class="n">show_image</span><span class="p">(</span><span class="n">enhanced_data</span><span class="p">,</span> <span class="n">title</span><span class="o">=</span><span class="s2">&quot;Enhanced SAR Data&quot;</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="s1">&#39;gray&#39;</span><span class="p">)</span>
 </code></pre>
 <h2 id="basic-workflow-overview">Basic Workflow Overview</h2>
-<p>sarpyx follows a modular approach to SAR processing:</p>
+<p>sarpyx follows a modular approach around the implemented workflow surface:</p>
 <ol>
-<li><strong>Data Loading</strong>: Import SAR data from various formats</li>
-<li><strong>Preprocessing</strong>: Apply calibration, filtering, and corrections</li>
-<li><strong>Core Processing</strong>: Execute focusing, autofocus, or analysis algorithms</li>
-<li><strong>Analysis</strong>: Perform sub-look analysis, interferometry, or scientific applications</li>
-<li><strong>Visualization</strong>: Display results and generate reports</li>
+<li><strong>WorldSAR CLI</strong>: run mission-specific SNAP preprocessing, tiling, validation, and H5-to-Zarr conversion</li>
+<li><strong>SNAP Integration</strong>: call SNAP GPT operators and graph workflows from Python</li>
+<li><strong>Sub-Aperture Processing</strong>: generate sub-aperture bands from BEAM-DIMAP products</li>
+<li><strong>Analysis</strong>: compute implemented SAR indices and quality metrics</li>
+<li><strong>Utilities</strong>: handle grids, WKT geometry, DEM support, H5/Zarr stores, upload, and reports</li>
 </ol>
 <h2 id="working-with-real-sar-data">Working with Real SAR Data</h2>
 <h3 id="sub-look-analysis-example">Sub-Look Analysis Example</h3>
@@ -151,12 +150,11 @@
 <h2 id="understanding-the-module-structure">Understanding the Module Structure</h2>
 <p>sarpyx is organized into several main modules:</p>
 <h3 id="sarpyxprocessor"><code>sarpyx.processor</code></h3>
-<p>Core SAR processing algorithms:
-- <code>core</code>: Focus algorithms, transforms, decoding
-- <code>autofocus</code>: Quality metrics and autofocus methods
-- <code>algorithms</code>: High-level algorithms (RDA, back-projection)
-- <code>data</code>: Data I/O and format conversion
-- <code>utils</code>: Processing utilities</p>
+<p>Core SAR processing primitives:
+- <code>core</code>: decode helpers, focus primitives, transforms, signal utilities, sub-aperture processing
+- <code>algorithms</code>: currently has no public high-level wrappers; use implemented <code>core</code> modules
+- <code>data</code>: implemented <code>read_tif</code> and <code>read_zarr_file</code> readers
+- <code>utils</code>: processing utilities</p>
 <h3 id="sarpyxsla"><code>sarpyx.sla</code></h3>
 <p>Sub-Look Analysis for aperture decomposition:
 - Frequency domain processing

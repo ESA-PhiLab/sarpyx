@@ -1,12 +1,29 @@
-import torch
-import torch.nn.functional as F
-from torch.nn.functional import conv2d
+from __future__ import annotations
+
 import numpy as np
 from typing import Optional, Tuple, Union
+
+try:
+    import torch
+    import torch.nn.functional as F
+    from torch.nn.functional import conv2d
+except ImportError as exc:
+    torch = None
+    F = None
+    conv2d = None
+    _TORCH_IMPORT_ERROR = exc
+else:
+    _TORCH_IMPORT_ERROR = None
 
 # Constants for SSIM
 K1 = 0.01
 K2 = 0.03
+
+
+def _require_torch():
+    if torch is None:
+        raise ImportError("processor.utils.metrics torch-based functions require the 'torch' extra") from _TORCH_IMPORT_ERROR
+    return torch
 
 
 def luminance(img1: np.ndarray, img2: np.ndarray) -> float:
@@ -86,8 +103,9 @@ def create_window(window_size: int, channel: int) -> torch.Tensor:
     """
     assert isinstance(window_size, int) and window_size > 0, 'window_size must be a positive integer'
     assert isinstance(channel, int) and channel > 0, 'channel must be a positive integer'
+    torch_mod = _require_torch()
     
-    _1d_window = torch.hann_window(window_size, periodic=False).unsqueeze(1)
+    _1d_window = torch_mod.hann_window(window_size, periodic=False).unsqueeze(1)
     _2d_window = _1d_window.mm(_1d_window.t()).float().unsqueeze(0).unsqueeze(0)
     window = _2d_window.expand(channel, 1, window_size, window_size).contiguous()
     return window
@@ -114,14 +132,16 @@ def ssim(img1: Union[torch.Tensor, np.ndarray],
     Returns:
         SSIM value or map as torch tensor.
     """
+    torch_mod = _require_torch()
+
     # Convert numpy arrays to tensors if needed
     if isinstance(img1, np.ndarray):
-        img1 = torch.from_numpy(img1).float()
+        img1 = torch_mod.from_numpy(img1).float()
     if isinstance(img2, np.ndarray):
-        img2 = torch.from_numpy(img2).float()
+        img2 = torch_mod.from_numpy(img2).float()
 
-    assert isinstance(img1, torch.Tensor), 'img1 must be a torch tensor or numpy array'
-    assert isinstance(img2, torch.Tensor), 'img2 must be a torch tensor or numpy array'
+    assert isinstance(img1, torch_mod.Tensor), 'img1 must be a torch tensor or numpy array'
+    assert isinstance(img2, torch_mod.Tensor), 'img2 must be a torch tensor or numpy array'
     assert img1.shape == img2.shape, f'Images must have same shape. Got {img1.shape} and {img2.shape}'
 
     # Ensure the images are at least 4D tensors
@@ -184,18 +204,19 @@ def psnr(img1: Union[torch.Tensor, np.ndarray],
     Returns:
         PSNR value as torch tensor.
     """
+    torch_mod = _require_torch()
+
     # Convert np arrays to torch tensors if necessary
     if isinstance(img1, np.ndarray):
-        img1 = torch.tensor(img1, dtype=torch.float32)
+        img1 = torch_mod.tensor(img1, dtype=torch_mod.float32)
     if isinstance(img2, np.ndarray):
-        img2 = torch.tensor(img2, dtype=torch.float32)
+        img2 = torch_mod.tensor(img2, dtype=torch_mod.float32)
     
-    assert isinstance(img1, torch.Tensor), 'img1 must be a torch tensor or numpy array'
-    assert isinstance(img2, torch.Tensor), 'img2 must be a torch tensor or numpy array'
+    assert isinstance(img1, torch_mod.Tensor), 'img1 must be a torch tensor or numpy array'
+    assert isinstance(img2, torch_mod.Tensor), 'img2 must be a torch tensor or numpy array'
     assert img1.size() == img2.size(), f'Input shapes should match. Got {img1.size()} and {img2.size()}'
     assert max_val > 0, f'max_val must be positive. Got {max_val}'
 
     mse = F.mse_loss(img1, img2)
-    psnr_value = 20 * torch.log10(max_val / torch.sqrt(mse))
+    psnr_value = 20 * torch_mod.log10(max_val / torch_mod.sqrt(mse))
     return psnr_value
-

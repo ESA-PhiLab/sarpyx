@@ -1,25 +1,15 @@
-"""Data handling and I/O for SAR processing.
+"""Implemented data readers for SAR processing.
 
-The package exposes common reader, writer, and formatter helpers lazily so that
-importing ``sarpyx.processor.data`` does not immediately import heavier I/O
-libraries such as rasterio and zarr.
+The package exposes only implemented helpers. Writer and formatter placeholders
+were intentionally removed from the public surface.
 """
 
 import importlib
 
-_SUBMODULES = ("readers", "writers", "formatters")
+_SUBMODULES = ("readers",)
 _EXPORT_MODULES = {
-    "read_sentinel1": "readers",
-    "read_cosmo_skymed": "readers",
-    "read_terrasar_x": "readers",
     "read_tif": "readers",
     "read_zarr_file": "readers",
-    "write_geotiff": "writers",
-    "write_hdf5": "writers",
-    "write_binary": "writers",
-    "format_converter": "formatters",
-    "preprocess_data": "formatters",
-    "validate_format": "formatters",
 }
 
 __all__ = [*_SUBMODULES, *_EXPORT_MODULES]

@@ -28,7 +28,6 @@ The sarpyx API is organized into several main modules, each serving specific asp
 |----------|--------|-------------|
 | `show_image()` | `sarpyx.utils` | Display SAR images with customization |
 | `calculate_rvi()` | `sarpyx.science.indices` | Radar Vegetation Index calculation |
-| `calculate_entropy()` | `sarpyx.processor.autofocus.metrics` | Image focus quality metric |
 | `calculate_ndpoll()` | `sarpyx.science.indices` | Normalized Difference Polarization Index |
 | `save_matlab_mat()` | `sarpyx.utils.io` | Save data in MATLAB format |
 | `download_tiles_for_wkt()` | `sarpyx.utils.dem_utils` | Download Copernicus DEM tiles for a WKT geometry |
@@ -42,9 +41,8 @@ The sarpyx API is organized into several main modules, each serving specific asp
 sarpyx/
 ├── processor/          # Core processing algorithms
 │   ├── core/          # Focus, decode, transforms
-│   ├── autofocus/     # Autofocus algorithms and metrics
-│   ├── algorithms/    # High-level processing algorithms
-│   ├── data/          # Data I/O and format conversion
+│   ├── algorithms/    # Implemented algorithm support modules
+│   ├── data/          # Implemented readers
 │   └── utils/         # Processing utilities
 ├── sla/               # Sub-Look Analysis
 │   ├── core/          # Main SLA implementation
@@ -81,7 +79,6 @@ from sarpyx.utils import show_image, download_tiles_for_wkt
 
 # Import specific functions
 from sarpyx.science.indices import calculate_rvi, calculate_ndpoll
-from sarpyx.processor.autofocus.metrics import calculate_entropy
 from sarpyx.utils.dem_utils import tiles_from_wkt, build_vrt
 ```
 

@@ -11,10 +11,13 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 ARG SNAP_SKIP_UPDATES=1
 ENV JAVA_HOME="/usr/lib/jvm/java-8-openjdk-amd64"
 ENV SNAP_HOME="/workspace/snap13"
+ENV SNAP_USERDIR="/tmp/sarpyx-snap-userdir"
 ENV SNAP_SKIP_UPDATES="${SNAP_SKIP_UPDATES}"
 ENV PATH="${PATH}:${SNAP_HOME}/bin"
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1
 ENV PIP_NO_CACHE_DIR=1
+ENV PIP_NO_COMPILE=1
+ENV PYTHONDONTWRITEBYTECODE=1
 
 # Install shared system dependencies once for SNAP + Python runtime.
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -89,12 +92,15 @@ COPY --from=snap /snap13 /workspace/snap13
 RUN ln -sf /workspace/snap13/bin/snap /usr/local/bin/snap && \
     ln -sf /workspace/snap13/bin/gpt /usr/local/bin/gpt
 
+RUN mkdir -p "${SNAP_USERDIR}/auxdata/hdf_natives" && \
+    chmod -R 1777 "${SNAP_USERDIR}"
+
 COPY README.md pyproject.toml ./
 COPY sarpyx ./sarpyx
 
 # Install sarpyx once in the final image.
 RUN python3.11 -m pip install --upgrade pip setuptools wheel && \
-    python3.11 -m pip install --no-cache-dir . && \
+    python3.11 -m pip install --no-cache-dir --no-compile . && \
     python3.11 -c "import sarpyx; print('sarpyx installed successfully')" && \
     rm -rf /tmp/* /var/tmp/*
 

@@ -34,15 +34,10 @@ dependencies = [
     "tifffile>=2025.6.11",
     "folium>=0.20.0",
     "plotly>=6.2.0",
-    "lightning>=2.5.3",
     "einops>=0.8.1",
     "opt-einsum>=3.4.0",
     "scikit-image>=0.25.2",
     "pykeops>=2.3",
-    "kornia>=0.8.1",
-    "tensorboard>=2.20.0",
-    "tensorboardX>=2.6.4",
-    "wandb>=0.21.3",
     "scikit-learn>=1.7.2",
     "geographiclib>=2.1",
     "dotenv>=0.9.9",
@@ -56,10 +51,21 @@ dependencies = [
 copernicus = [
     "phidown>=0.1.26"
 ]
+torch = [
+    "torch>=2.0.0",
+    "lightning>=2.5.3",
+    "kornia>=0.8.1",
+    "tensorboard>=2.20.0",
+    "tensorboardX>=2.6.4",
+    "wandb>=0.21.3",
+]
 
 [project.scripts]
 sarpyx = "sarpyx.cli.worldsar:main"
 sarpyx-pipeline = "sarpyx.cli.pipeline:main"
+sarpyx-decode = "sarpyx.cli.decode:main"
+sarpyx-unzip = "sarpyx.cli.unzip:main"
+sarpyx-upload = "sarpyx.cli.upload:main"
 
 [tool.setuptools]
 include-package-data = false
@@ -70,5 +76,7 @@ namespaces = false
 
 [dependency-groups]
 dev = [
+    "markdown>=3.10.1",
+    "pygments>=2.19.2",
     "pytest==8.4.0",
 ]

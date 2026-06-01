@@ -288,10 +288,11 @@ def test_sentinel_post_chain_fails_fast_before_merge_and_tc(tmp_path: Path):
 
     op = FakeOp()
     with pytest.raises(RuntimeError, match="Polarimetric decomposition failed: forced pdec failure"):
-        _sentinel_post_chain(op=op, product_path=str(tmp_path / "input.SAFE"))
+        _sentinel_post_chain(op=op, product_path=str(tmp_path / "input.SAFE"), sentinel_subaps=4)
 
     assert op.do_subaps_kwargs is not None
     assert op.do_subaps_kwargs["update_dim"] is False
+    assert op.do_subaps_kwargs["n_decompositions"] == [4]
     assert merge_called is False
     assert op.tc_called is False
 
@@ -348,8 +349,17 @@ def test_sentinel_post_chain_fails_fast_on_deburst_before_subaps(tmp_path: Path)
     assert op.tc_called is False
 
 
+@pytest.mark.parametrize(
+    ("sentinel_subaps", "expected_subaps"),
+    [
+        (None, [3]),
+        (6, [6]),
+    ],
+)
 def test_pipeline_sentinel_strip_uses_update_dim_false_and_real_pdec_path(
     tmp_path: Path,
+    sentinel_subaps: int | None,
+    expected_subaps: list[int],
 ):
     merge_calls: list[dict[str, object]] = []
 
@@ -396,11 +406,13 @@ def test_pipeline_sentinel_strip_uses_update_dim_false_and_real_pdec_path(
         product_path=str(tmp_path / "input.SAFE"),
         output_dir=tmp_path / "out",
         is_TOPS=False,
+        sentinel_subaps=sentinel_subaps,
     )
 
     assert Path(result) == tmp_path / "tc.dim"
     assert fake_op.do_subaps_kwargs is not None
     assert fake_op.do_subaps_kwargs["update_dim"] is False
+    assert fake_op.do_subaps_kwargs["n_decompositions"] == expected_subaps
     assert len(merge_calls) == 1
     assert Path(merge_calls[0]["src_dim"]) == tmp_path / "cal.dim"
     assert Path(merge_calls[0]["pdec_dim"]) == tmp_path / "pdec.dim"
@@ -863,7 +875,7 @@ def test_pipeline_sentinel_tops_can_limit_swath_and_burst(tmp_path: Path):
         return FakeSwathOp(Path(output_dir))
 
     def fake_post_chain(op, product_path, **_kwargs):
-        post_calls.append((Path(op.prod_path), product_path))
+        post_calls.append((Path(op.prod_path), product_path, _kwargs))
         return op.prod_path
 
     pipeline_sentinel.__globals__["Path"] = Path
@@ -877,6 +889,7 @@ def test_pipeline_sentinel_tops_can_limit_swath_and_burst(tmp_path: Path):
         sentinel_swath="IW2",
         sentinel_first_burst=3,
         sentinel_last_burst=3,
+        sentinel_subaps=5,
     )
 
     assert list(result) == ["IW2"]
@@ -890,4 +903,15 @@ def test_pipeline_sentinel_tops_can_limit_swath_and_burst(tmp_path: Path):
             },
         )
     ]
-    assert post_calls == [(tmp_path / "out" / "IW2" / "split.dim", str(tmp_path / "input.SAFE"))]
+    assert post_calls == [
+        (
+            tmp_path / "out" / "IW2" / "split.dim",
+            str(tmp_path / "input.SAFE"),
+            {
+                "orbit_type": "Sentinel Precise (Auto Download)",
+                "orbit_continue_on_fail": False,
+                "sentinel_tc_source_band": None,
+                "sentinel_subaps": 5,
+            },
+        )
+    ]

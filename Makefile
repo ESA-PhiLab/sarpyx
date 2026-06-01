@@ -51,8 +51,10 @@ SENTINEL_GPT_PARALLELISM ?= 1
 SENTINEL_GPT_TIMEOUT ?= 14400
 
 SIF ?= sarpyx.sif
-SIF_TMPDIR ?= $(CURDIR)/.singularity/tmp
+SIF_AUTO_TMPDIR := $(shell if [ -d /dev/shm ] && [ "$$(df -Pk /dev/shm | awk 'NR == 2 {print $$4}')" -ge 41943040 ]; then printf '/dev/shm/%s-sarpyx-singularity-tmp' "$${USER:-user}"; else printf '%s/.singularity/tmp' "$(CURDIR)"; fi)
+SIF_TMPDIR ?= $(SIF_AUTO_TMPDIR)
 SIF_CACHEDIR ?= $(CURDIR)/.singularity/cache
+SIF_SOURCE ?= docker-daemon://$(DOCKER_FULL)
 HF_REPO ?= WORLDSAR/support
 HF_REPO_TYPE ?= dataset
 
@@ -74,7 +76,7 @@ SNAP_INSTALL_PARENT ?= $(CURDIR)
 	docker-build docker-test docker-push docker-all prune-docker \
 	recreate up-recreate up down logs ps pull push \
 	push-to-hpc \
-	sif-build sif-push sif-all sifbuid sifpush sifup \
+	sif-build sif-push sif-all sifbuid sifpush sifup update-sif \
 	clean_venv install_deps install_phidown prune_docker up_recreate
 
 help: ## Show available targets
@@ -237,15 +239,15 @@ install-snap: check-wget ## Install SNAP and configure default memory
 	@echo "SNAP installation complete."
 
 # ---------- SIF / Singularity ----------
-sif-build: check-singularity ## Build SIF from Docker image (uses DOCKER_FULL)
-	@echo "Building $(SIF) from docker://$(DOCKER_FULL)..."
+sif-build: check-singularity docker-build ## Build SIF from local Docker image (uses SIF_SOURCE)
+	@echo "Building $(SIF) from $(SIF_SOURCE)..."
 	@mkdir -p "$(SIF_TMPDIR)" "$(SIF_CACHEDIR)"
 	@if command -v apptainer >/dev/null 2>&1; then \
 		APPTAINER_TMPDIR="$(SIF_TMPDIR)" APPTAINER_CACHEDIR="$(SIF_CACHEDIR)" \
-		apptainer build --force --disable-cache "$(SIF)" "docker://$(DOCKER_FULL)"; \
+		apptainer build --force --disable-cache "$(SIF)" "$(SIF_SOURCE)"; \
 	else \
 		SINGULARITY_TMPDIR="$(SIF_TMPDIR)" SINGULARITY_CACHEDIR="$(SIF_CACHEDIR)" \
-		singularity build --force --disable-cache "$(SIF)" "docker://$(DOCKER_FULL)"; \
+		singularity build --force --disable-cache "$(SIF)" "$(SIF_SOURCE)"; \
 	fi
 
 sif-push: check-hf ## Upload SIF to Hugging Face (uses HF_REPO)
@@ -263,6 +265,7 @@ sif-all: sif-build push-to-hpc ## Build + upload SIF
 sifbuid: sif-build
 sifpush: sif-push
 sifup: sif-all
+update-sif: docker-build docker-test sifup ## Build/test Docker image, build SIF locally, and upload it to HPC
 
 # ---------- Docker ----------
 docker-build: check-docker ## Build Docker image

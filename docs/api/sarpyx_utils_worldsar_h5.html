@@ -1,0 +1,562 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="Exhaustive API reference for sarpyx.utils.worldsar_h5" />
+  <title>API: sarpyx.utils.worldsar_h5 | SARPyX Documentation</title>
+  <link rel="stylesheet" href="../assets/styles.css" />
+  <script defer src="../assets/scripts.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main-content">Skip to content</a>
+  <header class="topbar" role="banner">
+    <button class="sidebar-toggle" data-sidebar-toggle aria-controls="sidebar" aria-expanded="false">Menu</button>
+    <a class="brand" href="../index.html">SARPyX Docs</a>
+    <label class="search-wrap" for="site-search">
+      <span class="visually-hidden">Filter this page</span>
+      <input id="site-search" type="search" placeholder="Filter current page sections" />
+    </label>
+  </header>
+
+  <div class="layout">
+    <aside id="sidebar" class="sidebar" aria-label="Sidebar navigation">
+      <nav>
+        <h2 class="nav-title">Documentation</h2>
+        <ul class="nav-list">
+          <li><a class="nav-link" href="../index.html">Home</a></li><li><a class="nav-link" href="../installation.html">Installation</a></li><li><a class="nav-link" href="../quickstart.html">Quick Start</a></li><li><a class="nav-link" href="../architecture.html">Architecture</a></li><li><a class="nav-link" href="../results/snapflow_v2/index.html">Results</a></li><li><a class="nav-link" href="../api/index.html">API</a></li><li><a class="nav-link" href="../configuration.html">Configuration</a></li><li><a class="nav-link" href="../usage.html">Usage</a></li><li><a class="nav-link" href="../testing.html">Testing</a></li><li><a class="nav-link" href="../contributing.html">Contributing</a></li><li><a class="nav-link" href="../faq.html">FAQ</a></li>
+        </ul>
+        <h2 class="nav-title">API Modules</h2>
+        <details class="nav-group"><summary>__init__.py</summary><ul class="api-links"><li><a class="api-link" href="../api/sarpyx___init__.html">sarpyx.__init__</a></li></ul></details><details class="nav-group"><summary>cli</summary><ul class="api-links"><li><a class="api-link" href="../api/sarpyx_cli___init__.html">sarpyx.cli.__init__</a></li><li><a class="api-link" href="../api/sarpyx_cli_decode.html">sarpyx.cli.decode</a></li><li><a class="api-link" href="../api/sarpyx_cli_merge_iq_into_pdec.html">sarpyx.cli.merge_iq_into_pdec</a></li><li><a class="api-link" href="../api/sarpyx_cli_unzip.html">sarpyx.cli.unzip</a></li><li><a class="api-link" href="../api/sarpyx_cli_upload.html">sarpyx.cli.upload</a></li><li><a class="api-link" href="../api/sarpyx_cli_worldsar.html">sarpyx.cli.worldsar</a></li></ul></details><details class="nav-group"><summary>processor</summary><ul class="api-links"><li><a class="api-link" href="../api/sarpyx_processor___init__.html">sarpyx.processor.__init__</a></li><li><a class="api-link" href="../api/sarpyx_processor_algorithms___init__.html">sarpyx.processor.algorithms.__init__</a></li><li><a class="api-link" href="../api/sarpyx_processor_algorithms_constants.html">sarpyx.processor.algorithms.constants</a></li><li><a class="api-link" href="../api/sarpyx_processor_algorithms_mbautofocus.html">sarpyx.processor.algorithms.mbautofocus</a></li><li><a class="api-link" href="../api/sarpyx_processor_core___init__.html">sarpyx.processor.core.__init__</a></li><li><a class="api-link" href="../api/sarpyx_processor_core_aux.html">sarpyx.processor.core.aux</a></li><li><a class="api-link" href="../api/sarpyx_processor_core_code2physical.html">sarpyx.processor.core.code2physical</a></li><li><a class="api-link" href="../api/sarpyx_processor_core_constants.html">sarpyx.processor.core.constants</a></li><li><a class="api-link" href="../api/sarpyx_processor_core_decode.html">sarpyx.processor.core.decode</a></li><li><a class="api-link" href="../api/sarpyx_processor_core_focus.html">sarpyx.processor.core.focus</a></li><li><a class="api-link" href="../api/sarpyx_processor_core_meta.html">sarpyx.processor.core.meta</a></li><li><a class="api-link" href="../api/sarpyx_processor_core_signal.html">sarpyx.processor.core.signal</a></li><li><a class="api-link" href="../api/sarpyx_processor_core_spectrum.html">sarpyx.processor.core.spectrum</a></li><li><a class="api-link" href="../api/sarpyx_processor_core_subaperture.html">sarpyx.processor.core.subaperture</a></li><li><a class="api-link" href="../api/sarpyx_processor_core_subaperture_full_img.html">sarpyx.processor.core.subaperture_full_img</a></li><li><a class="api-link" href="../api/sarpyx_processor_core_transforms.html">sarpyx.processor.core.transforms</a></li><li><a class="api-link" href="../api/sarpyx_processor_core_utilis.html">sarpyx.processor.core.utilis</a></li><li><a class="api-link" href="../api/sarpyx_processor_data___init__.html">sarpyx.processor.data.__init__</a></li><li><a class="api-link" href="../api/sarpyx_processor_data_readers.html">sarpyx.processor.data.readers</a></li><li><a class="api-link" href="../api/sarpyx_processor_utils___init__.html">sarpyx.processor.utils.__init__</a></li><li><a class="api-link" href="../api/sarpyx_processor_utils_mem.html">sarpyx.processor.utils.mem</a></li><li><a class="api-link" href="../api/sarpyx_processor_utils_metrics.html">sarpyx.processor.utils.metrics</a></li><li><a class="api-link" href="../api/sarpyx_processor_utils_summary.html">sarpyx.processor.utils.summary</a></li><li><a class="api-link" href="../api/sarpyx_processor_utils_unzip.html">sarpyx.processor.utils.unzip</a></li><li><a class="api-link" href="../api/sarpyx_processor_utils_viz.html">sarpyx.processor.utils.viz</a></li></ul></details><details class="nav-group"><summary>science</summary><ul class="api-links"><li><a class="api-link" href="../api/sarpyx_science___init__.html">sarpyx.science.__init__</a></li><li><a class="api-link" href="../api/sarpyx_science_indices.html">sarpyx.science.indices</a></li></ul></details><details class="nav-group"><summary>sla</summary><ul class="api-links"><li><a class="api-link" href="../api/sarpyx_sla___init__.html">sarpyx.sla.__init__</a></li><li><a class="api-link" href="../api/sarpyx_sla_core___init__.html">sarpyx.sla.core.__init__</a></li><li><a class="api-link" href="../api/sarpyx_sla_core_meta.html">sarpyx.sla.core.meta</a></li><li><a class="api-link" href="../api/sarpyx_sla_core_spectrum.html">sarpyx.sla.core.spectrum</a></li><li><a class="api-link" href="../api/sarpyx_sla_metrics.html">sarpyx.sla.metrics</a></li><li><a class="api-link" href="../api/sarpyx_sla_utilis.html">sarpyx.sla.utilis</a></li></ul></details><details class="nav-group"><summary>snap.py</summary><ul class="api-links"><li><a class="api-link" href="../api/sarpyx_snap.html">sarpyx.snap</a></li></ul></details><details class="nav-group"><summary>snapflow</summary><ul class="api-links"><li><a class="api-link" href="../api/sarpyx_snapflow___init__.html">sarpyx.snapflow.__init__</a></li><li><a class="api-link" href="../api/sarpyx_snapflow_burst_utils.html">sarpyx.snapflow.burst_utils</a></li><li><a class="api-link" href="../api/sarpyx_snapflow_dim_updater.html">sarpyx.snapflow.dim_updater</a></li><li><a class="api-link" href="../api/sarpyx_snapflow_engine.html">sarpyx.snapflow.engine</a></li><li><a class="api-link" href="../api/sarpyx_snapflow_op.html">sarpyx.snapflow.op</a></li><li><a class="api-link" href="../api/sarpyx_snapflow_snap2stamps.html">sarpyx.snapflow.snap2stamps</a></li><li><a class="api-link" href="../api/sarpyx_snapflow_snap2stamps_pipelines.html">sarpyx.snapflow.snap2stamps_pipelines</a></li></ul></details><details class="nav-group"><summary>utils</summary><ul class="api-links"><li><a class="api-link" href="../api/sarpyx_utils___init__.html">sarpyx.utils.__init__</a></li><li><a class="api-link" href="../api/sarpyx_utils_complex_losses.html">sarpyx.utils.complex_losses</a></li><li><a class="api-link" href="../api/sarpyx_utils_dem_utils.html">sarpyx.utils.dem_utils</a></li><li><a class="api-link" href="../api/sarpyx_utils_executor.html">sarpyx.utils.executor</a></li><li><a class="api-link" href="../api/sarpyx_utils_geos.html">sarpyx.utils.geos</a></li><li><a class="api-link" href="../api/sarpyx_utils_grid.html">sarpyx.utils.grid</a></li><li><a class="api-link" href="../api/sarpyx_utils_hf.html">sarpyx.utils.hf</a></li><li><a class="api-link" href="../api/sarpyx_utils_io.html">sarpyx.utils.io</a></li><li><a class="api-link" href="../api/sarpyx_utils_losses.html">sarpyx.utils.losses</a></li><li><a class="api-link" href="../api/sarpyx_utils_meta.html">sarpyx.utils.meta</a></li><li><a class="api-link" href="../api/sarpyx_utils_metrics.html">sarpyx.utils.metrics</a></li><li><a class="api-link" href="../api/sarpyx_utils_nisar_utils.html">sarpyx.utils.nisar_utils</a></li><li><a class="api-link" href="../api/sarpyx_utils_peorb.html">sarpyx.utils.peorb</a></li><li><a class="api-link" href="../api/sarpyx_utils_rfigen.html">sarpyx.utils.rfigen</a></li><li><a class="api-link" href="../api/sarpyx_utils_sar_loss.html">sarpyx.utils.sar_loss</a></li><li><a class="api-link" href="../api/sarpyx_utils_up.html">sarpyx.utils.up</a></li><li><a class="api-link" href="../api/sarpyx_utils_viz.html">sarpyx.utils.viz</a></li><li><a class="api-link" href="../api/sarpyx_utils_wkt_utils.html">sarpyx.utils.wkt_utils</a></li><li><a class="api-link active" href="../api/sarpyx_utils_worldsar_h5.html">sarpyx.utils.worldsar_h5</a></li><li><a class="api-link" href="../api/sarpyx_utils_zarr_utils.html">sarpyx.utils.zarr_utils</a></li></ul></details>
+      </nav>
+    </aside>
+
+    <main id="main-content" class="content" role="main">
+      <nav class="breadcrumbs" aria-label="Breadcrumb">
+        <ol><li><a href="../index.html">Home</a></li><li><a href="index.html">API</a></li><li>sarpyx.utils.worldsar_h5</li></ol>
+      </nav>
+      <article class="doc-page" data-searchable data-search="API: sarpyx.utils.worldsar_h5">
+        
+<section>
+  <h1 id="module-sarpyx_utils_worldsar_h5">Module: <code>sarpyx.utils.worldsar_h5</code></h1>
+  <p><strong>File:</strong> <code>sarpyx/utils/worldsar_h5.py</code></p>
+  <p>No module docstring available; module purpose is inferred from implementation.</p>
+
+  <h2 id="module-exports">Exported Symbols (<code>__all__</code>)</h2>
+  <p>No explicit <code>__all__</code> list. Public symbols inferred from implementation.</p>
+
+  <h2 id="public-functions">Public Functions (20)</h2>
+  
+<details class="api-item" id="sarpyx-utils-worldsar-h5-py-normalize-attribute-value" data-searchable data-search="normalize_attribute_value normalize_attribute_value(value: Any)">
+  <summary><code>normalize_attribute_value</code> <span class="api-kind">function</span></summary>
+  <div class="api-body">
+    <p>inferred from implementation.</p>
+    <p><strong>File location:</strong> <code>sarpyx/utils/worldsar_h5.py:?</code></p>
+    <h3 id="sarpyx-utils-worldsar-h5-py-normalize-attribute-value-signature">Signature</h3>
+    <pre><code class="language-python">normalize_attribute_value(value: Any)</code></pre>
+    <h3 id="sarpyx-utils-worldsar-h5-py-normalize-attribute-value-parameters">Parameters</h3>
+    <table class="api-table"><thead><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Default</th><th>Description</th></tr></thead><tbody><tr><td><code>value</code></td><td><code>Any</code></td><td>yes</td><td><code>-</code></td><td>inferred from implementation.</td></tr></tbody></table>
+    <h3 id="sarpyx-utils-worldsar-h5-py-normalize-attribute-value-returns">Return Type</h3>
+    <p><code>Any</code></p>
+    <p>inferred from implementation.</p>
+    <h3 id="sarpyx-utils-worldsar-h5-py-normalize-attribute-value-exceptions">Exceptions</h3>
+    <p>None explicitly documented; inferred from implementation.</p>
+    <h3 id="sarpyx-utils-worldsar-h5-py-normalize-attribute-value-side-effects">Side Effects</h3>
+    <p>None explicitly documented; inferred from implementation.</p>
+    <h3 id="sarpyx-utils-worldsar-h5-py-normalize-attribute-value-example">Example Usage</h3>
+    <pre><code class="language-python">from sarpyx.utils.worldsar_h5 import normalize_attribute_value
+
+result = normalize_attribute_value(value=&lt;value&gt;)</code></pre>
+    <h3 id="sarpyx-utils-worldsar-h5-py-normalize-attribute-value-edge-cases">Edge Cases</h3>
+    <p>No explicit edge-case section found; behavior is inferred from implementation.</p>
+  </div>
+</details>
+
+<details class="api-item" id="sarpyx-utils-worldsar-h5-py-normalize-attributes" data-searchable data-search="normalize_attributes normalize_attributes(attrs: h5py.AttributeManager)">
+  <summary><code>normalize_attributes</code> <span class="api-kind">function</span></summary>
+  <div class="api-body">
+    <p>inferred from implementation.</p>
+    <p><strong>File location:</strong> <code>sarpyx/utils/worldsar_h5.py:?</code></p>
+    <h3 id="sarpyx-utils-worldsar-h5-py-normalize-attributes-signature">Signature</h3>
+    <pre><code class="language-python">normalize_attributes(attrs: h5py.AttributeManager)</code></pre>
+    <h3 id="sarpyx-utils-worldsar-h5-py-normalize-attributes-parameters">Parameters</h3>
+    <table class="api-table"><thead><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Default</th><th>Description</th></tr></thead><tbody><tr><td><code>attrs</code></td><td><code>h5py.AttributeManager</code></td><td>yes</td><td><code>-</code></td><td>inferred from implementation.</td></tr></tbody></table>
+    <h3 id="sarpyx-utils-worldsar-h5-py-normalize-attributes-returns">Return Type</h3>
+    <p><code>dict[str, Any]</code></p>
+    <p>inferred from implementation.</p>
+    <h3 id="sarpyx-utils-worldsar-h5-py-normalize-attributes-exceptions">Exceptions</h3>
+    <p>None explicitly documented; inferred from implementation.</p>
+    <h3 id="sarpyx-utils-worldsar-h5-py-normalize-attributes-side-effects">Side Effects</h3>
+    <p>None explicitly documented; inferred from implementation.</p>
+    <h3 id="sarpyx-utils-worldsar-h5-py-normalize-attributes-example">Example Usage</h3>
+    <pre><code class="language-python">from sarpyx.utils.worldsar_h5 import normalize_attributes
+
+result = normalize_attributes(attrs=&lt;attrs&gt;)</code></pre>
+    <h3 id="sarpyx-utils-worldsar-h5-py-normalize-attributes-edge-cases">Edge Cases</h3>
+    <p>No explicit edge-case section found; behavior is inferred from implementation.</p>
+  </div>
+</details>
+
+<details class="api-item" id="sarpyx-utils-worldsar-h5-py-derive-chunk-shape" data-searchable data-search="derive_chunk_shape derive_chunk_shape(shape: tuple[int, ...], chunk_size: tuple[int, int])">
+  <summary><code>derive_chunk_shape</code> <span class="api-kind">function</span></summary>
+  <div class="api-body">
+    <p>inferred from implementation.</p>
+    <p><strong>File location:</strong> <code>sarpyx/utils/worldsar_h5.py:?</code></p>
+    <h3 id="sarpyx-utils-worldsar-h5-py-derive-chunk-shape-signature">Signature</h3>
+    <pre><code class="language-python">derive_chunk_shape(shape: tuple[int, ...], chunk_size: tuple[int, int])</code></pre>
+    <h3 id="sarpyx-utils-worldsar-h5-py-derive-chunk-shape-parameters">Parameters</h3>
+    <table class="api-table"><thead><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Default</th><th>Description</th></tr></thead><tbody><tr><td><code>shape</code></td><td><code>tuple[int, ...]</code></td><td>yes</td><td><code>-</code></td><td>inferred from implementation.</td></tr><tr><td><code>chunk_size</code></td><td><code>tuple[int, int]</code></td><td>yes</td><td><code>-</code></td><td>inferred from implementation.</td></tr></tbody></table>
+    <h3 id="sarpyx-utils-worldsar-h5-py-derive-chunk-shape-returns">Return Type</h3>
+    <p><code>tuple[int, ...] | None</code></p>
+    <p>inferred from implementation.</p>
+    <h3 id="sarpyx-utils-worldsar-h5-py-derive-chunk-shape-exceptions">Exceptions</h3>
+    <p>None explicitly documented; inferred from implementation.</p>
+    <h3 id="sarpyx-utils-worldsar-h5-py-derive-chunk-shape-side-effects">Side Effects</h3>
+    <p>None explicitly documented; inferred from implementation.</p>
+    <h3 id="sarpyx-utils-worldsar-h5-py-derive-chunk-shape-example">Example Usage</h3>
+    <pre><code class="language-python">from sarpyx.utils.worldsar_h5 import derive_chunk_shape
+
+result = derive_chunk_shape(shape=&lt;shape&gt;, chunk_size=&lt;chunk_size&gt;)</code></pre>
+    <h3 id="sarpyx-utils-worldsar-h5-py-derive-chunk-shape-edge-cases">Edge Cases</h3>
+    <p>No explicit edge-case section found; behavior is inferred from implementation.</p>
+  </div>
+</details>
+
+<details class="api-item" id="sarpyx-utils-worldsar-h5-py-resolve-output-path" data-searchable data-search="resolve_output_path resolve_output_path(input_path: Path, output_path: Path | None)">
+  <summary><code>resolve_output_path</code> <span class="api-kind">function</span></summary>
+  <div class="api-body">
+    <p>inferred from implementation.</p>
+    <p><strong>File location:</strong> <code>sarpyx/utils/worldsar_h5.py:?</code></p>
+    <h3 id="sarpyx-utils-worldsar-h5-py-resolve-output-path-signature">Signature</h3>
+    <pre><code class="language-python">resolve_output_path(input_path: Path, output_path: Path | None)</code></pre>
+    <h3 id="sarpyx-utils-worldsar-h5-py-resolve-output-path-parameters">Parameters</h3>
+    <table class="api-table"><thead><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Default</th><th>Description</th></tr></thead><tbody><tr><td><code>input_path</code></td><td><code>Path</code></td><td>yes</td><td><code>-</code></td><td>inferred from implementation.</td></tr><tr><td><code>output_path</code></td><td><code>Path | None</code></td><td>yes</td><td><code>-</code></td><td>inferred from implementation.</td></tr></tbody></table>
+    <h3 id="sarpyx-utils-worldsar-h5-py-resolve-output-path-returns">Return Type</h3>
+    <p><code>Path</code></p>
+    <p>inferred from implementation.</p>
+    <h3 id="sarpyx-utils-worldsar-h5-py-resolve-output-path-exceptions">Exceptions</h3>
+    <p>None explicitly documented; inferred from implementation.</p>
+    <h3 id="sarpyx-utils-worldsar-h5-py-resolve-output-path-side-effects">Side Effects</h3>
+    <p>None explicitly documented; inferred from implementation.</p>
+    <h3 id="sarpyx-utils-worldsar-h5-py-resolve-output-path-example">Example Usage</h3>
+    <pre><code class="language-python">from sarpyx.utils.worldsar_h5 import resolve_output_path
+
+result = resolve_output_path(input_path=&lt;input_path&gt;, output_path=&lt;output_path&gt;)</code></pre>
+    <h3 id="sarpyx-utils-worldsar-h5-py-resolve-output-path-edge-cases">Edge Cases</h3>
+    <p>No explicit edge-case section found; behavior is inferred from implementation.</p>
+  </div>
+</details>
+
+<details class="api-item" id="sarpyx-utils-worldsar-h5-py-resolve-expected-band-names-from-dim-product" data-searchable data-search="resolve_expected_band_names_from_dim_product resolve_expected_band_names_from_dim_product(dim_path: Path | str)">
+  <summary><code>resolve_expected_band_names_from_dim_product</code> <span class="api-kind">function</span></summary>
+  <div class="api-body">
+    <p>inferred from implementation.</p>
+    <p><strong>File location:</strong> <code>sarpyx/utils/worldsar_h5.py:?</code></p>
+    <h3 id="sarpyx-utils-worldsar-h5-py-resolve-expected-band-names-from-dim-product-signature">Signature</h3>
+    <pre><code class="language-python">resolve_expected_band_names_from_dim_product(dim_path: Path | str)</code></pre>
+    <h3 id="sarpyx-utils-worldsar-h5-py-resolve-expected-band-names-from-dim-product-parameters">Parameters</h3>
+    <table class="api-table"><thead><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Default</th><th>Description</th></tr></thead><tbody><tr><td><code>dim_path</code></td><td><code>Path | str</code></td><td>yes</td><td><code>-</code></td><td>inferred from implementation.</td></tr></tbody></table>
+    <h3 id="sarpyx-utils-worldsar-h5-py-resolve-expected-band-names-from-dim-product-returns">Return Type</h3>
+    <p><code>list[str]</code></p>
+    <p>inferred from implementation.</p>
+    <h3 id="sarpyx-utils-worldsar-h5-py-resolve-expected-band-names-from-dim-product-exceptions">Exceptions</h3>
+    <p>None explicitly documented; inferred from implementation.</p>
+    <h3 id="sarpyx-utils-worldsar-h5-py-resolve-expected-band-names-from-dim-product-side-effects">Side Effects</h3>
+    <p>None explicitly documented; inferred from implementation.</p>
+    <h3 id="sarpyx-utils-worldsar-h5-py-resolve-expected-band-names-from-dim-product-example">Example Usage</h3>
+    <pre><code class="language-python">from sarpyx.utils.worldsar_h5 import resolve_expected_band_names_from_dim_product
+
+result = resolve_expected_band_names_from_dim_product(dim_path=&lt;dim_path&gt;)</code></pre>
+    <h3 id="sarpyx-utils-worldsar-h5-py-resolve-expected-band-names-from-dim-product-edge-cases">Edge Cases</h3>
+    <p>No explicit edge-case section found; behavior is inferred from implementation.</p>
+  </div>
+</details>
+
+<details class="api-item" id="sarpyx-utils-worldsar-h5-py-convert-tile-h5-to-zarr" data-searchable data-search="convert_tile_h5_to_zarr convert_tile_h5_to_zarr(input_path: Path | str, output_path: Path | str | None = None, chunk_size: tuple[int, int] = DEFAULT_ZARR_CHUNK_SIZE, overwrite: bool = False)">
+  <summary><code>convert_tile_h5_to_zarr</code> <span class="api-kind">function</span></summary>
+  <div class="api-body">
+    <p>inferred from implementation.</p>
+    <p><strong>File location:</strong> <code>sarpyx/utils/worldsar_h5.py:?</code></p>
+    <h3 id="sarpyx-utils-worldsar-h5-py-convert-tile-h5-to-zarr-signature">Signature</h3>
+    <pre><code class="language-python">convert_tile_h5_to_zarr(input_path: Path | str, output_path: Path | str | None = None, chunk_size: tuple[int, int] = DEFAULT_ZARR_CHUNK_SIZE, overwrite: bool = False)</code></pre>
+    <h3 id="sarpyx-utils-worldsar-h5-py-convert-tile-h5-to-zarr-parameters">Parameters</h3>
+    <table class="api-table"><thead><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Default</th><th>Description</th></tr></thead><tbody><tr><td><code>input_path</code></td><td><code>Path | str</code></td><td>yes</td><td><code>-</code></td><td>inferred from implementation.</td></tr><tr><td><code>output_path</code></td><td><code>Path | str | None</code></td><td>no</td><td><code>None</code></td><td>inferred from implementation.</td></tr><tr><td><code>chunk_size</code></td><td><code>tuple[int, int]</code></td><td>no</td><td><code>DEFAULT_ZARR_CHUNK_SIZE</code></td><td>inferred from implementation.</td></tr><tr><td><code>overwrite</code></td><td><code>bool</code></td><td>no</td><td><code>False</code></td><td>inferred from implementation.</td></tr></tbody></table>
+    <h3 id="sarpyx-utils-worldsar-h5-py-convert-tile-h5-to-zarr-returns">Return Type</h3>
+    <p><code>Path</code></p>
+    <p>inferred from implementation.</p>
+    <h3 id="sarpyx-utils-worldsar-h5-py-convert-tile-h5-to-zarr-exceptions">Exceptions</h3>
+    <p>None explicitly documented; inferred from implementation.</p>
+    <h3 id="sarpyx-utils-worldsar-h5-py-convert-tile-h5-to-zarr-side-effects">Side Effects</h3>
+    <p>None explicitly documented; inferred from implementation.</p>
+    <h3 id="sarpyx-utils-worldsar-h5-py-convert-tile-h5-to-zarr-example">Example Usage</h3>
+    <pre><code class="language-python">from sarpyx.utils.worldsar_h5 import convert_tile_h5_to_zarr
+
+result = convert_tile_h5_to_zarr(input_path=&lt;input_path&gt;)</code></pre>
+    <h3 id="sarpyx-utils-worldsar-h5-py-convert-tile-h5-to-zarr-edge-cases">Edge Cases</h3>
+    <p>Includes optional parameters with implementation-defined fallback behavior.</p>
+  </div>
+</details>
+
+<details class="api-item" id="sarpyx-utils-worldsar-h5-py-format-issue-map" data-searchable data-search="format_issue_map format_issue_map(issue_map: dict[str, dict[str, Any]])">
+  <summary><code>format_issue_map</code> <span class="api-kind">function</span></summary>
+  <div class="api-body">
+    <p>inferred from implementation.</p>
+    <p><strong>File location:</strong> <code>sarpyx/utils/worldsar_h5.py:?</code></p>
+    <h3 id="sarpyx-utils-worldsar-h5-py-format-issue-map-signature">Signature</h3>
+    <pre><code class="language-python">format_issue_map(issue_map: dict[str, dict[str, Any]])</code></pre>
+    <h3 id="sarpyx-utils-worldsar-h5-py-format-issue-map-parameters">Parameters</h3>
+    <table class="api-table"><thead><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Default</th><th>Description</th></tr></thead><tbody><tr><td><code>issue_map</code></td><td><code>dict[str, dict[str, Any]]</code></td><td>yes</td><td><code>-</code></td><td>inferred from implementation.</td></tr></tbody></table>
+    <h3 id="sarpyx-utils-worldsar-h5-py-format-issue-map-returns">Return Type</h3>
+    <p><code>list[str]</code></p>
+    <p>inferred from implementation.</p>
+    <h3 id="sarpyx-utils-worldsar-h5-py-format-issue-map-exceptions">Exceptions</h3>
+    <p>None explicitly documented; inferred from implementation.</p>
+    <h3 id="sarpyx-utils-worldsar-h5-py-format-issue-map-side-effects">Side Effects</h3>
+    <p>None explicitly documented; inferred from implementation.</p>
+    <h3 id="sarpyx-utils-worldsar-h5-py-format-issue-map-example">Example Usage</h3>
+    <pre><code class="language-python">from sarpyx.utils.worldsar_h5 import format_issue_map
+
+result = format_issue_map(issue_map=&lt;issue_map&gt;)</code></pre>
+    <h3 id="sarpyx-utils-worldsar-h5-py-format-issue-map-edge-cases">Edge Cases</h3>
+    <p>No explicit edge-case section found; behavior is inferred from implementation.</p>
+  </div>
+</details>
+
+<details class="api-item" id="sarpyx-utils-worldsar-h5-py-extract-tile-geometry-from-abstract-metadata" data-searchable data-search="extract_tile_geometry_from_abstract_metadata extract_tile_geometry_from_abstract_metadata(abstract_metadata: Mapping[str, Any])">
+  <summary><code>extract_tile_geometry_from_abstract_metadata</code> <span class="api-kind">function</span></summary>
+  <div class="api-body">
+    <p>inferred from implementation.</p>
+    <p><strong>File location:</strong> <code>sarpyx/utils/worldsar_h5.py:?</code></p>
+    <h3 id="sarpyx-utils-worldsar-h5-py-extract-tile-geometry-from-abstract-metadata-signature">Signature</h3>
+    <pre><code class="language-python">extract_tile_geometry_from_abstract_metadata(abstract_metadata: Mapping[str, Any])</code></pre>
+    <h3 id="sarpyx-utils-worldsar-h5-py-extract-tile-geometry-from-abstract-metadata-parameters">Parameters</h3>
+    <table class="api-table"><thead><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Default</th><th>Description</th></tr></thead><tbody><tr><td><code>abstract_metadata</code></td><td><code>Mapping[str, Any]</code></td><td>yes</td><td><code>-</code></td><td>inferred from implementation.</td></tr></tbody></table>
+    <h3 id="sarpyx-utils-worldsar-h5-py-extract-tile-geometry-from-abstract-metadata-returns">Return Type</h3>
+    <p><code>dict[str, Any]</code></p>
+    <p>inferred from implementation.</p>
+    <h3 id="sarpyx-utils-worldsar-h5-py-extract-tile-geometry-from-abstract-metadata-exceptions">Exceptions</h3>
+    <p>None explicitly documented; inferred from implementation.</p>
+    <h3 id="sarpyx-utils-worldsar-h5-py-extract-tile-geometry-from-abstract-metadata-side-effects">Side Effects</h3>
+    <p>None explicitly documented; inferred from implementation.</p>
+    <h3 id="sarpyx-utils-worldsar-h5-py-extract-tile-geometry-from-abstract-metadata-example">Example Usage</h3>
+    <pre><code class="language-python">from sarpyx.utils.worldsar_h5 import extract_tile_geometry_from_abstract_metadata
+
+result = extract_tile_geometry_from_abstract_metadata(abstract_metadata=&lt;abstract_metadata&gt;)</code></pre>
+    <h3 id="sarpyx-utils-worldsar-h5-py-extract-tile-geometry-from-abstract-metadata-edge-cases">Edge Cases</h3>
+    <p>No explicit edge-case section found; behavior is inferred from implementation.</p>
+  </div>
+</details>
+
+<details class="api-item" id="sarpyx-utils-worldsar-h5-py-normalize-expected-tile-geometries" data-searchable data-search="normalize_expected_tile_geometries normalize_expected_tile_geometries(rectangles: list[dict[str, Any]] | None)">
+  <summary><code>normalize_expected_tile_geometries</code> <span class="api-kind">function</span></summary>
+  <div class="api-body">
+    <p>inferred from implementation.</p>
+    <p><strong>File location:</strong> <code>sarpyx/utils/worldsar_h5.py:?</code></p>
+    <h3 id="sarpyx-utils-worldsar-h5-py-normalize-expected-tile-geometries-signature">Signature</h3>
+    <pre><code class="language-python">normalize_expected_tile_geometries(rectangles: list[dict[str, Any]] | None)</code></pre>
+    <h3 id="sarpyx-utils-worldsar-h5-py-normalize-expected-tile-geometries-parameters">Parameters</h3>
+    <table class="api-table"><thead><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Default</th><th>Description</th></tr></thead><tbody><tr><td><code>rectangles</code></td><td><code>list[dict[str, Any]] | None</code></td><td>yes</td><td><code>-</code></td><td>inferred from implementation.</td></tr></tbody></table>
+    <h3 id="sarpyx-utils-worldsar-h5-py-normalize-expected-tile-geometries-returns">Return Type</h3>
+    <p><code>dict[str, list[tuple[float, float]]]</code></p>
+    <p>inferred from implementation.</p>
+    <h3 id="sarpyx-utils-worldsar-h5-py-normalize-expected-tile-geometries-exceptions">Exceptions</h3>
+    <p>None explicitly documented; inferred from implementation.</p>
+    <h3 id="sarpyx-utils-worldsar-h5-py-normalize-expected-tile-geometries-side-effects">Side Effects</h3>
+    <p>None explicitly documented; inferred from implementation.</p>
+    <h3 id="sarpyx-utils-worldsar-h5-py-normalize-expected-tile-geometries-example">Example Usage</h3>
+    <pre><code class="language-python">from sarpyx.utils.worldsar_h5 import normalize_expected_tile_geometries
+
+result = normalize_expected_tile_geometries(rectangles=&lt;rectangles&gt;)</code></pre>
+    <h3 id="sarpyx-utils-worldsar-h5-py-normalize-expected-tile-geometries-edge-cases">Edge Cases</h3>
+    <p>No explicit edge-case section found; behavior is inferred from implementation.</p>
+  </div>
+</details>
+
+<details class="api-item" id="sarpyx-utils-worldsar-h5-py-validate-h5-tile" data-searchable data-search="validate_h5_tile validate_h5_tile(tile_path: Path | str, expected_bands: list[str], swath: str | None = None)">
+  <summary><code>validate_h5_tile</code> <span class="api-kind">function</span></summary>
+  <div class="api-body">
+    <p>inferred from implementation.</p>
+    <p><strong>File location:</strong> <code>sarpyx/utils/worldsar_h5.py:?</code></p>
+    <h3 id="sarpyx-utils-worldsar-h5-py-validate-h5-tile-signature">Signature</h3>
+    <pre><code class="language-python">validate_h5_tile(tile_path: Path | str, expected_bands: list[str], swath: str | None = None)</code></pre>
+    <h3 id="sarpyx-utils-worldsar-h5-py-validate-h5-tile-parameters">Parameters</h3>
+    <table class="api-table"><thead><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Default</th><th>Description</th></tr></thead><tbody><tr><td><code>tile_path</code></td><td><code>Path | str</code></td><td>yes</td><td><code>-</code></td><td>inferred from implementation.</td></tr><tr><td><code>expected_bands</code></td><td><code>list[str]</code></td><td>yes</td><td><code>-</code></td><td>inferred from implementation.</td></tr><tr><td><code>swath</code></td><td><code>str | None</code></td><td>no</td><td><code>None</code></td><td>inferred from implementation.</td></tr></tbody></table>
+    <h3 id="sarpyx-utils-worldsar-h5-py-validate-h5-tile-returns">Return Type</h3>
+    <p><code>dict[str, Any]</code></p>
+    <p>inferred from implementation.</p>
+    <h3 id="sarpyx-utils-worldsar-h5-py-validate-h5-tile-exceptions">Exceptions</h3>
+    <p>None explicitly documented; inferred from implementation.</p>
+    <h3 id="sarpyx-utils-worldsar-h5-py-validate-h5-tile-side-effects">Side Effects</h3>
+    <p>None explicitly documented; inferred from implementation.</p>
+    <h3 id="sarpyx-utils-worldsar-h5-py-validate-h5-tile-example">Example Usage</h3>
+    <pre><code class="language-python">from sarpyx.utils.worldsar_h5 import validate_h5_tile
+
+result = validate_h5_tile(tile_path=&lt;tile_path&gt;, expected_bands=&lt;expected_bands&gt;)</code></pre>
+    <h3 id="sarpyx-utils-worldsar-h5-py-validate-h5-tile-edge-cases">Edge Cases</h3>
+    <p>Includes optional parameters with implementation-defined fallback behavior.</p>
+  </div>
+</details>
+
+<details class="api-item" id="sarpyx-utils-worldsar-h5-py-enrich-validation-results-with-h5-structure" data-searchable data-search="enrich_validation_results_with_h5_structure enrich_validation_results_with_h5_structure(results: list[dict[str, Any]])">
+  <summary><code>enrich_validation_results_with_h5_structure</code> <span class="api-kind">function</span></summary>
+  <div class="api-body">
+    <p>inferred from implementation.</p>
+    <p><strong>File location:</strong> <code>sarpyx/utils/worldsar_h5.py:?</code></p>
+    <h3 id="sarpyx-utils-worldsar-h5-py-enrich-validation-results-with-h5-structure-signature">Signature</h3>
+    <pre><code class="language-python">enrich_validation_results_with_h5_structure(results: list[dict[str, Any]])</code></pre>
+    <h3 id="sarpyx-utils-worldsar-h5-py-enrich-validation-results-with-h5-structure-parameters">Parameters</h3>
+    <table class="api-table"><thead><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Default</th><th>Description</th></tr></thead><tbody><tr><td><code>results</code></td><td><code>list[dict[str, Any]]</code></td><td>yes</td><td><code>-</code></td><td>inferred from implementation.</td></tr></tbody></table>
+    <h3 id="sarpyx-utils-worldsar-h5-py-enrich-validation-results-with-h5-structure-returns">Return Type</h3>
+    <p><code>dict[str, list[str]]</code></p>
+    <p>inferred from implementation.</p>
+    <h3 id="sarpyx-utils-worldsar-h5-py-enrich-validation-results-with-h5-structure-exceptions">Exceptions</h3>
+    <p>None explicitly documented; inferred from implementation.</p>
+    <h3 id="sarpyx-utils-worldsar-h5-py-enrich-validation-results-with-h5-structure-side-effects">Side Effects</h3>
+    <p>None explicitly documented; inferred from implementation.</p>
+    <h3 id="sarpyx-utils-worldsar-h5-py-enrich-validation-results-with-h5-structure-example">Example Usage</h3>
+    <pre><code class="language-python">from sarpyx.utils.worldsar_h5 import enrich_validation_results_with_h5_structure
+
+result = enrich_validation_results_with_h5_structure(results=&lt;results&gt;)</code></pre>
+    <h3 id="sarpyx-utils-worldsar-h5-py-enrich-validation-results-with-h5-structure-edge-cases">Edge Cases</h3>
+    <p>No explicit edge-case section found; behavior is inferred from implementation.</p>
+  </div>
+</details>
+
+<details class="api-item" id="sarpyx-utils-worldsar-h5-py-build-validation-group-summary-rows" data-searchable data-search="build_validation_group_summary_rows build_validation_group_summary_rows(validation_groups: list[dict[str, Any]])">
+  <summary><code>build_validation_group_summary_rows</code> <span class="api-kind">function</span></summary>
+  <div class="api-body">
+    <p>inferred from implementation.</p>
+    <p><strong>File location:</strong> <code>sarpyx/utils/worldsar_h5.py:?</code></p>
+    <h3 id="sarpyx-utils-worldsar-h5-py-build-validation-group-summary-rows-signature">Signature</h3>
+    <pre><code class="language-python">build_validation_group_summary_rows(validation_groups: list[dict[str, Any]])</code></pre>
+    <h3 id="sarpyx-utils-worldsar-h5-py-build-validation-group-summary-rows-parameters">Parameters</h3>
+    <table class="api-table"><thead><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Default</th><th>Description</th></tr></thead><tbody><tr><td><code>validation_groups</code></td><td><code>list[dict[str, Any]]</code></td><td>yes</td><td><code>-</code></td><td>inferred from implementation.</td></tr></tbody></table>
+    <h3 id="sarpyx-utils-worldsar-h5-py-build-validation-group-summary-rows-returns">Return Type</h3>
+    <p><code>list[dict[str, Any]]</code></p>
+    <p>inferred from implementation.</p>
+    <h3 id="sarpyx-utils-worldsar-h5-py-build-validation-group-summary-rows-exceptions">Exceptions</h3>
+    <p>None explicitly documented; inferred from implementation.</p>
+    <h3 id="sarpyx-utils-worldsar-h5-py-build-validation-group-summary-rows-side-effects">Side Effects</h3>
+    <p>None explicitly documented; inferred from implementation.</p>
+    <h3 id="sarpyx-utils-worldsar-h5-py-build-validation-group-summary-rows-example">Example Usage</h3>
+    <pre><code class="language-python">from sarpyx.utils.worldsar_h5 import build_validation_group_summary_rows
+
+result = build_validation_group_summary_rows(validation_groups=&lt;validation_groups&gt;)</code></pre>
+    <h3 id="sarpyx-utils-worldsar-h5-py-build-validation-group-summary-rows-edge-cases">Edge Cases</h3>
+    <p>No explicit edge-case section found; behavior is inferred from implementation.</p>
+  </div>
+</details>
+
+<details class="api-item" id="sarpyx-utils-worldsar-h5-py-build-validation-headline-counts" data-searchable data-search="build_validation_headline_counts build_validation_headline_counts(validation_groups: list[dict[str, Any]])">
+  <summary><code>build_validation_headline_counts</code> <span class="api-kind">function</span></summary>
+  <div class="api-body">
+    <p>inferred from implementation.</p>
+    <p><strong>File location:</strong> <code>sarpyx/utils/worldsar_h5.py:?</code></p>
+    <h3 id="sarpyx-utils-worldsar-h5-py-build-validation-headline-counts-signature">Signature</h3>
+    <pre><code class="language-python">build_validation_headline_counts(validation_groups: list[dict[str, Any]])</code></pre>
+    <h3 id="sarpyx-utils-worldsar-h5-py-build-validation-headline-counts-parameters">Parameters</h3>
+    <table class="api-table"><thead><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Default</th><th>Description</th></tr></thead><tbody><tr><td><code>validation_groups</code></td><td><code>list[dict[str, Any]]</code></td><td>yes</td><td><code>-</code></td><td>inferred from implementation.</td></tr></tbody></table>
+    <h3 id="sarpyx-utils-worldsar-h5-py-build-validation-headline-counts-returns">Return Type</h3>
+    <p><code>dict[str, int]</code></p>
+    <p>inferred from implementation.</p>
+    <h3 id="sarpyx-utils-worldsar-h5-py-build-validation-headline-counts-exceptions">Exceptions</h3>
+    <p>None explicitly documented; inferred from implementation.</p>
+    <h3 id="sarpyx-utils-worldsar-h5-py-build-validation-headline-counts-side-effects">Side Effects</h3>
+    <p>None explicitly documented; inferred from implementation.</p>
+    <h3 id="sarpyx-utils-worldsar-h5-py-build-validation-headline-counts-example">Example Usage</h3>
+    <pre><code class="language-python">from sarpyx.utils.worldsar_h5 import build_validation_headline_counts
+
+result = build_validation_headline_counts(validation_groups=&lt;validation_groups&gt;)</code></pre>
+    <h3 id="sarpyx-utils-worldsar-h5-py-build-validation-headline-counts-edge-cases">Edge Cases</h3>
+    <p>No explicit edge-case section found; behavior is inferred from implementation.</p>
+  </div>
+</details>
+
+<details class="api-item" id="sarpyx-utils-worldsar-h5-py-build-validation-inventory-summary" data-searchable data-search="build_validation_inventory_summary build_validation_inventory_summary(group: Mapping[str, Any])">
+  <summary><code>build_validation_inventory_summary</code> <span class="api-kind">function</span></summary>
+  <div class="api-body">
+    <p>inferred from implementation.</p>
+    <p><strong>File location:</strong> <code>sarpyx/utils/worldsar_h5.py:?</code></p>
+    <h3 id="sarpyx-utils-worldsar-h5-py-build-validation-inventory-summary-signature">Signature</h3>
+    <pre><code class="language-python">build_validation_inventory_summary(group: Mapping[str, Any])</code></pre>
+    <h3 id="sarpyx-utils-worldsar-h5-py-build-validation-inventory-summary-parameters">Parameters</h3>
+    <table class="api-table"><thead><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Default</th><th>Description</th></tr></thead><tbody><tr><td><code>group</code></td><td><code>Mapping[str, Any]</code></td><td>yes</td><td><code>-</code></td><td>inferred from implementation.</td></tr></tbody></table>
+    <h3 id="sarpyx-utils-worldsar-h5-py-build-validation-inventory-summary-returns">Return Type</h3>
+    <p><code>dict[str, int]</code></p>
+    <p>inferred from implementation.</p>
+    <h3 id="sarpyx-utils-worldsar-h5-py-build-validation-inventory-summary-exceptions">Exceptions</h3>
+    <p>None explicitly documented; inferred from implementation.</p>
+    <h3 id="sarpyx-utils-worldsar-h5-py-build-validation-inventory-summary-side-effects">Side Effects</h3>
+    <p>None explicitly documented; inferred from implementation.</p>
+    <h3 id="sarpyx-utils-worldsar-h5-py-build-validation-inventory-summary-example">Example Usage</h3>
+    <pre><code class="language-python">from sarpyx.utils.worldsar_h5 import build_validation_inventory_summary
+
+result = build_validation_inventory_summary(group=&lt;group&gt;)</code></pre>
+    <h3 id="sarpyx-utils-worldsar-h5-py-build-validation-inventory-summary-edge-cases">Edge Cases</h3>
+    <p>No explicit edge-case section found; behavior is inferred from implementation.</p>
+  </div>
+</details>
+
+<details class="api-item" id="sarpyx-utils-worldsar-h5-py-build-validation-dashboard-rows" data-searchable data-search="build_validation_dashboard_rows build_validation_dashboard_rows(group: Mapping[str, Any])">
+  <summary><code>build_validation_dashboard_rows</code> <span class="api-kind">function</span></summary>
+  <div class="api-body">
+    <p>inferred from implementation.</p>
+    <p><strong>File location:</strong> <code>sarpyx/utils/worldsar_h5.py:?</code></p>
+    <h3 id="sarpyx-utils-worldsar-h5-py-build-validation-dashboard-rows-signature">Signature</h3>
+    <pre><code class="language-python">build_validation_dashboard_rows(group: Mapping[str, Any])</code></pre>
+    <h3 id="sarpyx-utils-worldsar-h5-py-build-validation-dashboard-rows-parameters">Parameters</h3>
+    <table class="api-table"><thead><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Default</th><th>Description</th></tr></thead><tbody><tr><td><code>group</code></td><td><code>Mapping[str, Any]</code></td><td>yes</td><td><code>-</code></td><td>inferred from implementation.</td></tr></tbody></table>
+    <h3 id="sarpyx-utils-worldsar-h5-py-build-validation-dashboard-rows-returns">Return Type</h3>
+    <p><code>list[dict[str, Any]]</code></p>
+    <p>inferred from implementation.</p>
+    <h3 id="sarpyx-utils-worldsar-h5-py-build-validation-dashboard-rows-exceptions">Exceptions</h3>
+    <p>None explicitly documented; inferred from implementation.</p>
+    <h3 id="sarpyx-utils-worldsar-h5-py-build-validation-dashboard-rows-side-effects">Side Effects</h3>
+    <p>None explicitly documented; inferred from implementation.</p>
+    <h3 id="sarpyx-utils-worldsar-h5-py-build-validation-dashboard-rows-example">Example Usage</h3>
+    <pre><code class="language-python">from sarpyx.utils.worldsar_h5 import build_validation_dashboard_rows
+
+result = build_validation_dashboard_rows(group=&lt;group&gt;)</code></pre>
+    <h3 id="sarpyx-utils-worldsar-h5-py-build-validation-dashboard-rows-edge-cases">Edge Cases</h3>
+    <p>No explicit edge-case section found; behavior is inferred from implementation.</p>
+  </div>
+</details>
+
+<details class="api-item" id="sarpyx-utils-worldsar-h5-py-build-validation-map-layers" data-searchable data-search="build_validation_map_layers build_validation_map_layers(validation_groups: list[dict[str, Any]])">
+  <summary><code>build_validation_map_layers</code> <span class="api-kind">function</span></summary>
+  <div class="api-body">
+    <p>inferred from implementation.</p>
+    <p><strong>File location:</strong> <code>sarpyx/utils/worldsar_h5.py:?</code></p>
+    <h3 id="sarpyx-utils-worldsar-h5-py-build-validation-map-layers-signature">Signature</h3>
+    <pre><code class="language-python">build_validation_map_layers(validation_groups: list[dict[str, Any]])</code></pre>
+    <h3 id="sarpyx-utils-worldsar-h5-py-build-validation-map-layers-parameters">Parameters</h3>
+    <table class="api-table"><thead><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Default</th><th>Description</th></tr></thead><tbody><tr><td><code>validation_groups</code></td><td><code>list[dict[str, Any]]</code></td><td>yes</td><td><code>-</code></td><td>inferred from implementation.</td></tr></tbody></table>
+    <h3 id="sarpyx-utils-worldsar-h5-py-build-validation-map-layers-returns">Return Type</h3>
+    <p><code>dict[str, Any]</code></p>
+    <p>inferred from implementation.</p>
+    <h3 id="sarpyx-utils-worldsar-h5-py-build-validation-map-layers-exceptions">Exceptions</h3>
+    <p>None explicitly documented; inferred from implementation.</p>
+    <h3 id="sarpyx-utils-worldsar-h5-py-build-validation-map-layers-side-effects">Side Effects</h3>
+    <p>None explicitly documented; inferred from implementation.</p>
+    <h3 id="sarpyx-utils-worldsar-h5-py-build-validation-map-layers-example">Example Usage</h3>
+    <pre><code class="language-python">from sarpyx.utils.worldsar_h5 import build_validation_map_layers
+
+result = build_validation_map_layers(validation_groups=&lt;validation_groups&gt;)</code></pre>
+    <h3 id="sarpyx-utils-worldsar-h5-py-build-validation-map-layers-edge-cases">Edge Cases</h3>
+    <p>No explicit edge-case section found; behavior is inferred from implementation.</p>
+  </div>
+</details>
+
+<details class="api-item" id="sarpyx-utils-worldsar-h5-py-build-failure-appendix-rows" data-searchable data-search="build_failure_appendix_rows build_failure_appendix_rows(validation_groups: list[dict[str, Any]])">
+  <summary><code>build_failure_appendix_rows</code> <span class="api-kind">function</span></summary>
+  <div class="api-body">
+    <p>inferred from implementation.</p>
+    <p><strong>File location:</strong> <code>sarpyx/utils/worldsar_h5.py:?</code></p>
+    <h3 id="sarpyx-utils-worldsar-h5-py-build-failure-appendix-rows-signature">Signature</h3>
+    <pre><code class="language-python">build_failure_appendix_rows(validation_groups: list[dict[str, Any]])</code></pre>
+    <h3 id="sarpyx-utils-worldsar-h5-py-build-failure-appendix-rows-parameters">Parameters</h3>
+    <table class="api-table"><thead><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Default</th><th>Description</th></tr></thead><tbody><tr><td><code>validation_groups</code></td><td><code>list[dict[str, Any]]</code></td><td>yes</td><td><code>-</code></td><td>inferred from implementation.</td></tr></tbody></table>
+    <h3 id="sarpyx-utils-worldsar-h5-py-build-failure-appendix-rows-returns">Return Type</h3>
+    <p><code>list[dict[str, Any]]</code></p>
+    <p>inferred from implementation.</p>
+    <h3 id="sarpyx-utils-worldsar-h5-py-build-failure-appendix-rows-exceptions">Exceptions</h3>
+    <p>None explicitly documented; inferred from implementation.</p>
+    <h3 id="sarpyx-utils-worldsar-h5-py-build-failure-appendix-rows-side-effects">Side Effects</h3>
+    <p>None explicitly documented; inferred from implementation.</p>
+    <h3 id="sarpyx-utils-worldsar-h5-py-build-failure-appendix-rows-example">Example Usage</h3>
+    <pre><code class="language-python">from sarpyx.utils.worldsar_h5 import build_failure_appendix_rows
+
+result = build_failure_appendix_rows(validation_groups=&lt;validation_groups&gt;)</code></pre>
+    <h3 id="sarpyx-utils-worldsar-h5-py-build-failure-appendix-rows-edge-cases">Edge Cases</h3>
+    <p>No explicit edge-case section found; behavior is inferred from implementation.</p>
+  </div>
+</details>
+
+<details class="api-item" id="sarpyx-utils-worldsar-h5-py-build-aggregate-dashboard-rows" data-searchable data-search="build_aggregate_dashboard_rows build_aggregate_dashboard_rows(validation_groups: list[dict[str, Any]])">
+  <summary><code>build_aggregate_dashboard_rows</code> <span class="api-kind">function</span></summary>
+  <div class="api-body">
+    <p>inferred from implementation.</p>
+    <p><strong>File location:</strong> <code>sarpyx/utils/worldsar_h5.py:?</code></p>
+    <h3 id="sarpyx-utils-worldsar-h5-py-build-aggregate-dashboard-rows-signature">Signature</h3>
+    <pre><code class="language-python">build_aggregate_dashboard_rows(validation_groups: list[dict[str, Any]])</code></pre>
+    <h3 id="sarpyx-utils-worldsar-h5-py-build-aggregate-dashboard-rows-parameters">Parameters</h3>
+    <table class="api-table"><thead><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Default</th><th>Description</th></tr></thead><tbody><tr><td><code>validation_groups</code></td><td><code>list[dict[str, Any]]</code></td><td>yes</td><td><code>-</code></td><td>inferred from implementation.</td></tr></tbody></table>
+    <h3 id="sarpyx-utils-worldsar-h5-py-build-aggregate-dashboard-rows-returns">Return Type</h3>
+    <p><code>list[dict[str, Any]]</code></p>
+    <p>inferred from implementation.</p>
+    <h3 id="sarpyx-utils-worldsar-h5-py-build-aggregate-dashboard-rows-exceptions">Exceptions</h3>
+    <p>None explicitly documented; inferred from implementation.</p>
+    <h3 id="sarpyx-utils-worldsar-h5-py-build-aggregate-dashboard-rows-side-effects">Side Effects</h3>
+    <p>None explicitly documented; inferred from implementation.</p>
+    <h3 id="sarpyx-utils-worldsar-h5-py-build-aggregate-dashboard-rows-example">Example Usage</h3>
+    <pre><code class="language-python">from sarpyx.utils.worldsar_h5 import build_aggregate_dashboard_rows
+
+result = build_aggregate_dashboard_rows(validation_groups=&lt;validation_groups&gt;)</code></pre>
+    <h3 id="sarpyx-utils-worldsar-h5-py-build-aggregate-dashboard-rows-edge-cases">Edge Cases</h3>
+    <p>No explicit edge-case section found; behavior is inferred from implementation.</p>
+  </div>
+</details>
+
+<details class="api-item" id="sarpyx-utils-worldsar-h5-py-build-report-metadata-snapshot" data-searchable data-search="build_report_metadata_snapshot build_report_metadata_snapshot(validation_groups: list[dict[str, Any]])">
+  <summary><code>build_report_metadata_snapshot</code> <span class="api-kind">function</span></summary>
+  <div class="api-body">
+    <p>inferred from implementation.</p>
+    <p><strong>File location:</strong> <code>sarpyx/utils/worldsar_h5.py:?</code></p>
+    <h3 id="sarpyx-utils-worldsar-h5-py-build-report-metadata-snapshot-signature">Signature</h3>
+    <pre><code class="language-python">build_report_metadata_snapshot(validation_groups: list[dict[str, Any]])</code></pre>
+    <h3 id="sarpyx-utils-worldsar-h5-py-build-report-metadata-snapshot-parameters">Parameters</h3>
+    <table class="api-table"><thead><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Default</th><th>Description</th></tr></thead><tbody><tr><td><code>validation_groups</code></td><td><code>list[dict[str, Any]]</code></td><td>yes</td><td><code>-</code></td><td>inferred from implementation.</td></tr></tbody></table>
+    <h3 id="sarpyx-utils-worldsar-h5-py-build-report-metadata-snapshot-returns">Return Type</h3>
+    <p><code>list[tuple[str, str]]</code></p>
+    <p>inferred from implementation.</p>
+    <h3 id="sarpyx-utils-worldsar-h5-py-build-report-metadata-snapshot-exceptions">Exceptions</h3>
+    <p>None explicitly documented; inferred from implementation.</p>
+    <h3 id="sarpyx-utils-worldsar-h5-py-build-report-metadata-snapshot-side-effects">Side Effects</h3>
+    <p>None explicitly documented; inferred from implementation.</p>
+    <h3 id="sarpyx-utils-worldsar-h5-py-build-report-metadata-snapshot-example">Example Usage</h3>
+    <pre><code class="language-python">from sarpyx.utils.worldsar_h5 import build_report_metadata_snapshot
+
+result = build_report_metadata_snapshot(validation_groups=&lt;validation_groups&gt;)</code></pre>
+    <h3 id="sarpyx-utils-worldsar-h5-py-build-report-metadata-snapshot-edge-cases">Edge Cases</h3>
+    <p>No explicit edge-case section found; behavior is inferred from implementation.</p>
+  </div>
+</details>
+
+<details class="api-item" id="sarpyx-utils-worldsar-h5-py-write-h5-validation-report-pdf" data-searchable data-search="write_h5_validation_report_pdf write_h5_validation_report_pdf(report_path: Path | str, product_name: str, validation_groups: list[dict[str, Any]])">
+  <summary><code>write_h5_validation_report_pdf</code> <span class="api-kind">function</span></summary>
+  <div class="api-body">
+    <p>inferred from implementation.</p>
+    <p><strong>File location:</strong> <code>sarpyx/utils/worldsar_h5.py:?</code></p>
+    <h3 id="sarpyx-utils-worldsar-h5-py-write-h5-validation-report-pdf-signature">Signature</h3>
+    <pre><code class="language-python">write_h5_validation_report_pdf(report_path: Path | str, product_name: str, validation_groups: list[dict[str, Any]])</code></pre>
+    <h3 id="sarpyx-utils-worldsar-h5-py-write-h5-validation-report-pdf-parameters">Parameters</h3>
+    <table class="api-table"><thead><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Default</th><th>Description</th></tr></thead><tbody><tr><td><code>report_path</code></td><td><code>Path | str</code></td><td>yes</td><td><code>-</code></td><td>inferred from implementation.</td></tr><tr><td><code>product_name</code></td><td><code>str</code></td><td>yes</td><td><code>-</code></td><td>inferred from implementation.</td></tr><tr><td><code>validation_groups</code></td><td><code>list[dict[str, Any]]</code></td><td>yes</td><td><code>-</code></td><td>inferred from implementation.</td></tr></tbody></table>
+    <h3 id="sarpyx-utils-worldsar-h5-py-write-h5-validation-report-pdf-returns">Return Type</h3>
+    <p><code>Path</code></p>
+    <p>inferred from implementation.</p>
+    <h3 id="sarpyx-utils-worldsar-h5-py-write-h5-validation-report-pdf-exceptions">Exceptions</h3>
+    <p>None explicitly documented; inferred from implementation.</p>
+    <h3 id="sarpyx-utils-worldsar-h5-py-write-h5-validation-report-pdf-side-effects">Side Effects</h3>
+    <p>None explicitly documented; inferred from implementation.</p>
+    <h3 id="sarpyx-utils-worldsar-h5-py-write-h5-validation-report-pdf-example">Example Usage</h3>
+    <pre><code class="language-python">from sarpyx.utils.worldsar_h5 import write_h5_validation_report_pdf
+
+result = write_h5_validation_report_pdf(report_path=&lt;report_path&gt;, product_name=&lt;product_name&gt;, validation_groups=&lt;validation_groups&gt;)</code></pre>
+    <h3 id="sarpyx-utils-worldsar-h5-py-write-h5-validation-report-pdf-edge-cases">Edge Cases</h3>
+    <p>No explicit edge-case section found; behavior is inferred from implementation.</p>
+  </div>
+</details>
+
+
+  <h2 id="public-classes">Public Classes (0)</h2>
+  <p>No public classes detected.</p>
+</section>
+
+      </article>
+      <footer class="page-footer">
+        <p>Generated from repository sources on 2026-05-11 18:10 UTC.</p>
+      </footer>
+    </main>
+  </div>
+</body>
+</html>

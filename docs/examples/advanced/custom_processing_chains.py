@@ -885,54 +885,6 @@ def create_vegetation_monitoring_chain() -> ProcessingChain:
     
     return chain
 
-def create_ship_detection_chain() -> ProcessingChain:
-    """Create a custom chain for ship detection."""
-    config = ProcessingConfig(
-        chain_name="ShipDetection",
-        parallel_workers=6,
-        memory_limit_gb=12.0,
-        custom_parameters={
-            'detection_algorithm': 'cfar',
-            'false_alarm_rate': 1e-6
-        }
-    )
-    
-    chain = ProcessingChain(config)
-    
-    # Add processing steps optimized for ship detection
-    chain.add_step(DataLoaderStep())
-    
-    preprocessing_config = {
-        'operations': ['calibration', 'speckle_filter'],
-        'speckle_filter_size': 3  # Smaller filter to preserve ship signatures
-    }
-    chain.add_step(PreprocessingStep(preprocessing_config))
-    
-    sla_config = {
-        'sub_apertures': 8,
-        'overlap_factor': 0.7
-    }
-    chain.add_step(SLAProcessingStep(sla_config))
-    
-    feature_config = {
-        'features': ['intensity', 'texture']
-    }
-    chain.add_step(FeatureExtractionStep(feature_config))
-    
-    classification_config = {
-        'algorithm': 'threshold',
-        'n_classes': 2  # Ship vs. no-ship
-    }
-    chain.add_step(ClassificationStep(classification_config))
-    
-    output_config = {
-        'format': 'HDF5',
-        'directory': 'ship_detection_output'
-    }
-    chain.add_step(OutputStep(output_config))
-    
-    return chain
-
 def main():
     """
     Main function demonstrating custom processing chains.
@@ -959,24 +911,8 @@ def main():
     except Exception as e:
         print(f"Vegetation monitoring failed: {e}")
     
-    # Create and run ship detection chain
-    print("\n2. Ship Detection Chain")
-    print("-" * 30)
-    
-    ship_chain = create_ship_detection_chain()
-    
-    # Save chain configuration
-    ship_chain.save_chain_config("ship_detection_chain.yaml")
-    
-    try:
-        ship_results = ship_chain.process(data_path)
-        print("Ship detection completed successfully!")
-        print(ship_chain.get_performance_report())
-    except Exception as e:
-        print(f"Ship detection failed: {e}")
-    
     # Demonstrate batch processing
-    print("\n3. Batch Processing Demo")
+    print("\n2. Batch Processing Demo")
     print("-" * 30)
     
     # Create a simple chain for batch processing

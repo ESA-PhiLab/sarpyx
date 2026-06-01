@@ -1,12 +1,12 @@
 # Data Formats and Compatibility
 
-This guide covers the data formats supported by sarpyx for input and output operations, along with format-specific considerations and best practices.
+This guide covers the data formats currently handled by implemented sarpyx workflows. Mission-specific support is concentrated in the WorldSAR CLI, SNAP GPT wrapper, H5/Zarr utilities, and sub-aperture BEAM-DIMAP helpers.
 
 ## Supported Input Formats
 
 ### SAR Product Formats
 
-sarpyx supports the following SAR mission data formats:
+sarpyx currently has implemented paths for the following SAR mission data formats:
 
 #### Sentinel-1 (Copernicus)
 - **Format**: SAFE (Standard Archive Format for Europe)
@@ -25,29 +25,14 @@ from sarpyx.sla import SubLookAnalysis
 sla = SubLookAnalysis("S1A_IW_SLC_1SDV_20230101T120000_20230101T120030_046123_058A2B_1234.zip")
 ```
 
-#### COSMO-SkyMed (Italian Space Agency)
-- **Format**: HDF5-based proprietary format
-- **File Extension**: Various (`.h5`, custom extensions)
-- **Product Types**: SCS (Single Look Complex Slant Range)
-- **Polarizations**: HH, HV, VH, VV
-- **Processing Levels**: Level-1A, Level-1B
+#### TerraSAR-X
+- **Format**: TerraSAR-X product directories and ZIP/SIP ZIP archives
+- **Product Types**: geocoded EEC/GEC, complex SSC/SLC, detected MGD/GRD variants
+- **Usage**: WorldSAR mode inference, product XML resolution, footprint extraction, and SNAP preprocessing dispatch
 
-```python
-# Example: COSMO-SkyMed processing
-from sarpyx.snapflow.engine import GPT
-
-# Initialize with COSMO-SkyMed product
-gpt = GPT(product_path="CSK_product.h5", 
-          outdir="output/", 
-          mode="MacOS")  # or "Ubuntu"
-```
-
-#### ALOS PALSAR / ALOS-2 PALSAR-2 (JAXA)
-- **Format**: CEOS (Committee on Earth Observation Satellites)
-- **File Extension**: Various (directory structures)
-- **Product Types**: Level 1.1, Level 1.5
-- **Polarizations**: HH, HV, VH, VV
-- **Band**: L-band
+#### NISAR
+- **Format**: HDF5-based products
+- **Usage**: metadata reading, footprint extraction, and cut helpers in `sarpyx.utils.nisar_utils`
 
 ### Derived Data Formats
 
@@ -90,10 +75,10 @@ sarpyx integrates with ESA's SNAP (Sentinel Application Platform) for advanced p
 from sarpyx.snapflow.engine import GPT
 
 # Example SNAP processing chain
-gpt = GPT(product_path="input.zip", outdir="output/")
+gpt = GPT(product="input.zip", outdir="output/")
 
 # Calibration (outputs BEAM-DIMAP by default)
-cal_product = gpt.Calibration(Pols=['VV', 'VH'])
+cal_product = gpt.calibration(pols=['VV', 'VH'])
 
 # Export to GeoTIFF for external use
 gpt.format = 'GeoTIFF'

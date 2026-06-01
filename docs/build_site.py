@@ -61,7 +61,6 @@ NAV: list[tuple[str, list[tuple[str, str]]]] = [
         ("04 – Multi-temporal",   "tutorials/04_multitemporal_analysis.md"),
         ("05 – Polarimetry",     "tutorials/05_polarimetric_analysis.md"),
         ("06 – Custom Workflows", "tutorials/06_custom_workflows.md"),
-        ("07 – Ship Detection",   "tutorials/07_ship_detection.md"),
         ("08 – InSAR",            "tutorials/08_interferometric_analysis.md"),
     ]),
     ("API Reference", [
@@ -470,9 +469,7 @@ def build(src_dir: Path, out_dir: Path) -> None:
         converted += 1
 
     # ── also copy .py example files as plain-text downloadable ────
-    for py in src_dir.rglob("*.py"):
-        if py.name == "build_site.py" or "_site" in py.parts:
-            continue
+    for py in (src_dir / "examples").rglob("*.py"):
         dest = out_dir / py.relative_to(src_dir)
         dest.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(py, dest)

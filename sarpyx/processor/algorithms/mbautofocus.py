@@ -1,5 +1,21 @@
-import torch 
-from torch import nn 
+try:
+    import torch
+    from torch import nn
+except ImportError as exc:
+    torch = None
+    _TORCH_IMPORT_ERROR = exc
+
+    class _MissingTorchModule:
+        def __init__(self, *args, **kwargs):
+            raise ImportError("processor.algorithms.mbautofocus requires the 'torch' extra") from _TORCH_IMPORT_ERROR
+
+    class _MissingTorchNN:
+        Module = _MissingTorchModule
+        Parameter = _MissingTorchModule
+
+    nn = _MissingTorchNN()
+else:
+    _TORCH_IMPORT_ERROR = None
 
 import matplotlib.pyplot as plt
 import matplotlib.colors as colors
@@ -8,7 +24,7 @@ from .constants import load_constants, load_constants_from_meta
 import pandas as pd 
 import numpy as np
 
-device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
+device = 'cuda:0' if torch is not None and torch.cuda.is_available() else 'cpu'
 
 class estimate_V_eff(nn.Module):
     def __init__(self, V_aux = 7900, patch_dim=(4096, 4096)):

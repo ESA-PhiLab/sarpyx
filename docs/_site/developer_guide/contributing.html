@@ -34,7 +34,6 @@
 <a href="../tutorials/04_multitemporal_analysis.html">04 – Multi-temporal</a>
 <a href="../tutorials/05_polarimetric_analysis.html">05 – Polarimetry</a>
 <a href="../tutorials/06_custom_workflows.html">06 – Custom Workflows</a>
-<a href="../tutorials/07_ship_detection.html">07 – Ship Detection</a>
 <a href="../tutorials/08_interferometric_analysis.html">08 – InSAR</a>
 <h3>API Reference</h3>
 <a href="../api/index.html">Overview</a>
@@ -62,15 +61,14 @@
 git<span class="w"> </span>clone<span class="w"> </span>https://github.com/ESA-sarpyx/sarpyx.git
 <span class="nb">cd</span><span class="w"> </span>sarpyx
 
-<span class="c1"># Create a virtual environment</span>
-python<span class="w"> </span>-m<span class="w"> </span>venv<span class="w"> </span>venv
-<span class="nb">source</span><span class="w"> </span>venv/bin/activate<span class="w">  </span><span class="c1"># On Windows: venv\Scripts\activate</span>
+<span class="c1"># Sync the local environment</span>
+uv<span class="w"> </span>sync<span class="w"> </span>--group<span class="w"> </span>dev
 
-<span class="c1"># Install in development mode</span>
-pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s2">&quot;.[dev]&quot;</span>
+<span class="c1"># Run the test suite</span>
+uv<span class="w"> </span>run<span class="w"> </span>pytest<span class="w"> </span>-q
 
-<span class="c1"># Install pre-commit hooks</span>
-pre-commit<span class="w"> </span>install
+<span class="c1"># Build release artifacts</span>
+uv<span class="w"> </span>build
 </code></pre>
 <h3 id="2-development-workflow">2. Development Workflow</h3>
 <ol>
@@ -214,19 +212,13 @@ pre-commit<span class="w"> </span>install
 </code></pre>
 <h3 id="running-tests">Running Tests</h3>
 <pre class="codehilite"><code><span class="c1"># Run all tests</span>
-pytest
+uv<span class="w"> </span>run<span class="w"> </span>pytest<span class="w"> </span>-q
 
-<span class="c1"># Run specific test file</span>
-pytest<span class="w"> </span>tests/test_sla/test_decomposition.py
+<span class="c1"># Run a focused regression</span>
+uv<span class="w"> </span>run<span class="w"> </span>pytest<span class="w"> </span>tests/test_worldsar_h5.py<span class="w"> </span>-q
 
-<span class="c1"># Run with coverage</span>
-pytest<span class="w"> </span>--cov<span class="o">=</span>sarpyx<span class="w"> </span>--cov-report<span class="o">=</span>html
-
-<span class="c1"># Run with verbose output</span>
-pytest<span class="w"> </span>-v
-
-<span class="c1"># Run tests for specific module</span>
-pytest<span class="w"> </span>tests/test_sla/
+<span class="c1"># Run a subset by keyword</span>
+uv<span class="w"> </span>run<span class="w"> </span>pytest<span class="w"> </span>-k<span class="w"> </span>worldsar<span class="w"> </span>-q
 </code></pre>
 <h2 id="documentation">Documentation</h2>
 <h3 id="building-documentation">Building Documentation</h3>

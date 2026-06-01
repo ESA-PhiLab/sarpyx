@@ -134,7 +134,6 @@ science/
 ├── indices.py           # Vegetation and polarimetric indices
 ├── polarimetry.py       # Polarimetric decomposition
 ├── interferometry.py    # InSAR processing
-├── target_detection.py  # Target detection algorithms
 └── time_series.py       # Time series analysis
 ```
 
@@ -143,7 +142,6 @@ science/
 - `VegetationIndices`: Vegetation monitoring algorithms
 - `PolarimetricDecomposer`: H/A/α, Freeman-Durden, etc.
 - `InterferogramProcessor`: InSAR processing
-- `CFARDetector`: Target detection algorithms
 - `TimeSeriesAnalyzer`: Temporal analysis
 
 ### 4. Utilities (`utils/`)
