@@ -49,6 +49,28 @@ SENTINEL_VALIDATE_WKT ?=
 SENTINEL_GPT_MEMORY ?= 8G
 SENTINEL_GPT_PARALLELISM ?= 1
 SENTINEL_GPT_TIMEOUT ?= 14400
+DEBUG_YAML_MASTER ?= data/S1A_IW_SLC__1SDV_20260226T122553_20260226T122620_063390_07F662_91CE.SAFE
+DEBUG_YAML_SLAVE ?= data/S1C_IW_SLC__1SDV_20260208T122502_20260208T122529_006264_00C961_E47A.SAFE
+DEBUG_YAML_CONFIG ?= pipelines/sentinel_insar/sentinel_insar.yaml
+DEBUG_YAML_PIPELINE ?= notebook_like_burst_insar
+DEBUG_YAML_OUT_BASE ?= outputs/debug-yaml
+ifndef DEBUG_YAML_TIMESTAMP
+DEBUG_YAML_TIMESTAMP := $(shell date -u +%Y%m%dT%H%M%SZ)
+endif
+DEBUG_YAML_ARTIFACT_DIR ?= $(DEBUG_YAML_OUT_BASE)/$(DEBUG_YAML_TIMESTAMP)
+DEBUG_YAML_OUTDIR ?= $(DEBUG_YAML_ARTIFACT_DIR)/run_out
+DEBUG_YAML_TMPDIR ?= $(CURDIR)/.tmp/debug-yaml
+DEBUG_YAML_SNAP_USERDIR ?= $(DEBUG_YAML_ARTIFACT_DIR)/snap-userdir
+DEBUG_YAML_GPT_PATH ?= $(HOME)/esa-snap/bin/gpt
+DEBUG_YAML_MEMORY ?= 24G
+DEBUG_YAML_PARALLELISM ?= 8
+DEBUG_YAML_TIMEOUT ?= 7200
+DEBUG_YAML_SUBSWATH ?= IW2
+DEBUG_YAML_POLARISATION ?= VV
+DEBUG_YAML_FIRST_BURST ?= 1
+DEBUG_YAML_LAST_BURST ?= 3
+DEBUG_YAML_DEM ?= Copernicus 30m Global DEM
+DEBUG_YAML_PIXEL_SPACING ?= 14.0
 
 SIF ?= sarpyx.sif
 SIF_AUTO_TMPDIR := $(shell if [ -d /dev/shm ] && [ "$$(df -Pk /dev/shm | awk 'NR == 2 {print $$4}')" -ge 41943040 ]; then printf '/dev/shm/%s-sarpyx-singularity-tmp' "$${USER:-user}"; else printf '%s/.singularity/tmp' "$(CURDIR)"; fi)
@@ -73,6 +95,7 @@ SNAP_INSTALL_PARENT ?= $(CURDIR)
 	test clean-dist build wheel-audit dist-check ci bump-version publish-testpypi publish-pypi publish \
 	install-snap \
 	validate-sentinel validate-tsx validate-nisar validate validate-all \
+	debug-yaml \
 	docker-build docker-test docker-push docker-all prune-docker \
 	recreate up-recreate up down logs ps pull push \
 	push-to-hpc \
@@ -357,6 +380,139 @@ validate-nisar: check-uv check-nisar-product check-nisar-grid ## Run NISAR valid
 		--cuts-outdir "$(NISAR_VALIDATE_CUTS)" \
 		--grid-path "$(NISAR_VALIDATE_GRID)" \
 		--db-dir "$(NISAR_VALIDATE_DB)"
+
+debug-yaml: check-uv ## Run the burst-style YAML pipeline debug workflow
+	@test -d "$(DEBUG_YAML_MASTER)" || { echo "Error: DEBUG_YAML_MASTER not found: $(DEBUG_YAML_MASTER)"; exit 1; }
+	@test -d "$(DEBUG_YAML_SLAVE)" || { echo "Error: DEBUG_YAML_SLAVE not found: $(DEBUG_YAML_SLAVE)"; exit 1; }
+	@test -x "$(DEBUG_YAML_GPT_PATH)" || { echo "Error: DEBUG_YAML_GPT_PATH not executable: $(DEBUG_YAML_GPT_PATH)"; exit 1; }
+	@mkdir -p "$(DEBUG_YAML_ARTIFACT_DIR)" "$(DEBUG_YAML_TMPDIR)" "$(DEBUG_YAML_SNAP_USERDIR)"
+	@echo "Writing debug YAML to $(DEBUG_YAML_ARTIFACT_DIR)/burst_validation.yaml"
+	@{ \
+		printf '%s\n' 'version: 1'; \
+		printf '%s\n' ''; \
+		printf '%s\n' 'defaults:'; \
+		printf '%s\n' '  format: BEAM-DIMAP'; \
+		printf '%s\n' '  gpt_path: $(DEBUG_YAML_GPT_PATH)'; \
+		printf '%s\n' '  memory: $(DEBUG_YAML_MEMORY)'; \
+		printf '%s\n' '  parallelism: $(DEBUG_YAML_PARALLELISM)'; \
+		printf '%s\n' '  timeout: $(DEBUG_YAML_TIMEOUT)'; \
+		printf '%s\n' '  resume: false'; \
+		printf '%s\n' '  overwrite: false'; \
+		printf '%s\n' '  keep_graphs: true'; \
+		printf '%s\n' '  snap_userdir: $(DEBUG_YAML_SNAP_USERDIR)'; \
+		printf '%s\n' ''; \
+		printf '%s\n' 'pipelines:'; \
+		printf '%s\n' '  split_orbit:'; \
+		printf '%s\n' '    inputs:'; \
+		printf '%s\n' '      product: null'; \
+		printf '%s\n' '    steps:'; \
+		printf '%s\n' '      - id: split_$(DEBUG_YAML_SUBSWATH)_$(DEBUG_YAML_POLARISATION)_bursts_$(DEBUG_YAML_FIRST_BURST)_$(DEBUG_YAML_LAST_BURST)'; \
+		printf '%s\n' '        method: topsar_split'; \
+		printf '%s\n' '        source: product'; \
+		printf '%s\n' '        params:'; \
+		printf '%s\n' '          subswath: $(DEBUG_YAML_SUBSWATH)'; \
+		printf '%s\n' '          selected_polarisations:'; \
+		printf '%s\n' '            - $(DEBUG_YAML_POLARISATION)'; \
+		printf '%s\n' '          first_burst_index: $(DEBUG_YAML_FIRST_BURST)'; \
+		printf '%s\n' '          last_burst_index: $(DEBUG_YAML_LAST_BURST)'; \
+		printf '%s\n' ''; \
+		printf '%s\n' '      - id: apply_orbit'; \
+		printf '%s\n' '        method: apply_orbit_file'; \
+		printf '%s\n' '        params:'; \
+		printf '%s\n' '          orbit_type: Sentinel Precise (Auto Download)'; \
+		printf '%s\n' '          poly_degree: 3'; \
+		printf '%s\n' '          continue_on_fail: false'; \
+		printf '%s\n' ''; \
+		printf '%s\n' '  $(DEBUG_YAML_PIPELINE):'; \
+		printf '%s\n' '    inputs:'; \
+		printf '%s\n' '      master: null'; \
+		printf '%s\n' '      slave: null'; \
+		printf '%s\n' '    steps:'; \
+		printf '%s\n' '      - id: master_pre'; \
+		printf '%s\n' '        use: split_orbit'; \
+		printf '%s\n' '        inputs:'; \
+		printf '%s\n' '          product: master'; \
+		printf '%s\n' ''; \
+		printf '%s\n' '      - id: slave_pre'; \
+		printf '%s\n' '        use: split_orbit'; \
+		printf '%s\n' '        inputs:'; \
+		printf '%s\n' '          product: slave'; \
+		printf '%s\n' ''; \
+		printf '%s\n' '      - id: pair_coreg'; \
+		printf '%s\n' '        method: topsar_coregistration'; \
+		printf '%s\n' '        sources:'; \
+		printf '%s\n' '          master_product: master_pre'; \
+		printf '%s\n' '          slave_product: slave_pre'; \
+		printf '%s\n' '        params:'; \
+		printf '%s\n' '          use_esd: false'; \
+		printf '%s\n' '          dem_name: $(DEBUG_YAML_DEM)'; \
+		printf '%s\n' '          output_name: pair_coreg'; \
+		printf '%s\n' '          keep_graph: true'; \
+		printf '%s\n' ''; \
+		printf '%s\n' '      - id: pair_coreg_deb'; \
+		printf '%s\n' '        method: deburst'; \
+		printf '%s\n' '        source: pair_coreg'; \
+		printf '%s\n' '        params:'; \
+		printf '%s\n' '          output_name: pair_coreg_deb'; \
+		printf '%s\n' ''; \
+		printf '%s\n' '      - id: pair_ifg'; \
+		printf '%s\n' '        method: interferogram'; \
+		printf '%s\n' '        source: pair_coreg_deb'; \
+		printf '%s\n' '        params:'; \
+		printf '%s\n' '          subtract_flat_earth_phase: true'; \
+		printf '%s\n' '          include_coherence: true'; \
+		printf '%s\n' '          output_name: pair_ifg'; \
+		printf '%s\n' ''; \
+		printf '%s\n' '      - id: pair_ifg_topo'; \
+		printf '%s\n' '        method: topo_phase_removal'; \
+		printf '%s\n' '        source: pair_ifg'; \
+		printf '%s\n' '        params:'; \
+		printf '%s\n' '          dem_name: $(DEBUG_YAML_DEM)'; \
+		printf '%s\n' '          output_name: pair_ifg_topo'; \
+		printf '%s\n' ''; \
+		printf '%s\n' '      - id: pair_ifg_tc'; \
+		printf '%s\n' '        method: terrain_correction'; \
+		printf '%s\n' '        source: pair_ifg_topo'; \
+		printf '%s\n' '        params:'; \
+		printf '%s\n' '          dem_name: $(DEBUG_YAML_DEM)'; \
+		printf '%s\n' '          pixel_spacing_in_meter: $(DEBUG_YAML_PIXEL_SPACING)'; \
+		printf '%s\n' '          save_selected_source_band: true'; \
+		printf '%s\n' '          save_local_incidence_angle: true'; \
+		printf '%s\n' '          output_name: pair_ifg_tc'; \
+	} > "$(DEBUG_YAML_ARTIFACT_DIR)/burst_validation.yaml"
+	@echo "Validating checked-in YAML: $(DEBUG_YAML_CONFIG)"
+	uv run sarpyx-pipeline validate "$(DEBUG_YAML_CONFIG)" > "$(DEBUG_YAML_ARTIFACT_DIR)/checked_in_validate.log" 2>&1
+	uv run sarpyx-pipeline list "$(DEBUG_YAML_CONFIG)" > "$(DEBUG_YAML_ARTIFACT_DIR)/checked_in_list.log" 2>&1
+	@echo "Validating generated debug YAML"
+	uv run sarpyx-pipeline validate "$(DEBUG_YAML_ARTIFACT_DIR)/burst_validation.yaml" > "$(DEBUG_YAML_ARTIFACT_DIR)/validate.log" 2>&1
+	uv run sarpyx-pipeline list "$(DEBUG_YAML_ARTIFACT_DIR)/burst_validation.yaml" > "$(DEBUG_YAML_ARTIFACT_DIR)/list.log" 2>&1
+	uv run sarpyx-pipeline run "$(DEBUG_YAML_ARTIFACT_DIR)/burst_validation.yaml" \
+		--pipeline "$(DEBUG_YAML_PIPELINE)" \
+		--set-input master="$(DEBUG_YAML_MASTER)" \
+		--set-input slave="$(DEBUG_YAML_SLAVE)" \
+		--outdir "$(DEBUG_YAML_ARTIFACT_DIR)/dry_run_out" \
+		--dry-run \
+		--json > "$(DEBUG_YAML_ARTIFACT_DIR)/dry_run.json" 2> "$(DEBUG_YAML_ARTIFACT_DIR)/dry_run.err"
+	@echo "Running YAML pipeline. Artifacts: $(DEBUG_YAML_ARTIFACT_DIR)"
+	TMPDIR="$(DEBUG_YAML_TMPDIR)" JAVA_TOOL_OPTIONS="-Djava.io.tmpdir=$(DEBUG_YAML_TMPDIR)" \
+	uv run sarpyx-pipeline run "$(DEBUG_YAML_ARTIFACT_DIR)/burst_validation.yaml" \
+		--pipeline "$(DEBUG_YAML_PIPELINE)" \
+		--set-input master="$(DEBUG_YAML_MASTER)" \
+		--set-input slave="$(DEBUG_YAML_SLAVE)" \
+		--outdir "$(DEBUG_YAML_OUTDIR)" \
+		--json > "$(DEBUG_YAML_ARTIFACT_DIR)/run.json" 2> "$(DEBUG_YAML_ARTIFACT_DIR)/run.err"
+	@python -c 'exec("""import json\nfrom pathlib import Path\nimport xml.etree.ElementTree as ET\nartifact_dir = Path(\"$(DEBUG_YAML_ARTIFACT_DIR)\")\nrun_text = (artifact_dir / \"run.json\").read_text(encoding=\"utf-8\")\nstart = run_text.rfind(\"\\n{\")\nstart = run_text.find(\"{\") if start == -1 else start + 1\npayload = json.loads(run_text[start:])\n(artifact_dir / \"run_payload.json\").write_text(json.dumps(payload, indent=2, sort_keys=True) + \"\\n\", encoding=\"utf-8\")\nfinal = Path(payload[\"output\"])\ndata_dir = final.with_suffix(\".data\")\nif not final.exists():\n    raise SystemExit(f\"Final DIM product missing: {final}\")\nif not data_dir.is_dir():\n    raise SystemExit(f\"Final data directory missing: {data_dir}\")\nimages = sorted(data_dir.glob(\"*.img\"))\nif not images:\n    raise SystemExit(f\"No final raster images found in: {data_dir}\")\nroot = ET.parse(final).getroot()\nncols = root.findtext(\".//Raster_Dimensions/NCOLS\")\nnrows = root.findtext(\".//Raster_Dimensions/NROWS\")\nnbands = root.findtext(\".//Raster_Dimensions/NBANDS\")\nprint(f\"Final output: {final}\")\nprint(f\"Raster dimensions: {ncols} x {nrows} x {nbands} bands\")\nprint(\"Final image bands:\")\nfor image in images:\n    print(f\"  {image.name} {image.stat().st_size}\")\n""")'
+	@echo "Checking resume path"
+	uv run sarpyx-pipeline run "$(DEBUG_YAML_ARTIFACT_DIR)/burst_validation.yaml" \
+		--pipeline "$(DEBUG_YAML_PIPELINE)" \
+		--set-input master="$(DEBUG_YAML_MASTER)" \
+		--set-input slave="$(DEBUG_YAML_SLAVE)" \
+		--outdir "$(DEBUG_YAML_OUTDIR)" \
+		--resume \
+		--json > "$(DEBUG_YAML_ARTIFACT_DIR)/resume.json" 2> "$(DEBUG_YAML_ARTIFACT_DIR)/resume.err"
+	@python -c 'exec("""import json\nfrom pathlib import Path\nartifact_dir = Path(\"$(DEBUG_YAML_ARTIFACT_DIR)\")\nresume = json.loads((artifact_dir / \"resume.json\").read_text(encoding=\"utf-8\"))\nactions = [step[\"action\"] for step in resume[\"steps\"]]\nprocessing_actions = [action for action in actions if action != \"completed\"]\nif not processing_actions or set(processing_actions) != {\"resume\"}:\n    raise SystemExit(f\"Resume gate failed: {actions}\")\nmanifest_count = sum(1 for _ in Path(\"$(DEBUG_YAML_OUTDIR)\").rglob(\"*.sarpyx-pipeline.json\"))\nif manifest_count < len(processing_actions):\n    raise SystemExit(f\"Expected at least {len(processing_actions)} manifests, found {manifest_count}\")\ngenerated_config = artifact_dir / \"burst_validation.yaml\"\noutput_path = resume[\"output\"]\nrecord = artifact_dir / \"final_record.md\"\nrecord.write_text(\"\\n\".join([\"# Debug YAML Run\", \"\", \"Master: `$(DEBUG_YAML_MASTER)`\", \"Slave: `$(DEBUG_YAML_SLAVE)`\", f\"Generated config: `{generated_config}`\", f\"Output: `{output_path}`\", f\"Actions: `{actions}`\", f\"Manifest count: `{manifest_count}`\", \"\"]) + \"\\n\", encoding=\"utf-8\")\nprint(f\"Resume actions: {actions}\")\nprint(f\"Manifest count: {manifest_count}\")\nprint(f\"Record: {record}\")\n""")'
+	@rm -rf "$(DEBUG_YAML_TMPDIR)"
+	@echo "debug-yaml complete: $(DEBUG_YAML_ARTIFACT_DIR)"
 
 validate-all: validate-sentinel validate-tsx validate-nisar ## Run all mission validation targets
 
