@@ -33,12 +33,33 @@ Installed console scripts:
 
 ```bash
 sarpyx --help          # WorldSAR preprocessing, tiling, validation, H5->Zarr
+sarpyx-pipeline --help # YAML-configured SNAP pipelines
 sarpyx-decode --help   # Sentinel-1 Level-0 decode wrapper
 sarpyx-unzip --help    # Extract Sentinel-1 ZIP products
 sarpyx-upload --help   # Upload artifacts to Hugging Face Hub
 ```
 
 Reserved placeholder commands such as `sarpyx-focus` and `sarpyx-shipdet` are not shipped.
+
+## YAML-configured pipelines
+
+For reusable SNAP workflows, use `sarpyx-pipeline` with versioned YAML configs:
+
+```bash
+uv run sarpyx-pipeline validate pipelines/sentinel_insar/sentinel_insar.yaml
+uv run sarpyx-pipeline list pipelines/sentinel_insar/sentinel_insar.yaml
+uv run sarpyx-pipeline run pipelines/sentinel_insar/sentinel_insar.yaml \
+  --pipeline sentinel_insar \
+  --set-input master=/data/master.SAFE \
+  --set-input slave=/data/slave.SAFE \
+  --outdir data/output/sentinel_insar
+```
+
+Example pipeline configs live under [`pipelines/`](pipelines/), including
+[`pipelines/sentinel_insar/sentinel_insar.yaml`](pipelines/sentinel_insar/sentinel_insar.yaml).
+See [docs/user_guide/config_pipelines.md](docs/user_guide/config_pipelines.md)
+for the YAML schema, nested pipelines, pair inputs, dry-run, resume, and
+overwrite behavior.
 
 ## Install
 
