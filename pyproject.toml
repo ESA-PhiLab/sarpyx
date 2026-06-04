@@ -8,7 +8,13 @@ version = "0.1.10"
 description = "A swissknife for SAR processing."
 readme = { file = "README.md", content-type = "text/markdown" }
 authors = [
-    { name = "Roberto Del Prete", email = "roberto.delprete@esa.int" }
+    { name = "Roberto Del Prete", email = "roberto.delprete@esa.int" },
+    { name = "Gabriele Daga" },
+    { name = "Sebastian Fieldhouse" },
+    { name = "Juanfrancisco Amieva" },
+    { name = "Cedric Leonard" },
+    { name = "Valerio Marsocci" },
+    { name = "Eva Gmelich Mejling" },
 ]
 license = "Apache-2.0"
 requires-python = ">=3.11, <3.14"
@@ -25,7 +31,7 @@ dependencies = [
     "h5py",
     "numba",
     "jupyter",
-    "rasterio==1.4.3",
+    "rasterio==1.5.0",
     "zarr>=3.0.0",
     "joblib>=1.5.1",
     "dask>=2025.5.1",
@@ -48,9 +54,6 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-copernicus = [
-    "phidown>=0.1.26"
-]
 torch = [
     "torch>=2.0.0",
     "lightning>=2.5.3",
@@ -58,6 +61,14 @@ torch = [
     "tensorboard>=2.20.0",
     "tensorboardX>=2.6.4",
     "wandb>=0.21.3",
+]
+
+copernicus = [
+    "phidown>=0.1.26",
+]
+
+all = [
+    "sarpyx[torch,copernicus]",
 ]
 
 [project.scripts]

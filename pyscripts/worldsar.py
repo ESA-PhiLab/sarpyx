@@ -65,8 +65,14 @@ def _sentinel_post_chain(
     orbit_type='Sentinel Precise (Auto Download)',
     orbit_continue_on_fail=False,
     sentinel_tc_source_band=None,
-    sentinel_subaps=2,
+    sentinel_subaps=None,
+    sentinel_subap_decompositions=None,
 ):
+    n_decompositions = (
+        sentinel_subap_decompositions
+        if sentinel_subap_decompositions is not None
+        else [sentinel_subaps if sentinel_subaps is not None else 2]
+    )
     fp_orb = _apply_sentinel_orbit_file(
         op,
         orbit_type=orbit_type,
@@ -85,7 +91,7 @@ def _sentinel_post_chain(
     op.do_subaps(
         dim_path=op.prod_path,
         safe_path=product_path,
-        n_decompositions=[sentinel_subaps],
+        n_decompositions=n_decompositions,
         byte_order=1,
         VERBOSE=False,
         update_dim=False,
@@ -141,6 +147,7 @@ def pipeline_sentinel(
     sentinel_last_burst=9999,
     sentinel_tc_source_band=None,
     sentinel_subaps=None,
+    sentinel_subap_decompositions=None,
     **_,
 ):
     from pathlib import Path
@@ -151,7 +158,11 @@ def pipeline_sentinel(
     if is_TOPS:
         results = {}
         swaths = (sentinel_swath,) if sentinel_swath else ('IW1', 'IW2', 'IW3')
-        tops_subaps = sentinel_subaps if sentinel_subaps is not None else 2
+        sentinel_subap_kwargs = (
+            {'sentinel_subap_decompositions': sentinel_subap_decompositions}
+            if sentinel_subap_decompositions is not None
+            else {'sentinel_subaps': sentinel_subaps if sentinel_subaps is not None else 2}
+        )
         for swath in swaths:
             sw_op = _create_gpt_operator(Path(op.prod_path), output_dir / swath, 'BEAM-DIMAP', **gpt_kw)
             split_result = sw_op.TopsarSplit(
@@ -169,7 +180,7 @@ def pipeline_sentinel(
                 orbit_type=orbit_type,
                 orbit_continue_on_fail=orbit_continue_on_fail,
                 sentinel_tc_source_band=sentinel_tc_source_band,
-                sentinel_subaps=tops_subaps,
+                **sentinel_subap_kwargs,
             )
         return results
 
@@ -182,10 +193,15 @@ def pipeline_sentinel(
     if fp_cal is None:
         raise RuntimeError(f'Calibration failed: {op.last_error_summary()}')
 
+    strip_subap_decompositions = (
+        sentinel_subap_decompositions
+        if sentinel_subap_decompositions is not None
+        else [sentinel_subaps if sentinel_subaps is not None else 3]
+    )
     op.do_subaps(
         safe_path=product_path,
         dim_path=op.prod_path,
-        n_decompositions=[sentinel_subaps if sentinel_subaps is not None else 3],
+        n_decompositions=strip_subap_decompositions,
         byte_order=1,
         VERBOSE=False,
         update_dim=False,

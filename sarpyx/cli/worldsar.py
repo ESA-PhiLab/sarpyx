@@ -47,8 +47,21 @@ TERRASAR_COMPLEX_VARIANTS = frozenset({'SSC', 'SLC'})
 TERRASAR_DETECTED_VARIANTS = frozenset({'MGD', 'GRD'})
 
 
+class _SentinelSubapAction(argparse.Action):
+    def __call__(self, parser, namespace, values, option_string=None):
+        decompositions = values if isinstance(values, list) else [values]
+        setattr(namespace, self.dest, decompositions)
+        setattr(namespace, 'sentinel_subaps', decompositions[0] if len(decompositions) == 1 else None)
+        setattr(namespace, '_sentinel_subap_option', option_string)
+
+
 def add_worldsar_arguments(parser: argparse.ArgumentParser) -> None:
     """Register WorldSAR CLI arguments without importing extra CLI modules."""
+    parser.set_defaults(
+        sentinel_subaps=None,
+        sentinel_subap_decompositions=None,
+        _sentinel_subap_option=None,
+    )
     parser.add_argument(
         '--input',
         '-i',
@@ -196,11 +209,15 @@ def add_worldsar_arguments(parser: argparse.ArgumentParser) -> None:
         help='Optional single Sentinel band name to keep during Terrain-Correction for smoke-test runs.'
     )
     parser.add_argument(
+        '--sentinel-subap-decompositions',
         '--sentinel-subaps',
-        dest='sentinel_subaps',
+        dest='sentinel_subap_decompositions',
         type=int,
+        nargs='+',
+        action=_SentinelSubapAction,
         default=None,
-        help='Number of Sentinel subapertures to generate (default: 2 for TOPS, 3 for STRIP).'
+        metavar='N',
+        help='Sentinel sub-aperture decomposition count(s). Defaults to 2 for TOPS, 3 for STRIP.'
     )
     parser.add_argument(
         '--skip-preprocessing',
@@ -793,9 +810,15 @@ def _sentinel_post_chain(
     orbit_type='Sentinel Precise (Auto Download)',
     orbit_continue_on_fail=False,
     sentinel_tc_source_band=None,
-    sentinel_subaps=2,
+    sentinel_subaps=None,
+    sentinel_subap_decompositions=None,
 ):
     """Calibration → DerampDemod → Deburst → PolDecomp → TC  (shared by each swath)."""
+    n_decompositions = (
+        sentinel_subap_decompositions
+        if sentinel_subap_decompositions is not None
+        else [sentinel_subaps if sentinel_subaps is not None else 2]
+    )
     fp_orb = _apply_sentinel_orbit_file(
         op,
         orbit_type=orbit_type,
@@ -814,7 +837,7 @@ def _sentinel_post_chain(
     op.do_subaps(
         dim_path=op.prod_path,
         safe_path=product_path,
-        n_decompositions=[sentinel_subaps],
+        n_decompositions=n_decompositions,
         byte_order=1,
         VERBOSE=False,
         update_dim=False,
@@ -870,6 +893,7 @@ def pipeline_sentinel(
     sentinel_last_burst=9999,
     sentinel_tc_source_band=None,
     sentinel_subaps=None,
+    sentinel_subap_decompositions=None,
     **_,
 ):
     """Sentinel-1 pipeline.
@@ -883,7 +907,11 @@ def pipeline_sentinel(
     if is_TOPS:
         results = {}
         swaths = (sentinel_swath,) if sentinel_swath else ('IW1', 'IW2', 'IW3')
-        tops_subaps = sentinel_subaps if sentinel_subaps is not None else 2
+        sentinel_subap_kwargs = (
+            {'sentinel_subap_decompositions': sentinel_subap_decompositions}
+            if sentinel_subap_decompositions is not None
+            else {'sentinel_subaps': sentinel_subaps if sentinel_subaps is not None else 2}
+        )
         for swath in swaths:
             sw_op = _create_gpt_operator(Path(op.prod_path), output_dir / swath, 'BEAM-DIMAP', **gpt_kw)
             split_result = sw_op.TopsarSplit(
@@ -901,7 +929,7 @@ def pipeline_sentinel(
                 orbit_type=orbit_type,
                 orbit_continue_on_fail=orbit_continue_on_fail,
                 sentinel_tc_source_band=sentinel_tc_source_band,
-                sentinel_subaps=tops_subaps,
+                **sentinel_subap_kwargs,
             )
         return results                    # {IW1: path, IW2: path, IW3: path}
     
@@ -915,10 +943,15 @@ def pipeline_sentinel(
     if fp_cal is None:
         raise RuntimeError(f'Calibration failed: {op.last_error_summary()}')
 
+    strip_subap_decompositions = (
+        sentinel_subap_decompositions
+        if sentinel_subap_decompositions is not None
+        else [sentinel_subaps if sentinel_subaps is not None else 3]
+    )
     op.do_subaps(
         safe_path=product_path,
         dim_path=op.prod_path,
-        n_decompositions=[sentinel_subaps if sentinel_subaps is not None else 3],
+        n_decompositions=strip_subap_decompositions,
         byte_order=1,
         VERBOSE=False,
         update_dim=False,
@@ -1887,8 +1920,16 @@ def _validate_runtime_args(args):
             '--sentinel-last-burst must be greater than or equal to '
             f'--sentinel-first-burst, got {args.sentinel_last_burst} < {args.sentinel_first_burst}'
         )
-    if args.sentinel_subaps is not None and args.sentinel_subaps < 2:
+    if (
+        args.sentinel_subaps is not None
+        and args._sentinel_subap_option == '--sentinel-subaps'
+        and args.sentinel_subaps < 2
+    ):
         raise ValueError(f'--sentinel-subaps must be >= 2, got {args.sentinel_subaps}')
+    if args.sentinel_subap_decompositions is not None:
+        invalid = [n for n in args.sentinel_subap_decompositions if n < 2]
+        if invalid:
+            raise ValueError(f'--sentinel-subap-decompositions values must be >= 2, got {invalid}')
 
 
 def _resolve_db_dir(cuts_outdir=None):
@@ -1955,6 +1996,7 @@ def _run_preprocessing(
     sentinel_last_burst=9999,
     sentinel_tc_source_band=None,
     sentinel_subaps=None,
+    sentinel_subap_decompositions=None,
     skip=False,
 ):
     if not prepro or skip:
@@ -1969,6 +2011,7 @@ def _run_preprocessing(
         sentinel_last_burst=sentinel_last_burst,
         sentinel_tc_source_band=sentinel_tc_source_band,
         sentinel_subaps=sentinel_subaps,
+        sentinel_subap_decompositions=sentinel_subap_decompositions,
         gpt_memory=gpt_memory, gpt_parallelism=gpt_parallelism, gpt_timeout=gpt_timeout,
     )
     # TOPS returns {IW1: path, IW2: path, IW3: path}; others return a single path.
@@ -2289,6 +2332,7 @@ def run(args) -> int:
         sentinel_last_burst=args.sentinel_last_burst,
         sentinel_tc_source_band=args.sentinel_tc_source_band,
         sentinel_subaps=args.sentinel_subaps,
+        sentinel_subap_decompositions=args.sentinel_subap_decompositions,
         skip=args.skip_preprocessing,
         **gpt_kwargs,
     )
