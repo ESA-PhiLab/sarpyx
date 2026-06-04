@@ -30,6 +30,44 @@ def test_validate_rejects_pipeline_cycles():
         validate_pipeline_config(config)
 
 
+def test_validate_rejects_unknown_default_pipeline():
+    config = {
+        "version": 1,
+        "default_pipeline": "missing",
+        "pipelines": {
+            "preprocess": {"steps": [{"id": "calibration", "op": "Calibration"}]},
+        },
+    }
+
+    with pytest.raises(ConfigPipelineError, match="default_pipeline"):
+        validate_pipeline_config(config)
+
+
+def test_runner_uses_default_pipeline_when_pipeline_omitted(tmp_path: Path):
+    product = _touch(tmp_path / "input.dim")
+    config = {
+        "version": 1,
+        "default_pipeline": "beta",
+        "pipelines": {
+            "alpha": {
+                "inputs": {"product": None},
+                "steps": [{"id": "alpha_cal", "op": "Calibration", "source": "product"}],
+            },
+            "beta": {
+                "inputs": {"product": None},
+                "steps": [{"id": "beta_cal", "op": "Calibration", "source": "product"}],
+            },
+        },
+    }
+
+    result = ConfigPipelineRunner(config, outdir=tmp_path / "out", dry_run=True).run(
+        inputs={"product": product},
+    )
+
+    assert result.pipeline == "beta"
+    assert result.records[0].step_id == "beta_cal"
+
+
 def test_dry_run_plans_named_nested_pipeline(tmp_path: Path):
     master = _touch(tmp_path / "master.dim")
     slave = _touch(tmp_path / "slave.dim")

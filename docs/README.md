@@ -66,6 +66,14 @@ cd sarpyx
 pip install -e .
 ```
 
+For the fastest local setup with `snap-engine` ready:
+
+```bash
+conda create -n sarpyx python=3.12
+conda activate sarpyx
+conda install -c sirbastiano/label/dev -c conda-forge snap13=13.0.0
+```
+
 ### Container note
 
 For container workflows, mount or otherwise provide any `*.geojson` grid in `/workspace/grid` (or set `GRID_PATH` to a specific in-container `*.geojson`). The entrypoint loads an existing grid and now fails fast if none is available; it no longer generates one automatically.

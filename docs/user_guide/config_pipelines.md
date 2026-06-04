@@ -6,14 +6,17 @@ pipelines without changing the existing WorldSAR command:
 ```bash
 uv run sarpyx-pipeline validate pipeline.yaml
 uv run sarpyx-pipeline list pipeline.yaml
-uv run sarpyx-pipeline run pipeline.yaml --pipeline preprocess --set-input product=/data/input.SAFE --outdir data/output
+uv run sarpyx-pipeline pipeline.yaml --master /data/master.SAFE --slave /data/slave.SAFE --output data/output
+uv run sarpyx-pipeline run pipeline.yaml --set-input product=/data/input.SAFE --outdir data/output
 ```
 
 The config format is versioned.  Version `1` supports named pipelines, nested
-mini-pipelines, raw SNAP operator steps, and existing `GPT` method steps.
+mini-pipelines, raw SNAP operator steps, existing `GPT` method steps, and an
+optional default pipeline for files that expose helper pipelines.
 
 ```yaml
 version: 1
+default_pipeline: preprocess
 
 defaults:
   format: BEAM-DIMAP
@@ -53,6 +56,10 @@ pipelines:
 - `use`: call another named pipeline from the same YAML file.
 
 Each step must set exactly one of `op`, `method`, or `use`.
+
+When a config defines more than one pipeline, either pass `--pipeline` or set a
+top-level `default_pipeline` that names the pipeline to run when `--pipeline` is
+omitted.
 
 ## Pair Inputs
 
@@ -104,11 +111,11 @@ pipelines:
 Run it with:
 
 ```bash
-uv run sarpyx-pipeline run insar.yaml \
+uv run sarpyx-pipeline insar.yaml \
   --pipeline insar_pair \
-  --set-input master=/data/master.SAFE \
-  --set-input slave=/data/slave.SAFE \
-  --outdir data/output/insar
+  --master /data/master.SAFE \
+  --slave /data/slave.SAFE \
+  --output data/output/insar
 ```
 
 ## Output Safety

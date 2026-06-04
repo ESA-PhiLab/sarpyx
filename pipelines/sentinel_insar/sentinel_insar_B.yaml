@@ -1,0 +1,181 @@
+# Sentinel-1 burst InSAR config-pipeline definitions for sarpyx-pipeline.
+#
+# Default one-line run:
+#   pipelines/sentinel_insar/run_sentinel_insar.sh /data/master.SAFE /data/slave.SAFE
+#
+# Direct CLI equivalent:
+#   sarpyx-pipeline run pipelines/sentinel_insar/sentinel_insar.yaml \
+#     --set-input master=/data/master.SAFE \
+#     --set-input slave=/data/slave.SAFE \
+#     --outdir data/output/sentinel_insar
+#
+# Inputs are extracted single-burst .SAFE products, as produced by the
+# snapflow_v2 notebook. Full Sentinel-1 SAFE products should be split to the
+# target burst before running this config.
+
+version: 1
+default_pipeline: sentinel_insar_ifg
+
+defaults:
+  format: BEAM-DIMAP
+  gpt_path: /usr/local/snap/bin/gpt
+  memory: 24G
+  parallelism: 8
+  timeout: 7200
+  resume: false
+  overwrite: false
+  keep_graphs: true
+
+pipelines:
+  sentinel_burst_orbit:
+    inputs:
+      product: null
+    steps:
+      - id: apply_orbit
+        method: apply_orbit_file
+        source: product
+        params:
+          orbit_type: Sentinel Precise (Auto Download)
+          poly_degree: 3
+          continue_on_fail: false
+          output_name: apply_orbit
+
+### BRANCH A
+
+  sentinel_insar_coregister:
+    inputs:
+      master: null
+      slave: null
+    steps:
+      - id: master_orbit
+        use: sentinel_burst_orbit
+        inputs:
+          product: master
+
+      - id: slave_orbit
+        use: sentinel_burst_orbit
+        inputs:
+          product: slave
+
+      - id: pair_coreg
+        method: topsar_coregistration
+        sources:
+          master_product: master_orbit
+          slave_product: slave_orbit
+        params:
+          use_esd: false
+          dem_name: Copernicus 30m Global DEM
+          output_name: pair_coreg
+          keep_graph: true
+
+      - id: pair_coreg_deburst
+        method: deburst
+        source: pair_coreg
+        params:
+          pols:
+            - VV
+          output_name: pair_coreg_deburst
+
+  sentinel_insar_ifg_branch:
+    inputs:
+      pair_coreg_deburst: null
+    steps:
+      - id: pair_ifg
+        method: interferogram
+        source: pair_coreg_deburst
+        params:
+          subtract_flat_earth_phase: true
+          include_coherence: true
+          dem_name: Copernicus 30m Global DEM
+          output_name: pair_ifg
+
+      - id: pair_ifg_topo
+        method: topo_phase_removal
+        source: pair_ifg
+        params:
+          dem_name: Copernicus 30m Global DEM
+          output_name: pair_ifg_topo
+
+      - id: pair_ifg_tc
+        method: terrain_correction
+        source: pair_ifg_topo
+        params:
+          dem_name: Copernicus 30m Global DEM
+          pixel_spacing_in_meter: 14.0
+          map_projection: WGS84(DD)
+          save_selected_source_band: true
+          output_name: pair_ifg_tc
+
+### BRANCH B
+
+  sentinel_insar_gslc_branch:
+    inputs:
+      pair_coreg_deburst: null
+    steps:
+      - id: pair_coreg_gslc
+        method: terrain_correction
+        source: pair_coreg_deburst
+        params:
+          dem_name: Copernicus 30m Global DEM
+          pixel_spacing_in_meter: 14.0
+          map_projection: WGS84(DD)
+          save_selected_source_band: true
+          output_complex: true
+          output_name: pair_coreg_gslc
+
+  sentinel_insar_gslc:
+    inputs:
+      master: null
+      slave: null
+    steps:
+      - id: pair_coreg_deburst
+        use: sentinel_insar_coregister
+        inputs:
+          master: master
+          slave: slave
+
+      - id: gslc_branch
+        use: sentinel_insar_gslc_branch
+        inputs:
+          pair_coreg_deburst: pair_coreg_deburst
+
+
+### RUNNER
+
+
+  sentinel_insar_ifg:
+    inputs:
+      master: null
+      slave: null
+    steps:
+      - id: pair_coreg_deburst
+        use: sentinel_insar_coregister
+        inputs:
+          master: master
+          slave: slave
+
+      - id: ifg_branch
+        use: sentinel_insar_ifg_branch
+        inputs:
+          pair_coreg_deburst: pair_coreg_deburst
+
+  sentinel_insar:
+    inputs:
+      master: null
+      slave: null
+    steps:
+      - id: pair_coreg_deburst
+        use: sentinel_insar_coregister
+        inputs:
+          master: master
+          slave: slave
+
+      - id: gslc_branch
+        use: sentinel_insar_gslc_branch
+        inputs:
+          pair_coreg_deburst: pair_coreg_deburst
+
+      - id: ifg_branch
+        use: sentinel_insar_ifg_branch
+        inputs:
+          pair_coreg_deburst: pair_coreg_deburst

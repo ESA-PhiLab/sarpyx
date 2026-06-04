@@ -97,6 +97,13 @@ def validate_pipeline_config(config: Mapping[str, Any]) -> None:
     if not isinstance(pipelines, dict) or not pipelines:
         raise ConfigPipelineError("Config must contain at least one pipeline")
 
+    default_pipeline = config.get("default_pipeline")
+    if default_pipeline is not None:
+        if not isinstance(default_pipeline, str) or not default_pipeline:
+            raise ConfigPipelineError("default_pipeline must be a non-empty string")
+        if default_pipeline not in pipelines:
+            raise ConfigPipelineError(f"default_pipeline references unknown pipeline '{default_pipeline}'")
+
     for pipeline_name, pipeline in pipelines.items():
         if not isinstance(pipeline, dict):
             raise ConfigPipelineError(f"Pipeline '{pipeline_name}' must be a mapping")
@@ -317,6 +324,9 @@ class ConfigPipelineRunner:
             if pipeline not in self.pipelines:
                 raise ConfigPipelineError(f"Unknown pipeline '{pipeline}'")
             return pipeline
+        default_pipeline = self.config.get("default_pipeline")
+        if default_pipeline:
+            return str(default_pipeline)
         names = list(self.pipelines)
         if len(names) != 1:
             raise ConfigPipelineError("Config defines multiple pipelines; pass --pipeline")

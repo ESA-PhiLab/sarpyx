@@ -1,0 +1,89 @@
+# Sentinel-1 burst InSAR config-pipeline for sarpyx-pipeline.
+#
+# Default one-line run:
+#   pipelines/sentinel_insar/run_sentinel_insar.sh /data/master.SAFE /data/slave.SAFE
+#
+# Direct CLI equivalent:
+#   sarpyx-pipeline pipelines/sentinel_insar/sentinel_insar_A.yaml \
+#     --master /data/master.SAFE \
+#     --slave /data/slave.SAFE \
+#     --output data/output/sentinel_insar
+#
+# Inputs are extracted single-burst .SAFE products, as produced by the
+# snapflow_v2 notebook. Full Sentinel-1 SAFE products should be split to the
+# target burst before running this config.
+
+version: 1
+default_pipeline: sentinel_insar_ifg
+
+defaults:
+  format: BEAM-DIMAP
+  gpt_path: /usr/local/snap/bin/gpt
+  memory: 24G
+  parallelism: 8
+  timeout: 7200
+  resume: false
+  overwrite: false
+  keep_graphs: true
+
+pipelines:
+  sentinel_insar_ifg:
+    inputs:
+      master: null
+      slave: null
+    steps:
+      - id: 01_master_orbit
+        method: apply_orbit_file
+        source: master
+        params:
+          orbit_type: Sentinel Precise (Auto Download)
+          poly_degree: 3
+          continue_on_fail: false
+
+      - id: 02_slave_orbit
+        method: apply_orbit_file
+        source: slave
+        params:
+          orbit_type: Sentinel Precise (Auto Download)
+          poly_degree: 3
+          continue_on_fail: false
+
+      - id: 03_pair_coreg
+        method: topsar_coregistration
+        sources:
+          master_product: 01_master_orbit
+          slave_product: 02_slave_orbit
+        params:
+          use_esd: false
+          dem_name: Copernicus 30m Global DEM
+          keep_graph: true
+
+      - id: 04_pair_deburst
+        method: deburst
+        source: 03_pair_coreg
+        params:
+          pols:
+            - VV
+
+      - id: 05_pair_ifg
+        method: interferogram
+        source: 04_pair_deburst
+        params:
+          subtract_flat_earth_phase: true
+          include_coherence: true
+          dem_name: Copernicus 30m Global DEM
+
+      - id: 06_pair_topo_phase_removed
+        method: topo_phase_removal
+        source: 05_pair_ifg
+        params:
+          dem_name: Copernicus 30m Global DEM
+
+      - id: 07_pair_terrain_corrected
+        method: terrain_correction
+        source: 06_pair_topo_phase_removed
+        params:
+          dem_name: Copernicus 30m Global DEM
+          pixel_spacing_in_meter: 14.0
+          map_projection: WGS84(DD)
+          save_selected_source_band: true

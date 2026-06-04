@@ -129,6 +129,14 @@ For full SNAP functionality, install ESA SNAP:
 2. Follow platform-specific installation instructions
 3. Ensure `gpt` command is available in your PATH
 
+For the fastest local setup with `snap-engine` ready, use conda:
+
+```bash
+conda create -n sarpyx python=3.12
+conda activate sarpyx
+conda install -c sirbastiano/label/dev -c conda-forge snap13=13.0.0
+```
+
 ### Jupyter Support
 For interactive notebooks:
 ```bash
@@ -210,7 +218,7 @@ source sarpyx-env/bin/activate  # Linux/macOS
 sarpyx-env\Scripts\activate     # Windows
 
 # Using conda
-conda create -n sarpyx python=3.9
+conda create -n sarpyx python=3.12
 conda activate sarpyx
 ```
 

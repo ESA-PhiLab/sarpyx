@@ -11,7 +11,7 @@ authors = [
     { name = "Roberto Del Prete", email = "roberto.delprete@esa.int" }
 ]
 license = "Apache-2.0"
-requires-python = ">=3.11, <4"
+requires-python = ">=3.11, <3.14"
 dependencies = [
     "matplotlib",
     "seaborn>=0.13.2",

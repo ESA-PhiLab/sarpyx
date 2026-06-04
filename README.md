@@ -41,22 +41,61 @@ sarpyx-upload --help   # Upload artifacts to Hugging Face Hub
 
 Reserved placeholder commands such as `sarpyx-focus` and `sarpyx-shipdet` are not shipped.
 
+## Sentinel-1 burst InSAR
+
+First download and extract the same burst pair selected by
+`notebooks/snapflow_v2.ipynb`:
+
+```bash
+.venv/bin/python pipelines/sentinel_insar/download_snapflow_bursts.py
+```
+
+Then use the wrapper. It checks the inputs and SNAP GPT before any processing
+starts, then runs the default interferogram branch.
+
+```bash
+pipelines/sentinel_insar/run_sentinel_insar.sh \
+  --master data/bursts/extracted/master/8ff4f2b3-64d8-4852-8c3b-4b2b8f729b03/master.SAFE \
+  --slave data/bursts/extracted/slave/2404a519-5e05-4dcc-95e5-b3e4e8a79127/slave.SAFE
+```
+
+Preview the exact steps without running SNAP:
+
+```bash
+pipelines/sentinel_insar/run_sentinel_insar.sh \
+  --master /data/master-burst.SAFE \
+  --slave /data/slave-burst.SAFE \
+  --dry-run
+```
+
+Useful options:
+
+```bash
+--pipeline ifg    # default: coregister, deburst, interferogram, topo removal, terrain correction
+--pipeline gslc   # coregister, deburst, terrain-correct complex stack
+--pipeline both   # run GSLC and IFG branches
+--gpt /path/to/gpt
+```
+
+The inputs must be extracted single-burst `.SAFE` directories, not full
+Sentinel-1 products. The `snapflow_v2.ipynb` notebook selects and extracts the
+burst pair.
+
 ## YAML-configured pipelines
 
 For reusable SNAP workflows, use `sarpyx-pipeline` with versioned YAML configs:
 
 ```bash
-uv run sarpyx-pipeline validate pipelines/sentinel_insar/sentinel_insar.yaml
-uv run sarpyx-pipeline list pipelines/sentinel_insar/sentinel_insar.yaml
-uv run sarpyx-pipeline run pipelines/sentinel_insar/sentinel_insar.yaml \
-  --pipeline sentinel_insar \
-  --set-input master=/data/master.SAFE \
-  --set-input slave=/data/slave.SAFE \
-  --outdir data/output/sentinel_insar
+uv run sarpyx-pipeline validate pipelines/sentinel_insar/sentinel_insar_A.yaml
+uv run sarpyx-pipeline list pipelines/sentinel_insar/sentinel_insar_A.yaml
+uv run sarpyx-pipeline pipelines/sentinel_insar/sentinel_insar_A.yaml \
+  --master /data/master-burst.SAFE \
+  --slave /data/slave-burst.SAFE \
+  --output data/output/sentinel_insar
 ```
 
 Example pipeline configs live under [`pipelines/`](pipelines/), including
-[`pipelines/sentinel_insar/sentinel_insar.yaml`](pipelines/sentinel_insar/sentinel_insar.yaml).
+[`pipelines/sentinel_insar/sentinel_insar_A.yaml`](pipelines/sentinel_insar/sentinel_insar_A.yaml).
 See [docs/user_guide/config_pipelines.md](docs/user_guide/config_pipelines.md)
 for the YAML schema, nested pipelines, pair inputs, dry-run, resume, and
 overwrite behavior.
@@ -84,6 +123,18 @@ uv sync --group dev
 uv sync --group dev --extra copernicus
 uv run pytest -q
 uv build
+```
+</details>
+
+<details>
+<summary><strong>Using conda with SNAP Engine</strong></summary>
+
+This is the fastest local path when you need `snap-engine` ready:
+
+```bash
+conda create -n sarpyx python=3.12
+conda activate sarpyx
+conda install -c sirbastiano/label/dev -c conda-forge snap13=13.0.0
 ```
 </details>
 
