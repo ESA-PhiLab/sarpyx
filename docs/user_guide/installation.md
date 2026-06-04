@@ -6,6 +6,7 @@ This guide will help you install sarpyx and its dependencies on your system.
 
 Before installing sarpyx, ensure you have:
 
+- Conda or Mamba
 - Python 3.11 or higher
 - pip package manager
 - Git (for development installation)
@@ -23,11 +24,65 @@ Before installing sarpyx, ensure you have:
 
 ## Installation Methods
 
-### Containerized execution (optional)
+### 1. Conda environment, then pip install sarpyx
+
+This is the primary local installation method. Conda manages the Python runtime
+and native/SNAP dependencies; pip installs the `sarpyx` Python package from the
+repository checkout.
+
+```bash
+git clone https://github.com/ESA-PhiLab/sarpyx.git
+cd sarpyx
+
+conda create -n sarpyx -c sirbastiano/label/dev -c conda-forge \
+  python=3.12 pip snap13=13.0.0
+conda activate sarpyx
+python -m pip install -e .
+```
+
+Verify the console scripts:
+
+```bash
+sarpyx --help
+sarpyx-pipeline --help
+```
+
+For Copernicus burst downloads and development checks:
+
+```bash
+python -m pip install -e ".[copernicus]"
+python -m pip install pytest
+pytest -q
+```
+
+### 2. Published pip package
+
+For environments that already provide the native geospatial and SNAP
+dependencies:
+
+```bash
+python -m pip install sarpyx
+```
+
+### 3. Using uv for repository maintenance
+
+`uv` is still useful for CI-style syncs, test runs, and builds:
+
+```bash
+uv sync --group dev
+uv sync --group dev --extra copernicus
+uv run pytest -q
+uv build
+```
+
+The conda plus pip flow above remains the default user-facing install path.
+
+### 4. Containerized execution
 
 If you run `sarpyx` via the provided container, the entrypoint uses this order:
 
-1. `GRID_PATH` (or `grid_path`) if it points to an existing in-container `*.geojson`
+1. `GRID_PATH` (or `grid_path`) if it points to an existing in-container
+   `*.geojson`
 2. first `*.geojson` found under `/workspace/grid`
 
 If neither is available, the container exits with an error. Startup-time grid
@@ -41,63 +96,13 @@ mkdir -p ./grid
 docker compose up
 ```
 
-If you use `docker-compose`, mount the grid directory and optionally set `GRID_PATH` to choose a specific file:
+If you use `docker-compose`, mount the grid directory and optionally set
+`GRID_PATH` to choose a specific file:
 
 ```bash
 - ./grid:/workspace/grid:ro
 - GRID_PATH=/workspace/grid/my_region.geojson
 ```
-
-### 1. Using pip (Recommended for Users)
-
-Once sarpyx is published to PyPI, you can install it using:
-
-```bash
-pip install sarpyx
-```
-
-For specific versions:
-```bash
-pip install sarpyx==<version>
-```
-
-### 2. Using uv (Recommended for Development and CI)
-
-`uv` is the canonical tool for local installation, testing, and builds:
-
-1. **Install uv:**
-   ```bash
-   pip install uv
-   ```
-
-2. **Clone the repository:**
-   ```bash
-   git clone https://github.com/ESA-PhiLab/sarpyx.git
-   cd sarpyx
-   ```
-
-3. **Install dependencies:**
-   ```bash
-   uv sync
-   ```
-
-4. **For development and optional Copernicus tooling:**
-   ```bash
-   uv sync --group dev
-   uv sync --group dev --extra copernicus
-   ```
-
-### 3. Development Installation
-
-For contributors or advanced users who want the latest features:
-
-```bash
-git clone https://github.com/ESA-PhiLab/sarpyx.git
-cd sarpyx
-uv sync --group dev
-```
-
-This creates an editable installation that reflects code changes immediately.
 
 ## Verifying Installation
 
@@ -113,11 +118,11 @@ from sarpyx.sla import SubLookAnalysis
 print("Installation successful!")
 ```
 
-For the managed `uv` environment:
+For the primary conda/pip environment:
 
 ```bash
-uv run python -c "import sarpyx; print(sarpyx.__version__)"
-uv run sarpyx --help
+python -c "import sarpyx; print(sarpyx.__version__)"
+sarpyx --help
 ```
 
 ## Optional Dependencies
@@ -129,24 +134,24 @@ For full SNAP functionality, install ESA SNAP:
 2. Follow platform-specific installation instructions
 3. Ensure `gpt` command is available in your PATH
 
-For the fastest local setup with `snap-engine` ready, use conda:
+The primary conda command installs the packaged SNAP engine:
 
 ```bash
-conda create -n sarpyx python=3.12
+conda create -n sarpyx -c sirbastiano/label/dev -c conda-forge \
+  python=3.12 pip snap13=13.0.0
 conda activate sarpyx
-conda install -c sirbastiano/label/dev -c conda-forge snap13=13.0.0
 ```
 
 ### Jupyter Support
 For interactive notebooks:
 ```bash
-pip install jupyter matplotlib ipywidgets
+python -m pip install jupyter matplotlib ipywidgets
 ```
 
 ### Visualization
 For enhanced plotting capabilities:
 ```bash
-pip install matplotlib seaborn plotly
+python -m pip install matplotlib seaborn plotly
 ```
 
 ## Troubleshooting
@@ -159,13 +164,13 @@ On some systems, GDAL can be challenging to install:
 **Ubuntu/Debian:**
 ```bash
 sudo apt-get install gdal-bin libgdal-dev
-pip install gdal
+python -m pip install gdal
 ```
 
 **macOS (using Homebrew):**
 ```bash
 brew install gdal
-pip install gdal
+python -m pip install gdal
 ```
 
 **Windows:**
@@ -182,7 +187,7 @@ For large SAR datasets, ensure sufficient memory:
 #### Permission Errors
 On Unix systems, you might need:
 ```bash
-pip install --user sarpyx
+python -m pip install --user sarpyx
 ```
 
 ### Getting Help
@@ -206,28 +211,23 @@ After successful installation:
 
 ## Environment Setup
 
-### Virtual Environment (Recommended)
+### Virtual Environment
 
 Create an isolated environment for sarpyx:
 
 ```bash
-# Using venv
-python -m venv sarpyx-env
-source sarpyx-env/bin/activate  # Linux/macOS
-# or
-sarpyx-env\Scripts\activate     # Windows
-
-# Using conda
-conda create -n sarpyx python=3.12
+conda create -n sarpyx -c sirbastiano/label/dev -c conda-forge \
+  python=3.12 pip snap13=13.0.0
 conda activate sarpyx
+python -m pip install -e .
 ```
 
 ### Development Environment
 
-For development work, use the managed toolchain:
+For development work, add test tooling in the same conda environment:
 
 ```bash
-uv sync --group dev
-uv run pytest -q
-uv build
+python -m pip install -e ".[copernicus]"
+python -m pip install pytest
+pytest -q
 ```

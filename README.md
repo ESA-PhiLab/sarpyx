@@ -102,15 +102,42 @@ overwrite behavior.
 
 ## Install
 
-For container workflows, use the Docker Compose CLI plugin (`docker compose`) with full commands:
+Use a conda environment first, then install `sarpyx` with pip from this
+checkout. This keeps SNAP/native dependencies in conda and the Python package
+installation in pip.
+
+```bash
+conda create -n sarpyx -c sirbastiano/label/dev -c conda-forge \
+  python=3.12 pip snap13=13.0.0
+conda activate sarpyx
+python -m pip install -e .
+```
+
+Verify the CLI entry points:
+
+```bash
+sarpyx --help
+sarpyx-pipeline --help
+```
+
+For development and tests:
+
+```bash
+python -m pip install -e ".[copernicus]"
+python -m pip install pytest
+pytest -q
+```
+
+For container workflows, use the Docker Compose CLI plugin (`docker compose`)
+with full commands:
 
 ```bash
 docker compose version
 make recreate
 ```
 
-<details open>
-<summary><strong>Using uv (recommended)</strong></summary>
+<details>
+<summary><strong>Using uv for repository maintenance</strong></summary>
 
 ```bash
 uv sync
@@ -127,22 +154,10 @@ uv build
 </details>
 
 <details>
-<summary><strong>Using conda with SNAP Engine</strong></summary>
-
-This is the fastest local path when you need `snap-engine` ready:
+<summary><strong>Published pip package</strong></summary>
 
 ```bash
-conda create -n sarpyx python=3.12
-conda activate sarpyx
-conda install -c sirbastiano/label/dev -c conda-forge snap13=13.0.0
-```
-</details>
-
-<details>
-<summary><strong>Using pip (editable)</strong></summary>
-
-```bash
-python -m pip install -e .
+python -m pip install sarpyx
 ```
 </details>
 
