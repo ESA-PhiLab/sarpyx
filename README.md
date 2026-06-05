@@ -13,59 +13,105 @@
 <a href="LICENSE">
   <img alt="License" src="https://img.shields.io/badge/License-Apache--2.0-374151?style=for-the-badge" />
 </a>
+
 </div>
 
 ##
 
-**sarpyx** is a specialized Python toolkit for **Synthetic Aperture Radar (SAR)** processing with tight integration to ESA **SNAP**. It focuses on reproducible pipelines, fast tiling workflows, and advanced research features like **sub-aperture decomposition**.
+**sarpyx** is a specialized Python toolkit for **Synthetic Aperture Radar (SAR)** processing with tight integration to ESA **SNAP**. It focuses on reproducible SAR workflows, SNAP GPT orchestration, fast tiling, validation, and research features such as **sub-aperture decomposition**.
 
 ## Highlights
 
 - SNAP GPT integration with configurable graphs and operator chaining.
-- Sub-aperture decomposition for squint-angle diversity and motion sensitivity.
-- Parallel tiling and batch processing for large product volumes.
+- WorldSAR preprocessing, tiling, validation, and H5-to-Zarr conversion.
+- Sub-aperture decomposition for Sentinel-style BEAM-DIMAP products.
 - Geocoded outputs ready for GIS and downstream ML.
-- Extensible architecture compatible with `rasterio`, `geopandas`, and `pyproj`.
+- Utilities compatible with `rasterio`, `geopandas`, `pyproj`, `h5py`, `zarr`, and `dask`.
+
+## Commands
+
+```bash
+sarpyx --help          # WorldSAR preprocessing, tiling, validation, H5-to-Zarr
+sarpyx-pipeline --help # YAML-configured SNAP pipelines
+sarpyx-decode --help   # Sentinel-1 Level-0 decode wrapper
+sarpyx-unzip --help    # Extract Sentinel-1 ZIP products
+sarpyx-upload --help   # Upload artifacts to Hugging Face Hub
+```
 
 ## Install
 
-For container workflows, use the Docker Compose CLI plugin (`docker compose`) with full commands:
+The recommended installation uses **conda first** to provide ESA SNAP and `gpt`, then installs `sarpyx` with pip from this checkout. This keeps SNAP/native dependencies managed by conda while keeping the Python package editable.
+
+```bash
+conda create -n sarpyx -c sirbastiano/label/dev -c conda-forge \
+  python=3.12 pip snap13=13.0.0
+
+conda activate sarpyx
+python -m pip install -e .
+```
+
+Verify the installation:
+
+```bash
+gpt -h
+sarpyx --help
+sarpyx-pipeline --help
+```
+
+For development and tests:
+
+```bash
+python -m pip install -e ".[copernicus]"
+python -m pip install pytest
+pytest -q
+```
+
+<details>
+<summary><strong>Using uv for repository maintenance</strong></summary>
+
+```bash
+uv sync
+uv sync --group dev
+uv sync --group dev --extra copernicus
+uv run pytest -q
+uv build
+```
+
+</details>
+
+<details>
+<summary><strong>Published pip package</strong></summary>
+
+```bash
+python -m pip install sarpyx
+```
+
+The pip package is suitable for Python-side usage, but SNAP GPT workflows require a working SNAP installation available in the environment.
+
+</details>
+
+## Documentation
+
+See the documentation site at https://esa-philab.github.io/sarpyx/ for installation, quick start, architecture, usage guides, testing, and contributing information.
+
+## Container usage
+
+For container workflows, use the Docker Compose CLI plugin:
 
 ```bash
 docker compose version
 make recreate
 ```
 
-<details open>
-<summary><strong>Using uv (recommended)</strong></summary>
+At startup, the container expects a mounted grid file. Provide either `GRID_PATH` or place a `*.geojson` file under `/workspace/grid`.
 
 ```bash
-uv sync
+mkdir -p ./grid
+# put any grid GeoJSON here, e.g. ./grid/my_region.geojson
+docker compose up
 ```
 
-For development, testing, and optional Copernicus tooling:
-
-```bash
-uv sync --group dev
-uv sync --group dev --extra copernicus
-uv run pytest -q
-uv build
-```
-</details>
-
-<details>
-<summary><strong>Using pip (editable)</strong></summary>
-
-```bash
-python -m pip install -e .
-```
-</details>
-
-
-## Docs
-
-See the documentation site at https://esa-philab.github.io/sarpyx/ for installation,
-quick start, architecture, usage guides, testing, and contributing information.
+You can also pass `--grid-path` to the `worldsar` CLI command.
 
 ## Community and citation
 
@@ -75,39 +121,10 @@ quick start, architecture, usage guides, testing, and contributing information.
 - [Reviewer smoke test](REVIEWER_SMOKE_TEST.md)
 - [JOSS paper draft](paper.md)
 
-## Container grid configuration
-
-At startup the container checks for grid files in this order:
-
-1. `GRID_PATH` (or `grid_path`) if it points to an existing in-container `*.geojson`
-2. First `*.geojson` found in `/workspace/grid`
-
-If neither exists, the container exits with an error. Automatic grid generation
-on startup has been removed.
-
-To use a mounted grid:
-
-```bash
-mkdir -p ./grid
-# put any grid GeoJSON here, e.g. ./grid/my_region.geojson
-docker compose up
-```
-
-For direct `docker run`, pass an explicit in-container path when needed:
-
-```bash
-docker run --rm \
-  -v "$PWD/grid:/workspace/grid:ro" \
-  -e GRID_PATH=/workspace/grid/my_region.geojson \
-  sirbastiano94/sarpyx:latest \
-  /usr/local/bin/start-jupyter.sh
-```
-
-You can also pass `--grid-path` to the `worldsar` CLI command.
-
 ##
+
 <div align="center">
 
-**With Love By:** Roberto Del Prete, Gabriele Daga, Sebastian Fieldhouse, Juanfrancisco Amieva, Cedric Leonard, Valerio Marsocci, Eva Gmelich Mejling
+**Maintainers:** Roberto Del Prete, Gabriele Daga, Sebastian Fieldhouse, Juanfrancisco Amieva, Cedric Leonard, Valerio Marsocci, Eva Gmelich Mejling
 
 </div>
