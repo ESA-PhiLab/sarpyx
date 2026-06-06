@@ -37,7 +37,38 @@ make recreate
 ```
 
 <details open>
-<summary><strong>Using uv (recommended)</strong></summary>
+<summary><strong>Using conda (preferred, avoids global SNAP installs)</strong></summary>
+
+The recommended installation uses conda first to provide ESA SNAP and `gpt`, then installs `sarpyx` with `pip` from this checkout. This keeps SNAP/native dependencies isolated in the environment while keeping the Python package editable.
+
+```bash
+conda create -n sarpyx -c sirbastiano/label/dev -c conda-forge \
+  python=3.12 pip snap13=13.0.0
+
+conda activate sarpyx
+python -m pip install -e .
+```
+
+Verify the installation:
+
+```bash
+gpt -h
+sarpyx --help
+sarpyx-pipeline --help
+```
+
+For development and tests:
+
+```bash
+python -m pip install -e ".[copernicus]"
+python -m pip install pytest
+pytest -q
+```
+
+</details>
+
+<details>
+<summary><strong>Using uv</strong></summary>
 
 ```bash
 uv sync
@@ -59,6 +90,28 @@ uv build
 ```bash
 python -m pip install -e .
 ```
+</details>
+
+<details>
+<summary><strong>SNAP GPT / WorldSAR setup</strong></summary>
+
+SNAP-driven workflows need ESA SNAP's `gpt` executable. The full setup is in
+[Installation](docs/installation.html), including the `GPT_PATH` resolution order,
+conda + SNAP engine setup, and helper scripts.
+
+For the conda workflow:
+
+```bash
+conda activate sarpyx-snap
+source scripts/setvars.sh
+"$GPT_PATH" --help
+```
+
+`scripts/setvars.sh` exports `SNAP_HOME`, `GPT_PATH`, `gpt_path`,
+`SNAP_USERDIR`, `snap_userdir`, and updates `PATH`. `scripts/worldsar.sh`
+activates `CONDA_ENV` (default `sarpyx-snap`), sources the same helper, prints
+the resolved SNAP GPT path, and runs WorldSAR.
+
 </details>
 
 

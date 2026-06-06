@@ -7,6 +7,8 @@ various operators like calibration, terrain correction, and subsetting.
 
 import os
 import subprocess
+import sys
+import threading
 import warnings
 import zipfile
 from pathlib import Path
@@ -298,44 +300,59 @@ class GPT:
         self.last_stderr = None
         self.last_returncode = None
         
+        stdout_chunks: list[str] = []
+        stderr_chunks: list[str] = []
+
+        def stream_pipe(pipe, sink, chunks):
+            try:
+                while True:
+                    chunk = pipe.read(1)
+                    if not chunk:
+                        break
+                    chunks.append(chunk)
+                    sink.write(chunk)
+                    sink.flush()
+            finally:
+                pipe.close()
+
         try:
-            run_kwargs = {
-                "shell": True,
-                "check": True,
-                "capture_output": True,
-                "text": True,
-            }
-            if self.timeout is not None:
-                run_kwargs["timeout"] = self.timeout
-            process = subprocess.run(cmd_str, **run_kwargs)
-            self.last_returncode = process.returncode
-            self.last_stdout = process.stdout or ''
-            self.last_stderr = process.stderr or ''
-            
-            if process.stdout:
-                print(f'GPT Output: {process.stdout}')
-            if process.stderr:
-                print(f'GPT Warnings: {process.stderr}')
-            
+            process = subprocess.Popen(
+                cmd_str,
+                shell=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                bufsize=1,
+            )
+            stdout_thread = threading.Thread(target=stream_pipe, args=(process.stdout, sys.stdout, stdout_chunks))
+            stderr_thread = threading.Thread(target=stream_pipe, args=(process.stderr, sys.stderr, stderr_chunks))
+            stdout_thread.start()
+            stderr_thread.start()
+            try:
+                self.last_returncode = process.wait(timeout=self.timeout)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                self.last_returncode = process.wait()
+                stdout_thread.join()
+                stderr_thread.join()
+                self.last_stdout = ''.join(stdout_chunks)
+                self.last_stderr = f'GPT command timed out after {self.timeout}s'
+                if stderr_chunks:
+                    self.last_stderr += '\n' + ''.join(stderr_chunks)
+                print(f'Error: GPT command timed out after {self.timeout}s')
+                return False
+            stdout_thread.join()
+            stderr_thread.join()
+            self.last_stdout = ''.join(stdout_chunks)
+            self.last_stderr = ''.join(stderr_chunks)
+
+            if self.last_returncode != 0:
+                print(f'Error executing GPT command: {cmd_str}')
+                print(f'Return code: {self.last_returncode}')
+                return False
+
             print('Command executed successfully!')
             return True
-            
-        except subprocess.TimeoutExpired as e:
-            self.last_stdout = (e.stdout or '') if hasattr(e, 'stdout') else ''
-            self.last_stderr = f'GPT command timed out after {self.timeout}s'
-            print('Error: GPT command timed out after 1 hour')
-            return False
-        except subprocess.CalledProcessError as e:
-            self.last_returncode = e.returncode
-            self.last_stdout = e.stdout or ''
-            self.last_stderr = e.stderr or ''
-            print(f'Error executing GPT command: {cmd_str}')
-            print(f'Return code: {e.returncode}')
-            if e.stdout:
-                print(f'Stdout: {e.stdout}')
-            if e.stderr:
-                print(f'Stderr: {e.stderr}')
-            return False
         except FileNotFoundError:
             print(f"Error: GPT executable '{self.gpt_executable}' not found!")
             print('Ensure SNAP is installed and configured correctly.')

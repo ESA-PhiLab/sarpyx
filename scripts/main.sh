@@ -250,7 +250,7 @@ echo "SENTINEL_SUBAPS=${SENTINEL_SUBAPS}"
   -B "${LEGACY_GRID_BIND_SOURCE}:/workspace/grid:ro" \
   -B "${SNAP_USER_DIR}:${WORKSPACE_PREFIX}/.snap" \
   "${SIF_IMAGE}" \
-  python "${WORKSPACE_PREFIX}/scripts/worldsar.py" \
+  python -m sarpyx.cli.worldsar \
     --input "${WORKSPACE_PREFIX}/data/${PRODUCT_NAME}" \
     --output "${WORKSPACE_PREFIX}/output" \
     --cuts-outdir "${WORKSPACE_PREFIX}/cuts" \

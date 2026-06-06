@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import ast
-import copy
 import importlib.util
 import re
 import sys
@@ -10,6 +8,10 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 
 import pytest
+
+from sarpyx.cli import worldsar as worldsar_module
+from sarpyx.pipelines.single_product import s1_tops
+from sarpyx.snapflow import tiling_runtime as tiling_runtime_mod
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -22,39 +24,6 @@ def _load_module_from_path(name: str, path: Path):
     return module
 
 
-def _strip_annotations(node: ast.FunctionDef) -> ast.FunctionDef:
-    fn = copy.deepcopy(node)
-    fn.returns = None
-    for arg in (
-        fn.args.posonlyargs
-        + fn.args.args
-        + fn.args.kwonlyargs
-    ):
-        arg.annotation = None
-    if fn.args.vararg is not None:
-        fn.args.vararg.annotation = None
-    if fn.args.kwarg is not None:
-        fn.args.kwarg.annotation = None
-    return fn
-
-
-def _load_functions_from_file(path: Path, names: list[str], extra_globals: dict[str, object] | None = None):
-    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
-    selected: list[ast.FunctionDef] = []
-    for name in names:
-        match = next(
-            node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == name
-        )
-        selected.append(_strip_annotations(match))
-    module_ast = ast.Module(body=selected, type_ignores=[])
-    ast.fix_missing_locations(module_ast)
-    namespace: dict[str, object] = {"__builtins__": __builtins__}
-    if extra_globals:
-        namespace.update(extra_globals)
-    exec(compile(module_ast, str(path), "exec"), namespace)
-    return [namespace[name] for name in names], namespace
-
-
 ENGINE_MOD = _load_module_from_path("_engine_for_tests", REPO_ROOT / "sarpyx" / "snapflow" / "engine.py")
 DIM_UPDATER_MOD = _load_module_from_path(
     "_dim_updater_for_tests",
@@ -65,14 +34,12 @@ GPT = ENGINE_MOD.GPT
 update_dim_add_bands_from_data_dir = DIM_UPDATER_MOD.update_dim_add_bands_from_data_dir
 sentinel1_swath_wkt_extractor_safe = WKT_UTILS_MOD.sentinel1_swath_wkt_extractor_safe
 
-[_apply_sentinel_orbit_file, _sentinel_post_chain, pipeline_sentinel, _resolve_tiling_wkt, _run_tops_swath_tiling], _WORLDSAR_NS = _load_functions_from_file(
-    REPO_ROOT / "pyscripts" / "worldsar.py",
-    ["_apply_sentinel_orbit_file", "_sentinel_post_chain", "pipeline_sentinel", "_resolve_tiling_wkt", "_run_tops_swath_tiling"],
-)
-[merge_iq_into_pdec], _MERGE_NS = _load_functions_from_file(
-    REPO_ROOT / "pyscripts" / "worldsar.py",
-    ["merge_iq_into_pdec"],
-)
+_apply_sentinel_orbit_file = worldsar_module._apply_sentinel_orbit_file
+_sentinel_post_chain = worldsar_module._sentinel_post_chain
+pipeline_sentinel = worldsar_module.pipeline_sentinel
+_resolve_tiling_wkt = worldsar_module._resolve_tiling_wkt
+_run_tops_swath_tiling = worldsar_module._run_tops_swath_tiling
+merge_iq_into_pdec = worldsar_module.merge_iq_into_pdec
 
 
 def _touch(path: Path, text: str = "placeholder") -> Path:
@@ -743,9 +710,9 @@ def test_resolve_tiling_wkt_prefers_swath_dim_footprint_and_falls_back(tmp_path:
     assert _resolve_tiling_wkt("FULL_WKT", safe_dir, swath_product, "S1STRIP", swath="IW1") == "FULL_WKT"
 
 
-def test_run_tops_swath_tiling_uses_swath_specific_wkt(tmp_path: Path):
+def test_run_tops_swath_tiling_uses_swath_specific_wkt(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     calls: list[tuple[str, Path]] = []
-    db_calls: list[tuple[Path, str]] = []
+    db_calls: list[tuple[tuple[str, ...], str, str | None, Path | None]] = []
     verify_calls: list[dict[str, object]] = []
     swath_products = {
         "IW1": _touch(tmp_path / "IW1.dim"),
@@ -760,14 +727,16 @@ def test_run_tops_swath_tiling_uses_swath_specific_wkt(tmp_path: Path):
 
     def fake_run_tiling(product_wkt, _grid_path, _source_product, intermediate_product, _cuts_outdir, _product_mode, **_kwargs):
         calls.append((product_wkt, Path(intermediate_product)))
+        assert Path(_cuts_outdir) == tmp_path / "cuts"
+        assert _kwargs["direct_cuts_dir"] is True
         return {
             "name": Path(intermediate_product).stem,
             "cut_failed": False,
             "report_path": _cuts_outdir / "cut_report.json",
-            "cuts_dir": _cuts_outdir / Path(intermediate_product).stem,
+            "cuts_dir": _cuts_outdir,
         }
 
-    def fake_validate_tile_group(_cuts_dir, swath_product, swath=None, tiling_result=None):
+    def fake_validate_tile_group(_cuts_dir, tiling_result, swath_product, swath=None):
         assert tiling_result is not None
         return {
             "name": Path(swath_product).stem,
@@ -775,8 +744,8 @@ def test_run_tops_swath_tiling_uses_swath_specific_wkt(tmp_path: Path):
             "results": [{"status": "success"}],
         }
 
-    def fake_run_db_indexing(validation_rows, name, swath=None):
-        db_calls.append((tuple(validation_rows), name, swath))
+    def fake_run_db_indexing(validation_rows, name, swath=None, cuts_outdir=None):
+        db_calls.append((tuple(validation_rows), name, swath, Path(cuts_outdir) if cuts_outdir else None))
 
     def fake_verify(product_wkt, _grid_path, cuts_outdir, intermediate, swath_wkts=None):
         verify_calls.append(
@@ -788,14 +757,14 @@ def test_run_tops_swath_tiling_uses_swath_specific_wkt(tmp_path: Path):
             }
         )
 
-    _run_tops_swath_tiling.__globals__["tiling"] = True
-    _run_tops_swath_tiling.__globals__["extract_product_id"] = lambda path: Path(path).stem
-    _run_tops_swath_tiling.__globals__["_resolve_tiling_wkt"] = fake_resolve
-    _run_tops_swath_tiling.__globals__["_run_tiling"] = fake_run_tiling
-    _run_tops_swath_tiling.__globals__["_validate_tile_group"] = fake_validate_tile_group
-    _run_tops_swath_tiling.__globals__["_run_db_indexing"] = fake_run_db_indexing
-    _run_tops_swath_tiling.__globals__["_verify_tops_tile_coverage"] = fake_verify
-    _run_tops_swath_tiling.__globals__["_write_h5_validation_report_pdf"] = lambda *_args, **_kwargs: None
+    monkeypatch.setattr(tiling_runtime_mod.config, "tiling", True)
+    monkeypatch.setattr(tiling_runtime_mod, "_resolve_tiling_wkt", fake_resolve)
+    monkeypatch.setattr(tiling_runtime_mod, "_run_tiling", fake_run_tiling)
+    monkeypatch.setattr(tiling_runtime_mod, "validate_worldsar_zarr_tile_group", fake_validate_tile_group)
+    monkeypatch.setattr(tiling_runtime_mod, "_run_db_indexing", fake_run_db_indexing)
+    monkeypatch.setattr(tiling_runtime_mod, "_verify_tops_tile_coverage", fake_verify)
+    monkeypatch.setattr(tiling_runtime_mod, "_write_h5_validation_report_pdf", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(tiling_runtime_mod, "_write_tiling_manifest", lambda *_args, **_kwargs: None)
 
     _run_tops_swath_tiling(
         product_wkt="FULL_WKT",
@@ -812,15 +781,15 @@ def test_run_tops_swath_tiling_uses_swath_specific_wkt(tmp_path: Path):
         ("WKT::IW2", swath_products["IW2"]),
     ]
     assert db_calls == [
-        (("row::IW1",), "IW1", "IW1"),
-        (("row::IW2",), "IW2", "IW2"),
+        (("row::IW1",), "IW1", "IW1", tmp_path / "cuts"),
+        (("row::IW2",), "IW2", "IW2", tmp_path / "cuts"),
     ]
     assert verify_calls == []
 
 
-def test_run_tops_swath_tiling_validates_existing_tiles_when_tiling_disabled(tmp_path: Path):
+def test_run_tops_swath_tiling_validates_existing_tiles_when_tiling_disabled(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     validate_calls: list[tuple[Path, Path, str | None, dict | None]] = []
-    db_calls: list[tuple[tuple[str, ...], str, str | None]] = []
+    db_calls: list[tuple[tuple[str, ...], str, str | None, Path | None]] = []
     swath_products = {
         "IW1": _touch(tmp_path / "IW1.dim"),
         "IW2": _touch(tmp_path / "IW2.dim"),
@@ -834,15 +803,19 @@ def test_run_tops_swath_tiling_validates_existing_tiles_when_tiling_disabled(tmp
             "results": [{"status": "success"}],
         }
 
-    def fake_run_db_indexing(validation_rows, name, swath=None):
-        db_calls.append((tuple(validation_rows), name, swath))
+    def fake_run_db_indexing(validation_rows, name, swath=None, cuts_outdir=None):
+        db_calls.append((tuple(validation_rows), name, swath, Path(cuts_outdir) if cuts_outdir else None))
 
-    _run_tops_swath_tiling.__globals__["tiling"] = False
-    _run_tops_swath_tiling.__globals__["_resolve_tiling_wkt"] = lambda full_wkt, *_args, **_kwargs: full_wkt
-    _run_tops_swath_tiling.__globals__["_validate_tile_group"] = fake_validate_tile_group
-    _run_tops_swath_tiling.__globals__["_run_db_indexing"] = fake_run_db_indexing
-    _run_tops_swath_tiling.__globals__["_write_h5_validation_report_pdf"] = lambda *_args, **_kwargs: None
-    _run_tops_swath_tiling.__globals__["_run_tiling"] = lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("_run_tiling should not be called when tiling is disabled"))
+    monkeypatch.setattr(tiling_runtime_mod.config, "tiling", False)
+    monkeypatch.setattr(tiling_runtime_mod, "_resolve_tiling_wkt", lambda full_wkt, *_args, **_kwargs: full_wkt)
+    monkeypatch.setattr(tiling_runtime_mod, "_validate_tile_group", fake_validate_tile_group)
+    monkeypatch.setattr(tiling_runtime_mod, "_run_db_indexing", fake_run_db_indexing)
+    monkeypatch.setattr(tiling_runtime_mod, "_write_h5_validation_report_pdf", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        tiling_runtime_mod,
+        "_run_tiling",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("_run_tiling should not be called when tiling is disabled")),
+    )
 
     _run_tops_swath_tiling(
         product_wkt="FULL_WKT",
@@ -855,26 +828,36 @@ def test_run_tops_swath_tiling_validates_existing_tiles_when_tiling_disabled(tmp
     )
 
     assert validate_calls == [
-        (
-            tmp_path / "cuts" / "IW1" / "IW1",
-            swath_products["IW1"],
-            "IW1",
-            {"source_wkt": "FULL_WKT", "report_source_wkt": "FULL_WKT"},
-        ),
-        (
-            tmp_path / "cuts" / "IW2" / "IW2",
-            swath_products["IW2"],
-            "IW2",
-            {"source_wkt": "FULL_WKT", "report_source_wkt": "FULL_WKT"},
-        ),
-    ]
+            (
+                tmp_path / "cuts",
+                swath_products["IW1"],
+                "IW1",
+                {
+                    "pre_tc_wkt": "FULL_WKT",
+                    "post_tc_wkt": "FULL_WKT",
+                    "source_wkt": "FULL_WKT",
+                    "report_source_wkt": "FULL_WKT",
+                },
+            ),
+            (
+                tmp_path / "cuts",
+                swath_products["IW2"],
+                "IW2",
+                {
+                    "pre_tc_wkt": "FULL_WKT",
+                    "post_tc_wkt": "FULL_WKT",
+                    "source_wkt": "FULL_WKT",
+                    "report_source_wkt": "FULL_WKT",
+                },
+            ),
+        ]
     assert db_calls == [
-        (("row::IW1",), "IW1", "IW1"),
-        (("row::IW2",), "IW2", "IW2"),
+        (("row::IW1",), "IW1", "IW1", tmp_path / "cuts"),
+        (("row::IW2",), "IW2", "IW2", tmp_path / "cuts"),
     ]
 
 
-def test_run_tops_swath_tiling_raises_on_validation_failure(tmp_path: Path):
+def test_run_tops_swath_tiling_raises_on_validation_failure(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     swath_products = {"IW1": _touch(tmp_path / "IW1.dim")}
 
     def fake_run_tiling(*_args, **_kwargs):
@@ -894,14 +877,15 @@ def test_run_tops_swath_tiling_raises_on_validation_failure(tmp_path: Path):
             "results": [{"status": "failed"}],
         }
 
-    _run_tops_swath_tiling.__globals__["tiling"] = True
-    _run_tops_swath_tiling.__globals__["_resolve_tiling_wkt"] = lambda full_wkt, *_args, **_kwargs: full_wkt
-    _run_tops_swath_tiling.__globals__["_run_tiling"] = fake_run_tiling
-    _run_tops_swath_tiling.__globals__["_validate_tile_group"] = fake_validate_tile_group
-    _run_tops_swath_tiling.__globals__["_run_db_indexing"] = lambda *_args, **_kwargs: None
-    _run_tops_swath_tiling.__globals__["_write_h5_validation_report_pdf"] = lambda *_args, **_kwargs: None
+    monkeypatch.setattr(tiling_runtime_mod.config, "tiling", True)
+    monkeypatch.setattr(tiling_runtime_mod, "_resolve_tiling_wkt", lambda full_wkt, *_args, **_kwargs: full_wkt)
+    monkeypatch.setattr(tiling_runtime_mod, "_run_tiling", fake_run_tiling)
+    monkeypatch.setattr(tiling_runtime_mod, "validate_worldsar_zarr_tile_group", fake_validate_tile_group)
+    monkeypatch.setattr(tiling_runtime_mod, "_run_db_indexing", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(tiling_runtime_mod, "_write_h5_validation_report_pdf", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(tiling_runtime_mod, "_write_tiling_manifest", lambda *_args, **_kwargs: None)
 
-    with pytest.raises(RuntimeError, match="H5 validation failed; report:"):
+    with pytest.raises(RuntimeError, match="ZARR validation failed; report:"):
         _run_tops_swath_tiling(
             product_wkt="FULL_WKT",
             grid_geoj_path=tmp_path / "grid.geojson",
@@ -948,7 +932,7 @@ def test_pipeline_sentinel_tops_raises_when_split_output_is_missing(tmp_path: Pa
 
 def test_pipeline_sentinel_tops_can_limit_swath_and_burst(tmp_path: Path):
     split_calls: list[tuple[Path, dict[str, object]]] = []
-    post_calls: list[tuple[Path, str]] = []
+    subap_calls: list[dict[str, object]] = []
 
     class FakeBaseOp:
         def __init__(self):
@@ -967,6 +951,34 @@ def test_pipeline_sentinel_tops_can_limit_swath_and_burst(tmp_path: Path):
             self.prod_path = split_path
             return str(split_path)
 
+        def ApplyOrbitFile(self, **_kwargs):
+            self.prod_path = self.outdir / "orb.dim"
+            return str(self.prod_path)
+
+        def Calibration(self, **_kwargs):
+            self.prod_path = self.outdir / "cal.dim"
+            return str(self.prod_path)
+
+        def TopsarDerampDemod(self):
+            self.prod_path = self.outdir / "deramp.dim"
+            return str(self.prod_path)
+
+        def Deburst(self):
+            self.prod_path = self.outdir / "deb.dim"
+            return str(self.prod_path)
+
+        def do_subaps(self, **kwargs):
+            subap_calls.append(kwargs)
+            return str(self.prod_path)
+
+        def polarimetric_decomposition(self, **_kwargs):
+            self.prod_path = self.outdir / "pdec.dim"
+            return str(self.prod_path)
+
+        def TerrainCorrection(self, **_kwargs):
+            self.prod_path = self.outdir / "tc.dim"
+            return str(self.prod_path)
+
         def last_error_summary(self):
             return "unused"
 
@@ -975,13 +987,9 @@ def test_pipeline_sentinel_tops_can_limit_swath_and_burst(tmp_path: Path):
             return FakeBaseOp()
         return FakeSwathOp(Path(output_dir))
 
-    def fake_post_chain(op, product_path, **_kwargs):
-        post_calls.append((Path(op.prod_path), product_path))
-        return op.prod_path
-
     pipeline_sentinel.__globals__["Path"] = Path
     pipeline_sentinel.__globals__["_create_gpt_operator"] = fake_create_gpt_operator
-    pipeline_sentinel.__globals__["_sentinel_post_chain"] = fake_post_chain
+    pipeline_sentinel.__globals__["merge_iq_into_pdec"] = lambda **_kwargs: None
 
     result = pipeline_sentinel(
         product_path=str(tmp_path / "input.SAFE"),
@@ -993,6 +1001,7 @@ def test_pipeline_sentinel_tops_can_limit_swath_and_burst(tmp_path: Path):
     )
 
     assert list(result) == ["IW2"]
+    assert result["IW2"] == tmp_path / "out" / "IW2" / "tc.dim"
     assert split_calls == [
         (
             tmp_path / "out" / "IW2",
@@ -1003,4 +1012,85 @@ def test_pipeline_sentinel_tops_can_limit_swath_and_burst(tmp_path: Path):
             },
         )
     ]
-    assert post_calls == [(tmp_path / "out" / "IW2" / "split.dim", str(tmp_path / "input.SAFE"))]
+    assert subap_calls[0]["safe_path"] == str(tmp_path / "input.SAFE")
+
+
+def test_pipeline_sentinel_tops_uses_recipe_swath_and_burst_defaults(tmp_path: Path):
+    split_calls: list[tuple[Path, dict[str, object]]] = []
+
+    class FakeBaseOp:
+        def __init__(self):
+            self.prod_path = tmp_path / "input.dim"
+
+    class FakeSwathOp:
+        def __init__(self, outdir: Path):
+            self.outdir = outdir
+            self.prod_path = tmp_path / "input.dim"
+
+        def TopsarSplit(self, **kwargs):
+            split_calls.append((self.outdir, kwargs))
+            split_path = self.outdir / "split.dim"
+            split_path.parent.mkdir(parents=True, exist_ok=True)
+            split_path.write_text("split", encoding="utf-8")
+            self.prod_path = split_path
+            return str(split_path)
+
+        def ApplyOrbitFile(self, **_kwargs):
+            self.prod_path = self.outdir / "orb.dim"
+            return str(self.prod_path)
+
+        def Calibration(self, **_kwargs):
+            self.prod_path = self.outdir / "cal.dim"
+            return str(self.prod_path)
+
+        def TopsarDerampDemod(self):
+            self.prod_path = self.outdir / "deramp.dim"
+            return str(self.prod_path)
+
+        def Deburst(self):
+            self.prod_path = self.outdir / "deb.dim"
+            return str(self.prod_path)
+
+        def do_subaps(self, **_kwargs):
+            return str(self.prod_path)
+
+        def polarimetric_decomposition(self, **_kwargs):
+            self.prod_path = self.outdir / "pdec.dim"
+            return str(self.prod_path)
+
+        def TerrainCorrection(self, **_kwargs):
+            self.prod_path = self.outdir / "tc.dim"
+            return str(self.prod_path)
+
+        def last_error_summary(self):
+            return "unused"
+
+    def fake_create_gpt_operator(_product_path, output_dir, *_args, **_kwargs):
+        if Path(output_dir) == tmp_path / "out":
+            return FakeBaseOp()
+        return FakeSwathOp(Path(output_dir))
+
+    pipeline_sentinel.__globals__["Path"] = Path
+    pipeline_sentinel.__globals__["_create_gpt_operator"] = fake_create_gpt_operator
+    pipeline_sentinel.__globals__["merge_iq_into_pdec"] = lambda **_kwargs: None
+
+    result = pipeline_sentinel(
+        product_path=str(tmp_path / "input.SAFE"),
+        output_dir=tmp_path / "out",
+        is_TOPS=True,
+    )
+
+    swath = s1_tops.DEFAULT_SWATH
+    expected_swaths = (swath,) if swath else s1_tops.DEFAULT_SWATHS
+    assert tuple(result) == expected_swaths
+    assert split_calls == [
+        (
+            tmp_path / "out" / swath,
+            {
+                "subswath": swath,
+                "first_burst_index": s1_tops.DEFAULT_FIRST_BURST,
+                "last_burst_index": s1_tops.DEFAULT_LAST_BURST,
+            },
+        )
+        for swath in expected_swaths
+    ]

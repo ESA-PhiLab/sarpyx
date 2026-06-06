@@ -1,0 +1,7 @@
+interface:
+  display_name: "Sarpyx Processing"
+  short_description: "Run sarpyx and SNAP workflows"
+  default_prompt: "Use $sarpyx-processing to run a WorldSAR, pipeline, or SNAP operator job from my SAR product inputs."
+
+policy:
+  allow_implicit_invocation: true
