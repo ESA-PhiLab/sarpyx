@@ -13,6 +13,7 @@ This guide provides comprehensive information for users of sarpyx, from installa
 7. [SNAP Integration](snap_integration.md)
 8. [Troubleshooting](troubleshooting.md)
 9. [SNAP2StaMPS Guide](snap2stamps_guide.md)
+10. [Generic Pipeline CLI](pipeline_cli.md)
 
 ## Overview
 
@@ -29,6 +30,7 @@ sarpyx is designed to provide researchers and developers with powerful tools for
 - **New to SAR processing?** Start with [Basic Concepts](basic_concepts.md)
 - **Want to dive in quickly?** Check out [Getting Started](getting_started.md)
 - **Need specific processing workflows?** See [Processing Workflows](processing_workflows.md)
+- **Need explicit recipe dispatch?** Use [Generic Pipeline CLI](pipeline_cli.md)
 - **Working with vegetation indices?** Explore [Science Applications](science_applications.md)
 
 ## Prerequisites

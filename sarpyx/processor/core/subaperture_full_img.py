@@ -14,6 +14,7 @@ from rasterio.windows import Window
 
 from .meta import Handler
 from . import utilis as ut
+from .subap_envi import _ensure_subap_output_space, _estimate_subap_output_bytes, write_envi_bsq_float32
 from sarpyx.snapflow.dim_updater import update_dim_add_bands_from_data_dir
 
 warnings.filterwarnings("ignore")
@@ -300,50 +301,6 @@ def DeHammWin_2d(signals_2d, coeff):
     w = np.float32(coeff) - np.float32(1 - coeff) * np.cos(alpha)
     divided = signals_2d / w[:, None]  # broadcast (n,1) over (n, nCols)
     return np.conj(divided).astype(np.complex64)
-
-def write_envi_bsq_float32(path_img, path_hdr, arr2d, band_name, byte_order=1, type_="real"):
-    """
-    Write a single-band ENVI BSQ float32 image + header.
-
-    Parameters
-    ----------
-    path_img : str
-        Output binary file path (.img).
-    path_hdr : str
-        Output ENVI header path (.hdr).
-    arr2d : array-like
-        2D array (lines, samples).
-    band_name : str
-        Band name to write into the ENVI header (must match your naming convention).
-    byte_order : int
-        ENVI byte order: 0 = little endian, 1 = big endian.
-    """
-    arr = np.asarray(arr2d, dtype=np.float32)
-
-    # Force explicit endianness
-    arr_out = arr.astype(">f4", copy=False) if byte_order == 1 else arr.astype("<f4", copy=False)
-
-    # Write binary (BSQ, 1 band)
-    arr_out.tofile(path_img)
-
-    lines, samples = arr.shape
-    hdr = f"""ENVI
-description = {{Sentinel-1 SM Level-1 SLC Product - Unit: {type_}}}
-samples = {samples}
-lines = {lines}
-bands = 1
-header offset = 0
-file type = ENVI Standard
-data type = 4
-interleave = bsq
-byte order = {byte_order}
-band names = {{ {band_name} }}
-data gain values = {{1.0}}
-data offset values = {{0.0}}
-"""
-    with open(path_hdr, "w", encoding="ascii") as f:
-        f.write(hdr)
-
 
 # ---------------------------------------------------------------------------
 # Dask lazy-loading helpers
@@ -1495,6 +1452,8 @@ def do_subaps(
             print(f"  {pol}: i={i_fp}, q={q_fp}")
         print(f"Metadata source SAFE: {safe_path}")
         print(f"Decompositions to run: {decomps}")
+
+    _ensure_subap_output_space(data_dir, _estimate_subap_output_bytes(data_dir, base_pairs, decomps, prefix))
 
     # -------------------------
     # Run one or multiple decompositions

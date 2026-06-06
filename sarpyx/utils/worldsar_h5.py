@@ -50,6 +50,7 @@ VALIDATION_CHECKS = (
     ('metadata completeness', lambda result: result.get('metadata_ok', False)),
     ('band attrs', lambda result: not result.get('band_attr_issues')),
     ('raster shape consistency', lambda result: not result.get('shape_summary')),
+    ('usable raster pixels', lambda result: result.get('raster_data_ok', True)),
     ('non-band rasters', lambda result: not result.get('missing_array_paths')),
     ('metadata paths', lambda result: not result.get('missing_metadata_paths')),
     ('metadata attrs', lambda result: not result.get('missing_metadata_attrs')),
@@ -810,6 +811,14 @@ def _group_expected_tiles(group: Mapping[str, Any]) -> list[str]:
     return sorted(str(tile) for tile in (group.get('expected_tile_geometries') or {}).keys())
 
 
+def _group_candidate_tiles(group: Mapping[str, Any]) -> list[str]:
+    if group.get('candidate_tiles'):
+        return sorted(str(tile) for tile in group.get('candidate_tiles', []))
+    if group.get('candidate_tile_geometries'):
+        return sorted(str(tile) for tile in (group.get('candidate_tile_geometries') or {}).keys())
+    return _group_expected_tiles(group)
+
+
 def _group_actual_tiles(group: Mapping[str, Any]) -> list[str]:
     if group.get('actual_tiles'):
         return sorted(str(tile) for tile in group.get('actual_tiles', []))
@@ -820,12 +829,40 @@ def _group_missing_tiles(group: Mapping[str, Any]) -> list[str]:
     return sorted(str(tile) for tile in group.get('missing_tiles', []))
 
 
+def _group_missing_tile_count(group: Mapping[str, Any]) -> int:
+    if group.get('missing_tile_count') is not None:
+        return int(group['missing_tile_count'])
+    return len(_group_missing_tiles(group))
+
+
 def _group_extra_tiles(group: Mapping[str, Any]) -> list[str]:
     return sorted(str(tile) for tile in group.get('extra_tiles', []))
 
 
+def _group_extra_tile_count(group: Mapping[str, Any]) -> int:
+    if group.get('extra_tile_count') is not None:
+        return int(group['extra_tile_count'])
+    return len(_group_extra_tiles(group))
+
+
 def _group_skipped_tiles(group: Mapping[str, Any]) -> list[str]:
     return sorted(str(tile) for tile in group.get('skipped_tiles', []))
+
+
+def _group_skipped_tile_count(group: Mapping[str, Any]) -> int:
+    if group.get('skipped_tile_count') is not None:
+        return int(group['skipped_tile_count'])
+    return len(_group_skipped_tiles(group))
+
+
+def _group_partial_tiles(group: Mapping[str, Any]) -> list[str]:
+    return sorted(str(tile) for tile in group.get('partial_tiles', []))
+
+
+def _group_partial_tile_count(group: Mapping[str, Any]) -> int:
+    if group.get('partial_tile_count') is not None:
+        return int(group['partial_tile_count'])
+    return len(_group_partial_tiles(group))
 
 
 def _group_failed_tiles(group: Mapping[str, Any]) -> list[str]:
@@ -844,6 +881,12 @@ def _group_expected_tile_count(group: Mapping[str, Any]) -> int:
     return len(_group_expected_tiles(group))
 
 
+def _group_candidate_tile_count(group: Mapping[str, Any]) -> int:
+    if group.get('candidate_tile_count') is not None:
+        return int(group['candidate_tile_count'])
+    return len(_group_candidate_tiles(group))
+
+
 def _group_actual_tile_count(group: Mapping[str, Any]) -> int:
     if group.get('actual_tile_count') is not None:
         return int(group['actual_tile_count'])
@@ -856,21 +899,24 @@ def build_validation_group_summary_rows(validation_groups: list[dict[str, Any]])
         results = group.get('results', [])
         passed_tiles = sorted(str(result['tile']) for result in results if result.get('status') == 'success')
         failed_tiles = _group_failed_tiles(group)
-        missing_tiles = _group_missing_tiles(group)
-        extra_tiles = _group_extra_tiles(group)
-        skipped_tiles = _group_skipped_tiles(group)
+        missing_count = _group_missing_tile_count(group)
+        extra_count = _group_extra_tile_count(group)
+        skipped_count = _group_skipped_tile_count(group)
+        partial_count = _group_partial_tile_count(group)
         overall_status = 'PASS'
-        if failed_tiles or missing_tiles or extra_tiles or group.get('cut_failed'):
+        if failed_tiles or missing_count or extra_count or group.get('cut_failed'):
             overall_status = 'FAIL'
         rows.append({
             'group': _group_label(group),
+            'candidate': _group_candidate_tile_count(group),
             'expected': _group_expected_tile_count(group),
             'actual': _group_actual_tile_count(group),
             'passed': len(set(passed_tiles)),
             'failed': len(set(failed_tiles)),
-            'skipped': len(set(skipped_tiles)),
-            'missing': len(set(missing_tiles)),
-            'extra': len(set(extra_tiles)),
+            'partial': partial_count,
+            'skipped': skipped_count,
+            'missing': missing_count,
+            'extra': extra_count,
             'overall_status': overall_status,
         })
     return rows
@@ -879,10 +925,12 @@ def build_validation_group_summary_rows(validation_groups: list[dict[str, Any]])
 def build_validation_headline_counts(validation_groups: list[dict[str, Any]]) -> dict[str, int]:
     summary_rows = build_validation_group_summary_rows(validation_groups)
     return {
+        'candidate_tiles': sum(row['candidate'] for row in summary_rows),
         'expected_tiles': sum(row['expected'] for row in summary_rows),
         'actual_tiles': sum(row['actual'] for row in summary_rows),
         'passed_tiles': sum(row['passed'] for row in summary_rows),
         'failed_tiles': sum(row['failed'] for row in summary_rows),
+        'partial_tiles': sum(row['partial'] for row in summary_rows),
         'skipped_tiles': sum(row['skipped'] for row in summary_rows),
         'missing_tiles': sum(row['missing'] for row in summary_rows),
         'extra_tiles': sum(row['extra'] for row in summary_rows),
@@ -937,9 +985,11 @@ def build_validation_map_layers(validation_groups: list[dict[str, Any]]) -> dict
     post_tc_outlines: list[dict[str, Any]] = []
     report_source_outlines: list[dict[str, Any]] = []
     swath_source_outlines: list[dict[str, Any]] = []
+    candidate_tiles: dict[str, list[tuple[float, float]]] = {}
     expected_tiles: dict[str, list[tuple[float, float]]] = {}
     missing_tiles: set[str] = set()
     skipped_tiles: set[str] = set()
+    partial_tiles: set[str] = set()
     extra_tiles: set[str] = set()
     actual_status: dict[str, str] = {}
     actual_polygons: dict[str, list[tuple[float, float]]] = {}
@@ -979,9 +1029,13 @@ def build_validation_map_layers(validation_groups: list[dict[str, Any]]) -> dict
             for ring in _wkt_to_rings(group['source_wkt']):
                 swath_source_outlines.append({'label': group_label, 'coords': ring})
 
-        expected_tiles.update(group.get('expected_tile_geometries', {}) or {})
+        group_expected_tiles = group.get('expected_tile_geometries', {}) or {}
+        group_candidate_tiles = group.get('candidate_tile_geometries', {}) or group_expected_tiles
+        candidate_tiles.update(group_candidate_tiles)
+        expected_tiles.update(group_expected_tiles)
         missing_tiles.update(_group_missing_tiles(group))
         skipped_tiles.update(_group_skipped_tiles(group))
+        partial_tiles.update(_group_partial_tiles(group))
         extra_tiles.update(_group_extra_tiles(group))
 
         for result in group.get('results', []):
@@ -1031,14 +1085,24 @@ def build_validation_map_layers(validation_groups: list[dict[str, Any]]) -> dict
         if tile_name in expected_tiles
     ]
     skipped_polygons = [
-        {'tile': tile_name, 'coords': expected_tiles[tile_name]}
+        {'tile': tile_name, 'coords': candidate_tiles[tile_name]}
         for tile_name in sorted(skipped_tiles)
-        if tile_name in expected_tiles
+        if tile_name in candidate_tiles
     ]
+    partial_polygons = [
+        {'tile': tile_name, 'coords': candidate_tiles[tile_name]}
+        for tile_name in sorted(partial_tiles)
+        if tile_name in candidate_tiles
+    ]
+    excluded_tiles = skipped_tiles | partial_tiles
     expected_polygons = [
         {'tile': tile_name, 'coords': coords}
         for tile_name, coords in sorted(expected_tiles.items())
-        if tile_name not in skipped_tiles
+        if tile_name not in excluded_tiles
+    ]
+    candidate_polygons = [
+        {'tile': tile_name, 'coords': coords}
+        for tile_name, coords in sorted(candidate_tiles.items())
     ]
 
     return {
@@ -1046,7 +1110,9 @@ def build_validation_map_layers(validation_groups: list[dict[str, Any]]) -> dict
         'post_tc_outlines': post_tc_outlines,
         'report_source_outlines': report_source_outlines,
         'swath_source_outlines': swath_source_outlines,
+        'candidate_polygons': candidate_polygons,
         'expected_polygons': expected_polygons,
+        'partial_polygons': partial_polygons,
         'skipped_polygons': skipped_polygons,
         'missing_polygons': missing_polygons,
         'passed_polygons': passed_polygons,
@@ -1056,9 +1122,11 @@ def build_validation_map_layers(validation_groups: list[dict[str, Any]]) -> dict
         'failed_points': failed_points,
         'extra_points': extra_points,
         'counts': {
-            'expected': len(expected_polygons),
+            'candidate': len(candidate_tiles),
+            'expected': len(expected_tiles),
             'passed': len({item['tile'] for item in passed_polygons + passed_points}),
             'failed': len({item['tile'] for item in failed_polygons + failed_points}),
+            'partial': len(partial_tiles),
             'skipped': len(skipped_tiles),
             'missing': len(missing_tiles),
             'extra': len(extra_tiles),
@@ -1091,6 +1159,26 @@ def build_failure_appendix_rows(validation_groups: list[dict[str, Any]]) -> list
                 'issues': ['tile cutting failed before H5 validation'],
             })
 
+        skipped_reasons = group.get('skipped_tile_reasons', {}) or {}
+        for tile_name in sorted(set(_group_skipped_tiles(group)) - set(actual_results)):
+            reason = skipped_reasons.get(tile_name) or 'tile skipped before H5 validation'
+            appendix_rows.append({
+                'tile': tile_name,
+                'group': group_label,
+                'swath': swath,
+                'issues': [reason],
+            })
+
+        partial_reasons = group.get('partial_tile_reasons', {}) or {}
+        for tile_name in sorted(set(_group_partial_tiles(group)) - set(actual_results)):
+            reason = partial_reasons.get(tile_name) or 'partial edge tile excluded from full-data deliverables'
+            appendix_rows.append({
+                'tile': tile_name,
+                'group': group_label,
+                'swath': swath,
+                'issues': [reason],
+            })
+
         extra_tiles = set(_group_extra_tiles(group))
         for tile_name in sorted(actual_results):
             result = actual_results[tile_name]
@@ -1117,6 +1205,11 @@ def build_failure_appendix_rows(validation_groups: list[dict[str, Any]]) -> list
                 issues.append('empty core metadata: ' + ', '.join(result['empty_core_metadata_fields']))
             if result.get('shape_summary'):
                 issues.append('shape mismatch: ' + ', '.join(result['shape_summary']))
+            if result.get('raster_data_ok') is False:
+                issues.append(
+                    f"incomplete raster coverage: valid_fraction={float(result.get('valid_fraction') or 0.0):.6f}, "
+                    f"nodata_fraction={float(result.get('nodata_fraction') or 1.0):.6f}"
+                )
             issue_lines = format_issue_map(result.get('band_attr_issues', {}))
             if issue_lines:
                 issues.append('band attr issues: ' + ' | '.join(issue_lines))
@@ -1167,6 +1260,8 @@ def _write_table(
         pass
     for (row_index, _col_index), cell in table.get_celld().items():
         cell.PAD = cell_pad
+        if fill_bbox:
+            cell.set_height(1.0 / max(len(row_values) + 1, 1))
         if row_index == 0:
             cell.set_text_props(weight='bold')
             cell.set_facecolor('#E9ECEF')
@@ -1190,10 +1285,12 @@ def _write_summary_page(pdf, product_name: str, validation_groups: list[dict[str
     fig.text(0.03, 0.91, f'Timestamp (UTC): {_datetime.now(_timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")}', ha='left', fontsize=10)
 
     headline_labels = (
+        ('Candidate', headline_counts['candidate_tiles']),
         ('Expected', headline_counts['expected_tiles']),
         ('Actual', headline_counts['actual_tiles']),
         ('Passed', headline_counts['passed_tiles']),
         ('Failed', headline_counts['failed_tiles']),
+        ('Partial', headline_counts['partial_tiles']),
         ('Skipped', headline_counts['skipped_tiles']),
         ('Missing', headline_counts['missing_tiles']),
         ('Extra', headline_counts['extra_tiles']),
@@ -1207,21 +1304,23 @@ def _write_summary_page(pdf, product_name: str, validation_groups: list[dict[str
     summary_ax = fig.add_axes([0.03, 0.14, 0.94, 0.56])
     _write_table(
         summary_ax,
-        ['Group', 'Expected', 'Actual', 'Passed', 'Failed', 'Skipped', 'Missing', 'Extra', 'Status'],
+        ['Group', 'Candidate', 'Expected', 'Actual', 'Passed', 'Failed', 'Partial', 'Skipped', 'Missing', 'Extra', 'Status'],
         [
             [
                 row['group'],
+                str(row['candidate']),
                 str(row['expected']),
                 str(row['actual']),
                 str(row['passed']),
                 str(row['failed']),
+                str(row['partial']),
                 str(row['skipped']),
                 str(row['missing']),
                 str(row['extra']),
                 row['overall_status'],
             ]
             for row in summary_rows
-        ] or [['-', '0', '0', '0', '0', '0', '0', '0', 'PASS']],
+        ] or [['-', '0', '0', '0', '0', '0', '0', '0', '0', '0', 'PASS']],
         font_size=9,
         scale_y=1.6,
     )
@@ -1271,8 +1370,10 @@ def _write_map_page(pdf, product_name: str, validation_groups: list[dict[str, An
     info_ax = fig.add_axes([0.76, 0.12, 0.20, 0.76])
     info_ax.axis('off')
 
-    _plot_polygon_items(map_ax, layers['expected_polygons'], edgecolor='#C7CED6', linewidth=0.8)
-    _plot_polygon_items(map_ax, layers['skipped_polygons'], edgecolor='#D97706', facecolor='#FEF3C7', linewidth=0.9, alpha=0.55, hatch='..')
+    _plot_polygon_items(map_ax, layers['candidate_polygons'], edgecolor='#CBD5E1', facecolor='#F8FAFC', linewidth=0.7, alpha=0.70)
+    _plot_polygon_items(map_ax, layers['expected_polygons'], edgecolor='#64748B', linewidth=0.8)
+    _plot_polygon_items(map_ax, layers['partial_polygons'], edgecolor='#D97706', facecolor='#FEF3C7', linewidth=0.9, alpha=0.55, hatch='..')
+    _plot_polygon_items(map_ax, layers['skipped_polygons'], edgecolor='#94A3B8', linewidth=0.8, alpha=0.65, linestyle=':')
     _plot_polygon_items(map_ax, layers['missing_polygons'], edgecolor='#F59F00', linewidth=1.3, hatch='////')
     _plot_polygon_items(map_ax, layers['passed_polygons'], edgecolor='#2B8A3E', facecolor='#D3F9D8', linewidth=1.2, alpha=0.75)
     _plot_polygon_items(map_ax, layers['failed_polygons'], edgecolor='#C92A2A', facecolor='#FFE3E3', linewidth=1.2, alpha=0.8)
@@ -1312,7 +1413,7 @@ def _write_map_page(pdf, product_name: str, validation_groups: list[dict[str, An
         )
 
     all_coords: list[tuple[float, float]] = []
-    for layer_name in ('report_source_outlines', 'swath_source_outlines', 'expected_polygons', 'skipped_polygons', 'missing_polygons', 'passed_polygons', 'failed_polygons', 'extra_polygons'):
+    for layer_name in ('report_source_outlines', 'swath_source_outlines', 'candidate_polygons', 'expected_polygons', 'partial_polygons', 'skipped_polygons', 'missing_polygons', 'passed_polygons', 'failed_polygons', 'extra_polygons'):
         for item in layers[layer_name]:
             all_coords.extend(item['coords'])
     for layer_name in ('passed_points', 'failed_points', 'extra_points'):
@@ -1335,8 +1436,10 @@ def _write_map_page(pdf, product_name: str, validation_groups: list[dict[str, An
 
     legend_handles = [
         Patch(facecolor='none', edgecolor='#000000', linewidth=1.4, label='product footprint'),
-        Patch(facecolor='none', edgecolor='#C7CED6', linewidth=0.8, label='expected tiles'),
-        Patch(facecolor='#FEF3C7', edgecolor='#D97706', linewidth=0.9, hatch='..', label='skipped tiles'),
+        Patch(facecolor='#F8FAFC', edgecolor='#CBD5E1', linewidth=0.8, label='candidate cells'),
+        Patch(facecolor='none', edgecolor='#64748B', linewidth=0.8, label='expected deliverables'),
+        Patch(facecolor='#FEF3C7', edgecolor='#D97706', linewidth=0.9, hatch='..', label='partial edge tiles'),
+        Patch(facecolor='none', edgecolor='#94A3B8', linewidth=0.8, label='outside-bounds skips'),
         Patch(facecolor='#D3F9D8', edgecolor='#2B8A3E', linewidth=1.2, label='passed tiles'),
         Patch(facecolor='#FFE3E3', edgecolor='#C92A2A', linewidth=1.2, label='failed tiles'),
         Patch(facecolor='none', edgecolor='#F59F00', linewidth=1.3, hatch='////', label='missing tiles'),
@@ -1354,9 +1457,11 @@ def _write_map_page(pdf, product_name: str, validation_groups: list[dict[str, An
         0.46,
         '\n'.join([
             'Counts',
+            f"Candidate: {counts['candidate']}",
             f"Expected: {counts['expected']}",
             f"Passed: {counts['passed']}",
             f"Failed: {counts['failed']}",
+            f"Partial: {counts['partial']}",
             f"Skipped: {counts['skipped']}",
             f"Missing: {counts['missing']}",
             f"Extra: {counts['extra']}",
@@ -1418,12 +1523,13 @@ def _write_dashboard_pages(pdf, validation_groups: list[dict[str, Any]]) -> None
         status_ax = fig.add_axes([0.52, 0.59, 0.45, 0.22])
         _write_table(
             status_ax,
-            ['Expected', 'Actual', 'Passed', 'Failed', 'Skipped', 'Missing', 'Extra', 'Status'],
+            ['Expected', 'Actual', 'Passed', 'Failed', 'Partial', 'Skipped', 'Missing', 'Extra', 'Status'],
             [[
                 str(summary_row['expected']),
                 str(summary_row['actual']),
                 str(summary_row['passed']),
                 str(summary_row['failed']),
+                str(summary_row['partial']),
                 str(summary_row['skipped']),
                 str(summary_row['missing']),
                 str(summary_row['extra']),
@@ -1589,7 +1695,8 @@ def _status_distribution(validation_groups: list[dict[str, Any]]) -> list[tuple[
     return [
         ('Passed', counts['passed_tiles'], '#16A34A'),
         ('Failed', counts['failed_tiles'], '#DC2626'),
-        ('Skipped', counts['skipped_tiles'], '#D97706'),
+        ('Partial', counts['partial_tiles'], '#D97706'),
+        ('Skipped', counts['skipped_tiles'], '#94A3B8'),
         ('Missing', counts['missing_tiles'], '#F59E0B'),
         ('Extra', counts['extra_tiles'], '#7C3AED'),
     ]
@@ -1720,6 +1827,255 @@ def _add_fitted_text_block(
         linespacing=line_spacing,
         clip_on=True,
     )
+
+
+def _collect_cut_report_texts(validation_groups: list[dict[str, Any]]) -> list[tuple[str, list[str]]]:
+    reports: list[tuple[str, list[str]]] = []
+    seen: set[Path] = set()
+    for group in validation_groups:
+        report_path = group.get('cut_report_path')
+        if not report_path:
+            continue
+        path = Path(report_path)
+        if path in seen or not path.exists():
+            continue
+        seen.add(path)
+        lines = path.read_text(encoding='utf-8', errors='replace').splitlines()
+        reports.append((str(path), lines))
+    return reports
+
+
+def _paginate_report_text(lines: list[str], *, width_chars: int = 125, max_lines: int = 47) -> list[list[str]]:
+    wrapped = _wrap_lines_to_width(lines or ['-'], width_chars)
+    pages: list[list[str]] = []
+    for start in range(0, len(wrapped), max_lines):
+        pages.append(wrapped[start : start + max_lines])
+    return pages or [['-']]
+
+
+def _tile_sample_candidates(validation_groups: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    candidates: list[dict[str, Any]] = []
+    for group in validation_groups:
+        for result in group.get('results', []) or []:
+            output_path = result.get('output_path')
+            if output_path:
+                candidates.append({'group': group.get('name') or group.get('swath') or '-', 'result': result})
+    return candidates
+
+
+def _select_sample_tile(validation_groups: list[dict[str, Any]]) -> dict[str, Any] | None:
+    candidates = _tile_sample_candidates(validation_groups)
+    if not candidates:
+        return None
+
+    passed = [item for item in candidates if item['result'].get('status') == 'success']
+    pool = passed or candidates
+    seed_text = '|'.join(str(item['result'].get('tile', '')) for item in pool)
+    seed = sum((index + 1) * ord(char) for index, char in enumerate(seed_text)) % (2**32)
+    rng = np.random.default_rng(seed)
+    return pool[int(rng.integers(0, len(pool)))]
+
+
+def _band_priority(name: str) -> tuple[int, str]:
+    lowered = name.lower()
+    if any(token in lowered for token in ('_sa', 'subap', 'sub_ap', 'feature')):
+        bucket = 0
+    elif any(token in lowered for token in ('vv', 'vh', 'hh', 'hv')):
+        bucket = 1
+    elif any(token in lowered for token in ('entropy', 'alpha', 'anisotropy', 'span', 'intensity', 'sigma')):
+        bucket = 2
+    else:
+        bucket = 3
+    return bucket, name
+
+
+def _select_sample_band_names(band_names: list[str], limit: int = 6) -> list[str]:
+    if len(band_names) <= limit:
+        return sorted(band_names, key=_band_priority)
+
+    selected: list[str] = []
+    seen_keys: set[str] = set()
+    for name in sorted(band_names, key=_band_priority):
+        lowered = name.lower()
+        key = next((token for token in ('vv', 'vh', 'hh', 'hv', 'sa', 'entropy', 'alpha', 'sigma', 'intensity') if token in lowered), name)
+        if key in seen_keys and len(selected) < limit - 1:
+            continue
+        selected.append(name)
+        seen_keys.add(key)
+        if len(selected) == limit:
+            break
+
+    if len(selected) < limit:
+        for name in sorted(band_names, key=_band_priority):
+            if name not in selected:
+                selected.append(name)
+            if len(selected) == limit:
+                break
+    return selected
+
+
+def _read_sample_array(dataset: Any, max_pixels: int = 160) -> np.ndarray | None:
+    shape = tuple(int(dim) for dim in getattr(dataset, 'shape', ()) or ())
+    if len(shape) < 2 or any(dim <= 0 for dim in shape[-2:]):
+        return None
+    row_count, col_count = shape[-2:]
+    row_step = max(int(np.ceil(row_count / max_pixels)), 1)
+    col_step = max(int(np.ceil(col_count / max_pixels)), 1)
+    selection = tuple(0 for _ in shape[:-2]) + (slice(0, row_count, row_step), slice(0, col_count, col_step))
+    data = np.asarray(dataset[selection])
+    if np.iscomplexobj(data):
+        data = np.abs(data)
+    data = np.asarray(data, dtype=np.float32)
+    finite = np.isfinite(data)
+    if not finite.any():
+        return None
+    data = np.where(finite, data, np.nan)
+    return data
+
+
+def _collect_raster_sample_panels(validation_groups: list[dict[str, Any]], limit: int = 6) -> tuple[dict[str, Any] | None, list[dict[str, Any]], str | None]:
+    sample = _select_sample_tile(validation_groups)
+    if sample is None:
+        return None, [], 'No tile output paths were available in validation results.'
+
+    tile_path = Path(sample['result'].get('output_path', ''))
+    if not tile_path.exists():
+        return sample, [], f'Sample tile path does not exist: {tile_path}'
+
+    try:
+        if tile_path.suffix.lower() in {'.h5', '.hdf5'}:
+            with h5py.File(tile_path, 'r') as root:
+                bands_group = root.get('bands')
+                if not isinstance(bands_group, h5py.Group):
+                    return sample, [], f'Sample tile has no bands group: {tile_path.name}'
+                return sample, _sample_panels_from_group(bands_group, limit), None
+
+        root = zarr.open(tile_path.as_posix(), mode='r')
+        bands_group = root.get('bands') if hasattr(root, 'get') else None
+        if bands_group is None:
+            return sample, [], f'Sample tile has no bands group: {tile_path.name}'
+        return sample, _sample_panels_from_group(bands_group, limit), None
+    except Exception as exc:
+        return sample, [], f'Could not read sample tile {tile_path.name}: {type(exc).__name__}: {exc}'
+
+
+def _sample_panels_from_group(bands_group: Any, limit: int) -> list[dict[str, Any]]:
+    band_names = _select_sample_band_names([str(name) for name in bands_group.keys()], limit=limit)
+    panels: list[dict[str, Any]] = []
+    for band_name in band_names:
+        try:
+            data = _read_sample_array(bands_group[band_name])
+        except Exception:
+            data = None
+        if data is not None:
+            panels.append({'name': band_name, 'data': data})
+    return panels
+
+
+def _plot_sample_panel(ax, name: str, data: np.ndarray) -> Any:
+    finite = data[np.isfinite(data)]
+    vmin, vmax = np.nanpercentile(finite, [2, 98]) if finite.size else (0.0, 1.0)
+    if not np.isfinite(vmin) or not np.isfinite(vmax) or vmin == vmax:
+        vmin, vmax = float(np.nanmin(data)), float(np.nanmax(data))
+    image = ax.imshow(data, cmap='viridis', vmin=vmin, vmax=vmax, origin='upper')
+    ax.set_title(_trim_text(name, 30), fontsize=8.5, color='#0F172A')
+    ax.set_xticks([])
+    ax.set_yticks([])
+    for spine in ax.spines.values():
+        spine.set_color('#CBD5E1')
+        spine.set_linewidth(0.7)
+    return image
+
+
+def _write_raster_sample_page(pdf, product_name: str, validation_groups: list[dict[str, Any]], total_pages: int) -> None:
+    import matplotlib.pyplot as plt
+
+    sample, panels, error = _collect_raster_sample_panels(validation_groups)
+    fig = plt.figure(figsize=(11.69, 8.27))
+    _add_page_chrome(fig, 'Raster Sample', f'{product_name} | Random tile band preview', 3, total_pages)
+
+    tile_name = sample['result'].get('tile') if sample else '-'
+    group_name = sample.get('group') if sample else '-'
+    tile_path = sample['result'].get('output_path') if sample else '-'
+    _add_metadata_box(
+        fig,
+        [0.05, 0.72, 0.90, 0.13],
+        'Sample Tile',
+        [
+            ('Group', group_name),
+            ('Tile', tile_name),
+            ('Path', _trim_text(str(tile_path), 92)),
+            ('Bands shown', str(len(panels))),
+        ],
+        facecolor='#FFFFFF',
+    )
+
+    if not panels:
+        _add_note_box(
+            fig,
+            [0.12, 0.32, 0.76, 0.22],
+            'Raster preview unavailable',
+            [error or 'No readable 2D band arrays were found in the selected tile.'],
+            facecolor='#FFFFFF',
+        )
+        pdf.savefig(fig)
+        plt.close(fig)
+        return
+
+    grid_left, grid_bottom = 0.055, 0.08
+    cell_w, cell_h = 0.285, 0.275
+    x_gap, y_gap = 0.035, 0.07
+    for index, panel in enumerate(panels[:6]):
+        row = index // 3
+        col = index % 3
+        ax = fig.add_axes([grid_left + col * (cell_w + x_gap), grid_bottom + (1 - row) * (cell_h + y_gap), cell_w, cell_h])
+        image = _plot_sample_panel(ax, panel['name'], panel['data'])
+        cbar = fig.colorbar(image, ax=ax, fraction=0.036, pad=0.015)
+        cbar.ax.tick_params(labelsize=6.8, colors='#475569')
+
+    pdf.savefig(fig)
+    plt.close(fig)
+
+
+def _write_cut_report_text_pages(
+    pdf,
+    cut_reports: list[tuple[str, list[str]]],
+    *,
+    start_page: int,
+    total_pages: int,
+) -> None:
+    import matplotlib.pyplot as plt
+
+    page_number = start_page
+    for report_path, lines in cut_reports:
+        pages = _paginate_report_text(lines)
+        for index, page_lines in enumerate(pages, start=1):
+            fig = plt.figure(figsize=(11.69, 8.27))
+            _add_page_chrome(
+                fig,
+                'WorldSAR Cut Report',
+                f'{Path(report_path).name} | Text report {index}/{len(pages)}',
+                page_number,
+                total_pages,
+            )
+            fig.text(0.035, 0.885, report_path, ha='left', va='top', fontsize=8.0, color='#475569')
+            ax = fig.add_axes([0.035, 0.06, 0.93, 0.80])
+            ax.axis('off')
+            ax.text(
+                0.0,
+                1.0,
+                '\n'.join(page_lines),
+                transform=ax.transAxes,
+                ha='left',
+                va='top',
+                fontsize=7.4,
+                family='monospace',
+                color='#0F172A',
+                linespacing=1.08,
+            )
+            pdf.savefig(fig)
+            plt.close(fig)
+            page_number += 1
 
 
 def _add_metric_card(fig, bounds: list[float], label: str, value: str, accent: str, subtitle: str | None = None) -> None:
@@ -1915,7 +2271,7 @@ def _write_table_panel(
     )
 
 
-def _write_summary_page_compact(pdf, product_name: str, validation_groups: list[dict[str, Any]]) -> None:
+def _write_summary_page_compact(pdf, product_name: str, validation_groups: list[dict[str, Any]], total_pages: int = 2) -> None:
     import matplotlib.pyplot as plt
 
     from datetime import datetime as _datetime, timezone as _timezone
@@ -1934,16 +2290,18 @@ def _write_summary_page_compact(pdf, product_name: str, validation_groups: list[
         'WorldSAR Validation Report',
         f'{product_name} | Executive summary | Generated {_datetime.now(_timezone.utc).strftime("%Y-%m-%d %H:%M:%SZ")}',
         1,
-        2,
+        total_pages,
     )
 
     overview_metrics = [
         ('Validation groups', str(len(summary_rows))),
+        ('Candidate tiles', str(counts['candidate_tiles'])),
         ('Expected tiles', str(counts['expected_tiles'])),
         ('Produced tiles', str(counts['actual_tiles'])),
         ('Passed tiles', str(counts['passed_tiles'])),
         ('Failed tiles', str(counts['failed_tiles'])),
-        ('Skipped tiles', str(counts['skipped_tiles'])),
+        ('Partial edge tiles', str(counts['partial_tiles'])),
+        ('Skipped outside', str(counts['skipped_tiles'])),
         ('Missing tiles', str(counts['missing_tiles'])),
         ('Extra tiles', str(counts['extra_tiles'])),
         ('Pass rate', f'{pass_rate:.1f}%'),
@@ -1965,17 +2323,19 @@ def _write_summary_page_compact(pdf, product_name: str, validation_groups: list[
     group_rows = [
         [
             row['group'],
+            str(row['candidate']),
             str(row['expected']),
             str(row['actual']),
             str(row['passed']),
             str(row['failed']),
+            str(row['partial']),
             str(row['skipped']),
             str(row['missing']),
             str(row['extra']),
             row['overall_status'],
         ]
         for row in summary_rows
-    ] or [['-', '0', '0', '0', '0', '0', '0', '0', 'PASS']]
+    ] or [['-', '0', '0', '0', '0', '0', '0', '0', '0', '0', 'PASS']]
     check_rows = [
         [
             row['check'],
@@ -1999,42 +2359,42 @@ def _write_summary_page_compact(pdf, product_name: str, validation_groups: list[
         content_bounds=[0.02, 0.14, 0.96, 0.64],
         fill_bbox=True,
         col_widths=[0.32, 0.18, 0.32, 0.18],
-        cell_pad=0.10,
+        cell_pad=0.13,
     )
 
     _write_table_panel(
         fig,
-        [0.05, 0.50, 0.90, 0.13],
+        [0.05, 0.48, 0.90, 0.16],
         'Product Metadata',
         'Mission and acquisition attributes used by the validator',
         ['Field', 'Value'],
         metadata_rows,
-        font_size=8.8,
+        font_size=8.0,
         scale_y=1.0,
         cell_loc='left',
-        content_bounds=[0.02, 0.16, 0.96, 0.56],
+        content_bounds=[0.02, 0.10, 0.96, 0.66],
         fill_bbox=True,
         col_widths=[0.22, 0.78],
-        cell_pad=0.10,
+        cell_pad=0.13,
     )
 
     _write_table_panel(
         fig,
-        [0.05, 0.32, 0.90, 0.13],
+        [0.05, 0.29, 0.90, 0.15],
         'Validation Groups',
         'Per-group production outcome and issue counts',
-        ['Group', 'Expected', 'Actual', 'Passed', 'Failed', 'Skipped', 'Missing', 'Extra', 'Status'],
+        ['Group', 'Cand.', 'Expected', 'Actual', 'Passed', 'Failed', 'Partial', 'Skipped', 'Missing', 'Extra', 'Status'],
         group_rows,
-        font_size=8.4,
+        font_size=7.2,
         scale_y=1.0,
-        content_bounds=[0.02, 0.16, 0.96, 0.56],
+        content_bounds=[0.02, 0.12, 0.96, 0.62],
         fill_bbox=True,
-        cell_pad=0.10,
+        cell_pad=0.12,
     )
 
     _write_table_panel(
         fig,
-        [0.05, 0.06, 0.90, 0.21],
+        [0.05, 0.05, 0.90, 0.20],
         'Validation Checks',
         'Aggregate pass and fail counts across the produced tile set',
         ['Check', 'Passed', 'Failed', 'Pass rate'],
@@ -2042,17 +2402,17 @@ def _write_summary_page_compact(pdf, product_name: str, validation_groups: list[
         font_size=8.6,
         scale_y=1.0,
         cell_loc='left',
-        content_bounds=[0.02, 0.12, 0.96, 0.68],
+        content_bounds=[0.02, 0.10, 0.96, 0.70],
         fill_bbox=True,
         col_widths=[0.52, 0.16, 0.14, 0.18],
-        cell_pad=0.10,
+        cell_pad=0.12,
     )
 
     pdf.savefig(fig)
     plt.close(fig)
 
 
-def _write_footprint_page_compact(pdf, product_name: str, validation_groups: list[dict[str, Any]]) -> None:
+def _write_footprint_page_compact(pdf, product_name: str, validation_groups: list[dict[str, Any]], total_pages: int = 2) -> None:
     import matplotlib.pyplot as plt
     from matplotlib.lines import Line2D
     from matplotlib.patches import Patch
@@ -2064,22 +2424,24 @@ def _write_footprint_page_compact(pdf, product_name: str, validation_groups: lis
 
     pre_coords = [item['coords'] for item in layers['pre_tc_outlines']]
     post_coords = [item['coords'] for item in layers['post_tc_outlines']]
-    tile_coords = [item['coords'] for item in layers['expected_polygons']] + [item['coords'] for item in layers['passed_polygons']]
+    tile_coords = [item['coords'] for item in layers['candidate_polygons']]
     combined_coords = pre_coords + post_coords + tile_coords
     pre_focus_coords = pre_coords + post_coords
-    post_focus_coords = post_coords + [item['coords'] for item in layers['expected_polygons']]
+    post_focus_coords = post_coords + [item['coords'] for item in layers['candidate_polygons']]
     post_focus_coords += [item['coords'] for item in layers['passed_polygons']]
     post_focus_coords += [item['coords'] for item in layers['failed_polygons']]
+    post_focus_coords += [item['coords'] for item in layers['partial_polygons']]
+    post_focus_coords += [item['coords'] for item in layers['skipped_polygons']]
 
     fig = plt.figure(figsize=(11.69, 8.27))
-    _add_page_chrome(fig, 'Footprint Analysis', f'{product_name} | Source geometry vs processed raster extent', 2, 2)
+    _add_page_chrome(fig, 'Footprint Analysis', f'{product_name} | Source geometry vs processed raster extent', 2, total_pages)
 
     before_panel_ax, before_ax = _make_panel(
         fig,
         [0.05, 0.52, 0.42, 0.29],
         'Source Product Footprint',
         'Input footprint from source metadata or manual override',
-        [0.08, 0.14, 0.88, 0.70],
+        [0.10, 0.22, 0.84, 0.62],
     )
     _plot_polygon_items(before_ax, layers['pre_tc_outlines'], edgecolor='#1D4ED8', facecolor='#DBEAFE', linewidth=1.6, alpha=0.85)
     _plot_polygon_items(before_ax, layers['post_tc_outlines'], edgecolor='#0F766E', linewidth=1.0, linestyle='--', alpha=0.55)
@@ -2089,10 +2451,13 @@ def _write_footprint_page_compact(pdf, product_name: str, validation_groups: lis
         fig,
         [0.52, 0.52, 0.42, 0.29],
         'Processed Raster Footprint',
-        'Processed raster extent used for tile selection and reporting',
-        [0.08, 0.14, 0.88, 0.70],
+        'Full-data deliverables separated from partial edge candidates',
+        [0.10, 0.22, 0.84, 0.62],
     )
-    _plot_polygon_items(after_ax, layers['expected_polygons'], edgecolor='#CBD5E1', facecolor='#F1F5F9', linewidth=0.8, alpha=0.95)
+    _plot_polygon_items(after_ax, layers['candidate_polygons'], edgecolor='#CBD5E1', facecolor='#F8FAFC', linewidth=0.7, alpha=0.70)
+    _plot_polygon_items(after_ax, layers['expected_polygons'], edgecolor='#64748B', facecolor='none', linewidth=0.75, alpha=0.9)
+    _plot_polygon_items(after_ax, layers['partial_polygons'], edgecolor='#D97706', facecolor='#FEF3C7', linewidth=0.9, alpha=0.65, hatch='..')
+    _plot_polygon_items(after_ax, layers['skipped_polygons'], edgecolor='#EA580C', facecolor='#FFEDD5', linewidth=0.9, alpha=0.72, hatch='//')
     _plot_polygon_items(after_ax, layers['passed_polygons'], edgecolor='#15803D', facecolor='#DCFCE7', linewidth=1.1, alpha=0.9)
     _plot_polygon_items(after_ax, layers['failed_polygons'], edgecolor='#B91C1C', facecolor='#FEE2E2', linewidth=1.2, alpha=0.85)
     _plot_polygon_items(after_ax, layers['post_tc_outlines'], edgecolor='#0F172A', linewidth=1.6)
@@ -2102,11 +2467,14 @@ def _write_footprint_page_compact(pdf, product_name: str, validation_groups: lis
         fig,
         [0.05, 0.19, 0.44, 0.24],
         'Footprint comparison overlay',
-        'Source outline vs processed raster extent with tile footprint overlay',
-        [0.08, 0.14, 0.86, 0.66],
+        'Source and processed extents with accepted and edge tile classes',
+        [0.10, 0.22, 0.82, 0.58],
     )
     _plot_polygon_items(overlay_ax, layers['pre_tc_outlines'], edgecolor='#1D4ED8', linewidth=1.2, linestyle='--', alpha=0.95)
     _plot_polygon_items(overlay_ax, layers['post_tc_outlines'], edgecolor='#0F172A', linewidth=1.6, alpha=0.95)
+    _plot_polygon_items(overlay_ax, layers['candidate_polygons'], edgecolor='#CBD5E1', linewidth=0.6, alpha=0.45)
+    _plot_polygon_items(overlay_ax, layers['partial_polygons'], edgecolor='#D97706', facecolor='#FEF3C7', linewidth=0.8, alpha=0.55, hatch='..')
+    _plot_polygon_items(overlay_ax, layers['skipped_polygons'], edgecolor='#EA580C', facecolor='#FFEDD5', linewidth=0.8, alpha=0.55, hatch='//')
     _plot_polygon_items(overlay_ax, layers['passed_polygons'], edgecolor='#16A34A', facecolor='#DCFCE7', linewidth=0.9, alpha=0.85)
     _set_map_extent(overlay_ax, combined_coords)
 
@@ -2117,7 +2485,8 @@ def _write_footprint_page_compact(pdf, product_name: str, validation_groups: lis
         [
             'Source footprint is read from product metadata or a manual WKT override.',
             'Processed footprint is read from the BEAM-DIMAP raster extent used for tile selection.',
-            'Skipped tile anchors outside raster bounds are excluded from the overlay to avoid overstating coverage.',
+            'Partial edge candidates contain some no-data and are excluded from full-data deliverables.',
+            'Outside-bounds candidates are outlined only; they are not missing deliverables.',
             f"Extent-area ratio: {ratio:.1f}%." if ratio is not None else 'Extent-area ratio unavailable.',
         ],
         facecolor='#FFFFFF',
@@ -2129,7 +2498,10 @@ def _write_footprint_page_compact(pdf, product_name: str, validation_groups: lis
         handles=[
             Line2D([0], [0], color='#1D4ED8', linestyle='--', linewidth=1.4, label='source footprint'),
             Line2D([0], [0], color='#0F172A', linestyle='-', linewidth=1.8, label='processed footprint'),
-            Patch(facecolor='#F1F5F9', edgecolor='#CBD5E1', linewidth=0.8, label='expected tiles'),
+            Patch(facecolor='#F8FAFC', edgecolor='#CBD5E1', linewidth=0.8, label='candidate cells'),
+            Patch(facecolor='none', edgecolor='#64748B', linewidth=0.8, label='expected deliverables'),
+            Patch(facecolor='#FEF3C7', edgecolor='#D97706', linewidth=1.0, hatch='..', label='partial edge tiles'),
+            Patch(facecolor='#FFEDD5', edgecolor='#EA580C', linewidth=1.0, hatch='//', label='skipped tiles'),
             Patch(facecolor='#DCFCE7', edgecolor='#16A34A', linewidth=1.0, label='passed tiles'),
             Patch(facecolor='#FEE2E2', edgecolor='#B91C1C', linewidth=1.0, label='failed tiles'),
         ],
@@ -2168,10 +2540,10 @@ def _write_footprint_page_compact(pdf, product_name: str, validation_groups: lis
     _add_metric_card(
         fig,
         [0.74, 0.03, 0.20, 0.09],
-        'Tiles inside',
+        'Deliverables',
         str(layers['counts']['passed']),
         '#16A34A',
-        f"{layers['counts']['expected']} expected",
+        f"{layers['counts']['expected']} expected, {layers['counts']['partial']} partial",
     )
 
     pdf.savefig(fig)
@@ -2203,9 +2575,16 @@ def _write_dashboard_page_compact(pdf, product_name: str, validation_groups: lis
         'Materialized outputs and residual issue buckets',
         [0.08, 0.18, 0.89, 0.62],
     )
-    status_labels = ['Passed', 'Failed', 'Skipped', 'Missing', 'Extra']
-    status_values = [counts['passed_tiles'], counts['failed_tiles'], counts['skipped_tiles'], counts['missing_tiles'], counts['extra_tiles']]
-    status_colors = ['#16A34A', '#DC2626', '#D97706', '#F59E0B', '#7C3AED']
+    status_labels = ['Passed', 'Failed', 'Partial', 'Skipped', 'Missing', 'Extra']
+    status_values = [
+        counts['passed_tiles'],
+        counts['failed_tiles'],
+        counts['partial_tiles'],
+        counts['skipped_tiles'],
+        counts['missing_tiles'],
+        counts['extra_tiles'],
+    ]
+    status_colors = ['#16A34A', '#DC2626', '#D97706', '#94A3B8', '#F59E0B', '#7C3AED']
     x_pos = np.arange(len(status_labels))
     bars = status_ax.bar(x_pos, status_values, color=status_colors, width=0.62)
     status_ax.set_xticks(x_pos, labels=status_labels)
@@ -2271,17 +2650,18 @@ def _write_dashboard_page_compact(pdf, product_name: str, validation_groups: lis
     )
     _write_table(
         summary_ax,
-        ['Group', 'Expected', 'Actual', 'Passed', 'Status'],
+        ['Group', 'Expected', 'Actual', 'Passed', 'Partial', 'Status'],
         [
             [
                 row['group'],
                 str(row['expected']),
                 str(row['actual']),
                 str(row['passed']),
+                str(row['partial']),
                 row['overall_status'],
             ]
             for row in summary_rows
-        ] or [['-', '0', '0', '0', 'PASS']],
+        ] or [['-', '0', '0', '0', '0', 'PASS']],
         font_size=8.8,
         scale_y=1.45,
     )
@@ -2298,6 +2678,8 @@ def write_h5_validation_report_pdf(report_path: Path | str, product_name: str, v
 
     report_path = Path(report_path)
     report_path.parent.mkdir(parents=True, exist_ok=True)
+    cut_reports = _collect_cut_report_texts(validation_groups)
+    cut_report_page_count = sum(len(_paginate_report_text(lines)) for _, lines in cut_reports)
 
     rc_params = {
         'font.family': 'sans-serif',
@@ -2305,7 +2687,11 @@ def write_h5_validation_report_pdf(report_path: Path | str, product_name: str, v
     }
     with mpl.rc_context(rc=rc_params):
         with PdfPages(report_path) as pdf:
-            _write_summary_page_compact(pdf, product_name, validation_groups)
-            _write_footprint_page_compact(pdf, product_name, validation_groups)
+            total_pages = 3 + cut_report_page_count
+            _write_summary_page_compact(pdf, product_name, validation_groups, total_pages=total_pages)
+            _write_footprint_page_compact(pdf, product_name, validation_groups, total_pages=total_pages)
+            _write_raster_sample_page(pdf, product_name, validation_groups, total_pages=total_pages)
+            if cut_reports:
+                _write_cut_report_text_pages(pdf, cut_reports, start_page=4, total_pages=total_pages)
 
     return report_path

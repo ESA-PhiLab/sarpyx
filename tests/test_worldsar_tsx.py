@@ -1,4 +1,3 @@
-import importlib.util
 import zipfile
 from argparse import Namespace
 from pathlib import Path
@@ -212,7 +211,7 @@ def test_pipeline_tsx_csg_passes_resolved_xml_to_gpt(monkeypatch: pytest.MonkeyP
         captured["output_format"] = output_format
         return FakeOp()
 
-    monkeypatch.setattr(worldsar, "_create_gpt_operator", fake_create_gpt_operator)
+    monkeypatch.setitem(worldsar.pipeline_tsx_csg.__globals__, "_create_gpt_operator", fake_create_gpt_operator)
 
     assert worldsar.pipeline_tsx_csg(product_dir, tmp_path / "out") == FakeOp.prod_path
     assert captured["product_path"] == metadata_xml
@@ -246,7 +245,7 @@ def test_pipeline_tsx_eec_uses_write_without_calibration(monkeypatch: pytest.Mon
         captured["output_format"] = output_format
         return FakeOp()
 
-    monkeypatch.setattr(worldsar, "_create_gpt_operator", fake_create_gpt_operator)
+    monkeypatch.setitem(worldsar.pipeline_tsx_csg.__globals__, "_create_gpt_operator", fake_create_gpt_operator)
 
     assert worldsar.pipeline_tsx_csg(product_dir, tmp_path / "out") == FakeOp.prod_path
     assert captured["product_path"] == metadata_xml
@@ -289,7 +288,7 @@ def test_pipeline_tsx_geocoded_variant_from_product_type_uses_write(
         captured["product_path"] = Path(product_path)
         return FakeOp()
 
-    monkeypatch.setattr(worldsar, "_create_gpt_operator", fake_create_gpt_operator)
+    monkeypatch.setitem(worldsar.pipeline_tsx_csg.__globals__, "_create_gpt_operator", fake_create_gpt_operator)
 
     assert worldsar._terrasar_product_variant(metadata_xml) == "GEC"
     assert worldsar.pipeline_tsx_csg(product_dir, tmp_path / "out") == FakeOp.prod_path
@@ -339,7 +338,7 @@ def test_pipeline_tsx_variant_controls_calibration_complexity(
         captured["product_path"] = Path(product_path)
         return FakeOp()
 
-    monkeypatch.setattr(worldsar, "_create_gpt_operator", fake_create_gpt_operator)
+    monkeypatch.setitem(worldsar.pipeline_tsx_csg.__globals__, "_create_gpt_operator", fake_create_gpt_operator)
 
     assert worldsar.pipeline_tsx_csg(product_dir, tmp_path / "out") == FakeOp.prod_path
     assert captured["product_path"] == metadata_xml
@@ -348,15 +347,8 @@ def test_pipeline_tsx_variant_controls_calibration_complexity(
     assert captured["terrain_correction_kwargs"]["pixel_spacing_in_meter"] == 5.0
 
 
-def test_pyscript_worldsar_parser_uses_shared_none_defaults() -> None:
-    module_path = Path(__file__).resolve().parents[1] / "pyscripts" / "worldsar.py"
-    spec = importlib.util.spec_from_file_location("worldsar_pyscript_under_test", module_path)
-    assert spec is not None
-    assert spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-
-    args = module.create_parser().parse_args(["--input", "/tmp/product"])
+def test_worldsar_parser_uses_shared_defaults() -> None:
+    args = worldsar.create_parser().parse_args(["--input", "/tmp/product"])
 
     assert args.product_path == "/tmp/product"
     assert args.output_dir is None
@@ -364,6 +356,7 @@ def test_pyscript_worldsar_parser_uses_shared_none_defaults() -> None:
     assert args.gpt_path is None
     assert args.grid_path is None
     assert args.db_dir is None
-    assert args.gpt_memory is None
-    assert args.gpt_parallelism is None
+    assert args.gpt_memory == "16G"
+    assert args.gpt_cache_size == "8G"
+    assert args.gpt_parallelism == 6
     assert args.gpt_timeout is None
