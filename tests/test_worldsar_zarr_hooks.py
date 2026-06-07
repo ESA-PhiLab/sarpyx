@@ -103,6 +103,23 @@ def test_cut_single_tc_tile_to_zarr_from_dimap(tmp_path: Path, monkeypatch: pyte
     assert group["rows"][0]["mds1_tx_rx_polar"] == "VH"
 
 
+def test_validate_worldsar_zarr_tile_accepts_declared_250_chunks(tmp_path: Path) -> None:
+    tile_path = tmp_path / "tile-250.zarr"
+    root = zarr.create_group(store=tile_path.as_posix(), zarr_format=3, overwrite=True)
+    root.attrs.update({"pass_direction": "ASC", "polarizations": ["VV"], "chunk_size": [250, 250]})
+    bands = root.create_group("bands")
+    bands.create_array(
+        "Sigma0_VV",
+        data=np.ones((1000, 1000), dtype=np.float32),
+        chunks=(250, 250),
+    )
+
+    result = validate_worldsar_zarr_tile(tile_path)
+
+    assert result["status"] == "success"
+    assert result["band_attrs_ok"] is True
+
+
 def test_zarr_raster_quality_counts_nan_and_all_band_zero_pixels(tmp_path: Path) -> None:
     tile_path = tmp_path / "quality.zarr"
     _write_zarr_tile(
