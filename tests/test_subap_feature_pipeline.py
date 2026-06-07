@@ -294,7 +294,10 @@ def test_epsg_terrain_correction_merges_geocoded_subap_bands(monkeypatch: pytest
     hrefs = [node.get("href") for node in redirect_root.findall(".//*[@href]")]
     assert hrefs
     assert all(not Path(href).is_absolute() for href in hrefs if href)
+    assert all(".." not in Path(href).parts for href in hrefs if href)
     assert all((redirect_product.parent / href).resolve().exists() for href in hrefs if href)
+    assert (redirect_product.with_suffix(".data") / "i_IW1_VV_SA1.img").exists()
+    assert (redirect_product.with_suffix(".data") / "q_IW1_VV_SA1.img").exists()
     assert "i_IW1_VV_SA1" in materialized_band_names(target)
     assert "q_IW1_VV_SA1" in materialized_band_names(target)
     assert (target.with_suffix(".data") / "i_IW1_VV_SA1.img").exists()
