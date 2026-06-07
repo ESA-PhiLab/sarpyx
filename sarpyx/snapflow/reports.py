@@ -102,10 +102,15 @@ def _resolve_expected_tile_bands(intermediate_product) -> list[str]:
 
 
 def _validate_tile_group(cuts_dir, intermediate_product, swath=None, tiling_result=None):
-    tiling_result = hydrate_tiling_result(tiling_result)
+    tiling_result = hydrate_tiling_result(tiling_result) or {}
     cuts_dir = Path(cuts_dir)
     expected_bands = _resolve_expected_tile_bands(intermediate_product)
-    tile_files = sorted(cuts_dir.glob("*.h5"))
+    actual_tiles = sorted(tiling_result.get("actual_tiles") or [])
+    if actual_tiles:
+        tile_files = [cuts_dir / f"{tile}.h5" for tile in actual_tiles]
+        tile_files = [path for path in tile_files if path.exists()]
+    else:
+        tile_files = sorted(cuts_dir.glob("*.h5"))
     if not tile_files:
         raise FileNotFoundError(f"No H5 tiles found in {cuts_dir}{f' for swath {swath}' if swath else ''}.")
     results = [validate_h5_tile(tile_file, expected_bands, swath=swath) for tile_file in tile_files]

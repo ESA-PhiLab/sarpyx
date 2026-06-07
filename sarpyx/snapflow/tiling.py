@@ -140,6 +140,15 @@ def _cut_single_tile(rect, product_path, cuts_dir, product_mode, gpt_memory, gpt
         return {"tile": tile_name, "status": "failed", "reason": reason, "output_path": str(tile_path)}
 
 
+def _actual_tiles_from_run_results(results, cuts_dir, tile_writer):
+    actual_tiles = set()
+    for result in results:
+        output_path = Path(result.get("output_path") or tile_output_path(cuts_dir, result["tile"], tile_writer))
+        if output_path.exists():
+            actual_tiles.add(str(result["tile"]))
+    return sorted(actual_tiles)
+
+
 def _run_tiling(
     product_wkt,
     grid_geoj_path,
@@ -195,7 +204,7 @@ def _run_tiling(
     skipped_tiles = sorted({r["tile"] for r in results if r.get("status") == "skipped"})
     partial_tiles = sorted({r["tile"] for r in results if r.get("status") == "partial"})
     failed_tiles = sorted({r["tile"] for r in results if r.get("status") == "failed"})
-    actual_tiles = sorted({path.stem for path in cuts_dir.glob(tile_glob_pattern(tile_writer))})
+    actual_tiles = _actual_tiles_from_run_results(results, cuts_dir, tile_writer)
     expected_tiles = sorted(set(candidate_tiles) - set(skipped_tiles) - set(partial_tiles))
     missing_tiles = sorted(set(expected_tiles) - set(skipped_tiles) - set(actual_tiles))
     extra_tiles = sorted(set(actual_tiles) - set(expected_tiles))

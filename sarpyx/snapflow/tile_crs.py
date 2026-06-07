@@ -169,8 +169,12 @@ def _complete_iq_pairs(mapping: dict[str, str]) -> bool:
 def _write_subap_redirect_product(source_product: Path, workdir: Path, sa: int, redirect: dict[str, str]) -> Path:
     redirect_product = workdir / f"{source_product.stem}_SA{sa}_source.dim"
     source_data_dir = source_product.with_suffix(".data")
+    redirect_data_dir = redirect_product.with_suffix(".data")
     if redirect_product.exists():
         redirect_product.unlink()
+    if redirect_data_dir.exists():
+        shutil.rmtree(redirect_data_dir)
+    redirect_data_dir.mkdir(parents=True, exist_ok=True)
     tree = ET.parse(source_product)
     root = tree.getroot()
     _rebase_hrefs(root, source_product.parent, redirect_product.parent)
@@ -192,7 +196,8 @@ def _write_subap_redirect_product(source_product: Path, workdir: Path, sa: int, 
             data_access.remove(data_file)
             continue
         if band_name in redirect and href is not None:
-            href.set("href", _relative_href(source_data_dir / f"{redirect[band_name]}.hdr", redirect_product.parent))
+            _copy_band_files(source_data_dir, redirect_data_dir, redirect[band_name], redirect[band_name])
+            href.set("href", _relative_href(redirect_data_dir / f"{redirect[band_name]}.hdr", redirect_product.parent))
     _set_nbands(root)
     indent_xml(root)
     tree.write(redirect_product, encoding="UTF-8", xml_declaration=False)
