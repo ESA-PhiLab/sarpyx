@@ -7,11 +7,13 @@ import types
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
+import pandas as pd
 import pytest
 
 from sarpyx.cli import worldsar as worldsar_module
 from sarpyx.pipelines.single_product import s1_tops
 from sarpyx.snapflow import tiling_runtime as tiling_runtime_mod
+from sarpyx.snapflow.reports import create_merged_tile_database_from_groups, delete_swath_tile_databases
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -713,6 +715,8 @@ def test_resolve_tiling_wkt_prefers_swath_dim_footprint_and_falls_back(tmp_path:
 def test_run_tops_swath_tiling_uses_swath_specific_wkt(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     calls: list[tuple[str, Path]] = []
     db_calls: list[tuple[tuple[str, ...], str, str | None, Path | None]] = []
+    merge_calls: list[tuple[tuple[tuple[str, ...], ...], Path, str]] = []
+    delete_calls: list[tuple[Path, tuple[str, ...], str]] = []
     verify_calls: list[dict[str, object]] = []
     swath_products = {
         "IW1": _touch(tmp_path / "IW1.dim"),
@@ -727,7 +731,7 @@ def test_run_tops_swath_tiling_uses_swath_specific_wkt(tmp_path: Path, monkeypat
 
     def fake_run_tiling(product_wkt, _grid_path, _source_product, intermediate_product, _cuts_outdir, _product_mode, **_kwargs):
         calls.append((product_wkt, Path(intermediate_product)))
-        assert Path(_cuts_outdir) == tmp_path / "cuts"
+        assert Path(_cuts_outdir) == tmp_path / "cuts" / "source.SAFE"
         assert _kwargs["direct_cuts_dir"] is True
         return {
             "name": Path(intermediate_product).stem,
@@ -747,6 +751,12 @@ def test_run_tops_swath_tiling_uses_swath_specific_wkt(tmp_path: Path, monkeypat
     def fake_run_db_indexing(validation_rows, name, swath=None, cuts_outdir=None):
         db_calls.append((tuple(validation_rows), name, swath, Path(cuts_outdir) if cuts_outdir else None))
 
+    def fake_merge_database(validation_groups, output_db_folder, output_name):
+        merge_calls.append((tuple(tuple(group["rows"]) for group in validation_groups), Path(output_db_folder), output_name))
+
+    def fake_delete_swath_databases(output_db_folder, swaths, output_name):
+        delete_calls.append((Path(output_db_folder), tuple(swaths), output_name))
+
     def fake_verify(product_wkt, _grid_path, cuts_outdir, intermediate, swath_wkts=None):
         verify_calls.append(
             {
@@ -758,10 +768,14 @@ def test_run_tops_swath_tiling_uses_swath_specific_wkt(tmp_path: Path, monkeypat
         )
 
     monkeypatch.setattr(tiling_runtime_mod.config, "tiling", True)
+    monkeypatch.setattr(tiling_runtime_mod.config, "db_indexing", True)
+    monkeypatch.setattr(tiling_runtime_mod.config, "DB_DIR", None)
     monkeypatch.setattr(tiling_runtime_mod, "_resolve_tiling_wkt", fake_resolve)
     monkeypatch.setattr(tiling_runtime_mod, "_run_tiling", fake_run_tiling)
     monkeypatch.setattr(tiling_runtime_mod, "validate_worldsar_zarr_tile_group", fake_validate_tile_group)
     monkeypatch.setattr(tiling_runtime_mod, "_run_db_indexing", fake_run_db_indexing)
+    monkeypatch.setattr(tiling_runtime_mod, "create_merged_tile_database_from_groups", fake_merge_database)
+    monkeypatch.setattr(tiling_runtime_mod, "delete_swath_tile_databases", fake_delete_swath_databases)
     monkeypatch.setattr(tiling_runtime_mod, "_verify_tops_tile_coverage", fake_verify)
     monkeypatch.setattr(tiling_runtime_mod, "_write_h5_validation_report_pdf", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(tiling_runtime_mod, "_write_tiling_manifest", lambda *_args, **_kwargs: None)
@@ -781,8 +795,14 @@ def test_run_tops_swath_tiling_uses_swath_specific_wkt(tmp_path: Path, monkeypat
         ("WKT::IW2", swath_products["IW2"]),
     ]
     assert db_calls == [
-        (("row::IW1",), "IW1", "IW1", tmp_path / "cuts"),
-        (("row::IW2",), "IW2", "IW2", tmp_path / "cuts"),
+        (("row::IW1",), "IW1", "IW1", tmp_path / "cuts" / "source.SAFE"),
+        (("row::IW2",), "IW2", "IW2", tmp_path / "cuts" / "source.SAFE"),
+    ]
+    assert merge_calls == [
+        ((("row::IW1",), ("row::IW2",)), tmp_path / "cuts" / "_db", "source.SAFE"),
+    ]
+    assert delete_calls == [
+        (tmp_path / "cuts" / "_db", ("IW1", "IW2"), "source.SAFE"),
     ]
     assert verify_calls == []
 
@@ -790,6 +810,8 @@ def test_run_tops_swath_tiling_uses_swath_specific_wkt(tmp_path: Path, monkeypat
 def test_run_tops_swath_tiling_validates_existing_tiles_when_tiling_disabled(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     validate_calls: list[tuple[Path, Path, str | None, dict | None]] = []
     db_calls: list[tuple[tuple[str, ...], str, str | None, Path | None]] = []
+    merge_calls: list[tuple[tuple[tuple[str, ...], ...], Path, str]] = []
+    delete_calls: list[tuple[Path, tuple[str, ...], str]] = []
     swath_products = {
         "IW1": _touch(tmp_path / "IW1.dim"),
         "IW2": _touch(tmp_path / "IW2.dim"),
@@ -806,10 +828,20 @@ def test_run_tops_swath_tiling_validates_existing_tiles_when_tiling_disabled(tmp
     def fake_run_db_indexing(validation_rows, name, swath=None, cuts_outdir=None):
         db_calls.append((tuple(validation_rows), name, swath, Path(cuts_outdir) if cuts_outdir else None))
 
+    def fake_merge_database(validation_groups, output_db_folder, output_name):
+        merge_calls.append((tuple(tuple(group["rows"]) for group in validation_groups), Path(output_db_folder), output_name))
+
+    def fake_delete_swath_databases(output_db_folder, swaths, output_name):
+        delete_calls.append((Path(output_db_folder), tuple(swaths), output_name))
+
     monkeypatch.setattr(tiling_runtime_mod.config, "tiling", False)
+    monkeypatch.setattr(tiling_runtime_mod.config, "db_indexing", True)
+    monkeypatch.setattr(tiling_runtime_mod.config, "DB_DIR", None)
     monkeypatch.setattr(tiling_runtime_mod, "_resolve_tiling_wkt", lambda full_wkt, *_args, **_kwargs: full_wkt)
     monkeypatch.setattr(tiling_runtime_mod, "_validate_tile_group", fake_validate_tile_group)
     monkeypatch.setattr(tiling_runtime_mod, "_run_db_indexing", fake_run_db_indexing)
+    monkeypatch.setattr(tiling_runtime_mod, "create_merged_tile_database_from_groups", fake_merge_database)
+    monkeypatch.setattr(tiling_runtime_mod, "delete_swath_tile_databases", fake_delete_swath_databases)
     monkeypatch.setattr(tiling_runtime_mod, "_write_h5_validation_report_pdf", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(
         tiling_runtime_mod,
@@ -829,7 +861,7 @@ def test_run_tops_swath_tiling_validates_existing_tiles_when_tiling_disabled(tmp
 
     assert validate_calls == [
             (
-                tmp_path / "cuts",
+                tmp_path / "cuts" / "source.SAFE",
                 swath_products["IW1"],
                 "IW1",
                 {
@@ -840,7 +872,7 @@ def test_run_tops_swath_tiling_validates_existing_tiles_when_tiling_disabled(tmp
                 },
             ),
             (
-                tmp_path / "cuts",
+                tmp_path / "cuts" / "source.SAFE",
                 swath_products["IW2"],
                 "IW2",
                 {
@@ -852,9 +884,102 @@ def test_run_tops_swath_tiling_validates_existing_tiles_when_tiling_disabled(tmp
             ),
         ]
     assert db_calls == [
-        (("row::IW1",), "IW1", "IW1", tmp_path / "cuts"),
-        (("row::IW2",), "IW2", "IW2", tmp_path / "cuts"),
+        (("row::IW1",), "IW1", "IW1", tmp_path / "cuts" / "source.SAFE"),
+        (("row::IW2",), "IW2", "IW2", tmp_path / "cuts" / "source.SAFE"),
     ]
+    assert merge_calls == [
+        ((("row::IW1",), ("row::IW2",)), tmp_path / "cuts" / "_db", "source.SAFE"),
+    ]
+    assert delete_calls == [
+        (tmp_path / "cuts" / "_db", ("IW1", "IW2"), "source.SAFE"),
+    ]
+
+
+def test_finalize_tops_tiling_merges_swath_db_rows_with_product_name(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    merge_calls: list[tuple[tuple[tuple[dict[str, str], ...], ...], Path, str]] = []
+    delete_calls: list[tuple[Path, tuple[str, ...], str]] = []
+    product_name = "S1A_IW_SLC__1SDV_20250217T170559_20250217T170626_057939_072642_A1AB.SAFE"
+    swath_results = [
+        {
+            "name": product_name,
+            "swath": "IW1",
+            "swath_wkt": "WKT::IW1",
+            "validation_group": {"rows": [{"ID": "tile-iw1", "swath": "IW1"}], "results": [{"status": "success"}], "tile_writer": "zarr"},
+        },
+        {
+            "name": product_name,
+            "swath": "IW2",
+            "swath_wkt": "WKT::IW2",
+            "validation_group": {"rows": [{"ID": "tile-iw2", "swath": "IW2"}], "results": [{"status": "success"}], "tile_writer": "zarr"},
+        },
+        {
+            "name": product_name,
+            "swath": "IW3",
+            "swath_wkt": "WKT::IW3",
+            "validation_group": {"rows": [{"ID": "tile-iw3", "swath": "IW3"}], "results": [{"status": "success"}], "tile_writer": "zarr"},
+        },
+    ]
+
+    def fake_merge_database(validation_groups, output_db_folder, output_name):
+        merge_calls.append((tuple(tuple(group["rows"]) for group in validation_groups), Path(output_db_folder), output_name))
+
+    def fake_delete_swath_databases(output_db_folder, swaths, output_name):
+        delete_calls.append((Path(output_db_folder), tuple(swaths), output_name))
+
+    monkeypatch.setattr(tiling_runtime_mod.config, "db_indexing", True)
+    monkeypatch.setattr(tiling_runtime_mod.config, "DB_DIR", None)
+    monkeypatch.setattr(tiling_runtime_mod, "create_merged_tile_database_from_groups", fake_merge_database)
+    monkeypatch.setattr(tiling_runtime_mod, "delete_swath_tile_databases", fake_delete_swath_databases)
+    monkeypatch.setattr(tiling_runtime_mod, "_write_h5_validation_report_pdf", lambda *_args, **_kwargs: None)
+
+    tiling_runtime_mod.finalize_tops_tiling(
+        product_wkt="FULL_WKT",
+        grid_path=tmp_path / "grid.geojson",
+        cuts_outdir=tmp_path / "cuts",
+        swath_products={"IW1": tmp_path / "IW1.dim", "IW2": tmp_path / "IW2.dim", "IW3": tmp_path / "IW3.dim"},
+        swath_results=swath_results,
+        report_outdir=tmp_path / "pdfs",
+        product_name=product_name,
+    )
+
+    assert merge_calls == [
+        (
+            (
+                ({"ID": "tile-iw1", "swath": "IW1"},),
+                ({"ID": "tile-iw2", "swath": "IW2"},),
+                ({"ID": "tile-iw3", "swath": "IW3"},),
+            ),
+            tmp_path / "cuts" / "_db",
+            product_name,
+        )
+    ]
+    assert delete_calls == [
+        (tmp_path / "cuts" / "_db", ("IW1", "IW2", "IW3"), product_name),
+    ]
+
+
+def test_merged_tops_database_uses_product_parquet_and_deletes_swath_files(tmp_path: Path):
+    db_dir = tmp_path / "db"
+    product_name = "S1A_IW_SLC__1SDV_20250217T170559_20250217T170626_057939_072642_A1AB.SAFE"
+    validation_groups = [
+        {"rows": [{"ID": "tile-iw1", "swath": "IW1"}]},
+        {"rows": [{"ID": "tile-iw2", "swath": "IW2"}]},
+        {"rows": [{"ID": "tile-iw3", "swath": "IW3"}]},
+    ]
+    for swath in ("IW1", "IW2", "IW3"):
+        swath_file = db_dir / f"{swath}_{product_name}_core_metadata.parquet"
+        swath_file.parent.mkdir(parents=True, exist_ok=True)
+        pd.DataFrame([{"ID": f"tile-{swath.lower()}", "swath": swath}]).to_parquet(swath_file, index=False)
+
+    create_merged_tile_database_from_groups(validation_groups, db_dir, product_name)
+    delete_swath_tile_databases(db_dir, ("IW1", "IW2", "IW3"), product_name)
+
+    merged_file = db_dir / f"{product_name}.parquet"
+    assert merged_file.exists()
+    assert not (db_dir / f"IW1_{product_name}_core_metadata.parquet").exists()
+    assert not (db_dir / f"IW2_{product_name}_core_metadata.parquet").exists()
+    assert not (db_dir / f"IW3_{product_name}_core_metadata.parquet").exists()
+    assert pd.read_parquet(merged_file)["swath"].tolist() == ["IW1", "IW2", "IW3"]
 
 
 def test_run_tops_swath_tiling_raises_on_validation_failure(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):

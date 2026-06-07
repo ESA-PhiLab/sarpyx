@@ -12,6 +12,8 @@ from sarpyx.snapflow import config
 from sarpyx.snapflow.tile_writers import normalize_tile_writer
 from sarpyx.pipelines.single_product import s1_tops
 from sarpyx.snapflow.preprocessing import (
+    ISOLATED_PREPROCESSING_PREFIX,
+    _is_isolated_preprocessing_path,
     run_biomass_pipeline,
     run_nisar_pipeline,
     run_sentinel_strip_pipeline,
@@ -37,11 +39,19 @@ def _find_existing_intermediates(output_dir: Path, product_mode: str, sentinel_s
         swath = sentinel_swath or s1_tops.DEFAULT_SWATH
         swaths = (swath,) if swath else s1_tops.DEFAULT_SWATHS
         for swath in swaths:
-            dims = sorted((output_dir / swath).glob("*.dim"), key=lambda p: p.stat().st_mtime, reverse=True)
+            swath_dirs = [
+                output_dir / swath,
+                *sorted(output_dir.glob(f"{ISOLATED_PREPROCESSING_PREFIX}*/{swath}")),
+            ]
+            dims = sorted(
+                (dim for swath_dir in swath_dirs for dim in swath_dir.glob("*.dim")),
+                key=lambda p: p.stat().st_mtime,
+                reverse=True,
+            )
             if not dims:
-                raise FileNotFoundError(f"No .dim intermediate found in {output_dir / swath}")
+                raise FileNotFoundError(f"No .dim intermediate found for {swath} under {output_dir}")
             if len(dims) > 1:
-                print(f"[WARN] Multiple .dim files in {output_dir / swath}, using most recent: {dims[0].name}")
+                print(f"[WARN] Multiple .dim files for {swath} under {output_dir}, using most recent: {dims[0].name}")
             result[swath] = dims[0]
             print(f"Reusing intermediate {swath}: {dims[0]}")
         return result
@@ -125,13 +135,17 @@ def _run_preprocessing(
             print(f"Intermediate {swath}: {path}")
             if path is None:
                 raise RuntimeError(f"Intermediate product for {swath} was not returned.")
-            if not Path(path).exists():
+            if not Path(path).exists() and not (
+                not keep_intermediate and _is_isolated_preprocessing_path(path, output_dir)
+            ):
                 raise FileNotFoundError(f"Intermediate product {path} ({swath}) does not exist.")
         return {swath: Path(path) for swath, path in result.items()}
     print(f"Intermediate processed product located at: {result}")
     if result is None:
         raise RuntimeError(f"No intermediate product was returned for mode {product_mode}.")
-    if not Path(result).exists():
+    if not Path(result).exists() and not (
+        not keep_intermediate and _is_isolated_preprocessing_path(result, output_dir)
+    ):
         raise FileNotFoundError(f"Intermediate product {result} does not exist.")
     return Path(result)
 

@@ -7,7 +7,13 @@ from pathlib import Path
 from sarpyx.hooks.worldsar import validate_worldsar_zarr_tile_group
 from sarpyx.snapflow import config
 from sarpyx.snapflow.report_manifest import write_tiling_manifest as _write_tiling_manifest
-from sarpyx.snapflow.reports import _run_db_indexing, _validate_tile_group, _write_h5_validation_report_pdf
+from sarpyx.snapflow.reports import (
+    _run_db_indexing,
+    _validate_tile_group,
+    _write_h5_validation_report_pdf,
+    create_merged_tile_database_from_groups,
+    delete_swath_tile_databases,
+)
 from sarpyx.snapflow.tiling import _resolve_tiling_wkt, _run_tiling, _verify_tops_tile_coverage
 from sarpyx.snapflow.tile_writers import normalize_tile_writer
 
@@ -130,6 +136,11 @@ def finalize_tops_tiling(product_wkt, grid_path, cuts_outdir, swath_products, sw
         report_name = product_name or next((item["name"] for item in swath_results if item.get("name")), validation_groups[0]["name"])
         pdf_path = Path(report_outdir or cuts_outdir) / f"{report_name}_{tile_writer}_validation_report.pdf"
         _write_h5_validation_report_pdf(pdf_path, report_name, validation_groups)
+        if config.db_indexing and any(group.get("rows") for group in validation_groups):
+            db_dir = config.resolve_db_dir(cuts_outdir)
+            create_merged_tile_database_from_groups(validation_groups, db_dir, report_name)
+            swaths = [item.get("swath") for item in swath_results if item.get("swath")]
+            delete_swath_tile_databases(db_dir, swaths, report_name)
     errors = {item["swath"]: item["error"] for item in swath_results if item.get("error")}
     if errors:
         swath_wkts = {item["swath"]: item["swath_wkt"] for item in swath_results if item.get("swath")}

@@ -96,6 +96,120 @@ def test_cleanup_intermediates_runs_after_tiling_and_keeps_final_product(tmp_pat
     assert not old.with_suffix(".data").exists()
 
 
+def test_sentinel_tops_preprocessing_uses_output_local_tmp_and_removes_after_tiling(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    from sarpyx.snapflow import preprocessing
+
+    product = tmp_path / "input.SAFE"
+    product.mkdir()
+    output_dir = tmp_path / "worldsar_output"
+    finalized: list[dict[str, object]] = []
+
+    class FakeOp:
+        def __init__(self, product_path, outdir):
+            self.prod_path = Path(product_path)
+            self.outdir = Path(outdir)
+
+    def fake_create_operator(product_path, output_dir, *_args, **_kwargs):
+        return FakeOp(product_path, output_dir)
+
+    def fake_run_step(ctx, step):
+        assert step.name == "TopsarSplit"
+        assert ctx.output_dir.name == "IW3"
+        assert ctx.output_dir.parent.parent == output_dir
+        assert ctx.output_dir.parent.name.startswith(preprocessing.ISOLATED_PREPROCESSING_PREFIX)
+        split = _dimap(ctx.output_dir / "split.dim")
+        ctx.op.prod_path = split
+        return split
+
+    def fake_run_steps(ctx, _steps):
+        assert not ctx.metadata.get("cleanup_before_subaps")
+        _dimap(ctx.output_dir / "stale.dim")
+        final = _dimap(ctx.output_dir / "tc.dim")
+        ctx.op.prod_path = final
+        ctx.saved["tiling"] = {
+            "tiling_result": {"actual_tiles": ["001U_001R"]},
+            "validation_group": {"results": [{"tile": "001U_001R", "status": "success"}]},
+        }
+        return ctx
+
+    def fake_finalize(_product_wkt, _grid_path, _cuts_outdir, swath_products, *_args, **_kwargs):
+        tmp_root = Path(swath_products["IW3"]).parents[1]
+        assert (tmp_root / "IW3" / "stale.dim").exists()
+        assert (tmp_root / "IW3" / "tc.dim").exists()
+        finalized.append({"called": True})
+
+    monkeypatch.setattr(preprocessing, "run_step", fake_run_step)
+    monkeypatch.setattr(preprocessing, "run_steps", fake_run_steps)
+    monkeypatch.setattr(preprocessing, "finalize_tops_tiling", fake_finalize)
+
+    result = preprocessing.run_sentinel_tops_pipeline(
+        product,
+        output_dir,
+        create_operator=fake_create_operator,
+        product_wkt="POLYGON EMPTY",
+        grid_path=tmp_path / "grid.geojson",
+        cuts_outdir=output_dir / "tiles",
+        sentinel_swath="IW3",
+        keep_intermediate=False,
+    )
+
+    assert finalized == [{"called": True}]
+    assert any(
+        part.startswith(preprocessing.ISOLATED_PREPROCESSING_PREFIX)
+        for part in result["IW3"].parts
+    )
+    assert not result["IW3"].exists()
+    assert not list(output_dir.glob(f"{preprocessing.ISOLATED_PREPROCESSING_PREFIX}*"))
+    assert not (output_dir / "IW3").exists()
+
+
+def test_worldsar_runner_accepts_deleted_isolated_intermediate(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    from sarpyx.snapflow import preprocessing, runner
+
+    output_dir = tmp_path / "worldsar_output"
+    tmp_root = preprocessing._create_isolated_preprocessing_root(output_dir)
+    deleted_intermediate = tmp_root / "IW3" / "tc.dim"
+    preprocessing._cleanup_isolated_preprocessing_root(deleted_intermediate, output_dir)
+
+    def fake_pipeline(*_args, **_kwargs):
+        return {"IW3": deleted_intermediate}
+
+    monkeypatch.setitem(runner.ROUTER, "S1TOPS", fake_pipeline)
+
+    result = runner._run_preprocessing(
+        tmp_path / "input.SAFE",
+        output_dir,
+        "S1TOPS",
+        orbit_type="Sentinel Precise (Auto Download)",
+        orbit_continue_on_fail=False,
+        gpt_memory="1G",
+        gpt_parallelism=1,
+        gpt_timeout=None,
+        gpt_cache_size="1G",
+        keep_intermediate=False,
+    )
+
+    assert result == {"IW3": deleted_intermediate}
+
+
+def test_find_existing_intermediates_searches_isolated_tmp_roots(tmp_path: Path) -> None:
+    from sarpyx.snapflow import preprocessing, runner
+
+    output_dir = tmp_path / "worldsar_output"
+    tmp_root = preprocessing._create_isolated_preprocessing_root(output_dir)
+    intermediate = _dimap(tmp_root / "IW3" / "tc.dim")
+
+    result = runner._find_existing_intermediates(output_dir, "S1TOPS", sentinel_swath="IW3")
+
+    assert result == {"IW3": intermediate}
+
+
 def test_final_cleanup_removes_nested_tiling_intermediates(tmp_path: Path) -> None:
     from sarpyx.snapflow.runner import _cleanup_final_intermediates
 

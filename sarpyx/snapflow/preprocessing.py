@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import shutil
+import tempfile
 from pathlib import Path
 
 from sarpyx.pipelines.single_product import biomass, nisar, s1_strip, s1_tops, tsx
@@ -16,6 +17,8 @@ from sarpyx.snapflow.product import (
 )
 from sarpyx.snapflow.runtime import PipelineStep, make_context, run_step, run_steps
 from sarpyx.snapflow.tiling_runtime import finalize_tops_tiling
+
+ISOLATED_PREPROCESSING_PREFIX = "worldsar_tmp_"
 
 
 def _gpt_kwargs(gpt_memory=None, gpt_parallelism=None, gpt_timeout=None, gpt_cache_size=None) -> dict:
@@ -53,6 +56,37 @@ def _tiling_metadata(
 
 def _dimap_data_dir(dim_path: Path) -> Path:
     return dim_path.with_suffix(".data")
+
+
+def _create_isolated_preprocessing_root(output_dir) -> Path:
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    return Path(tempfile.mkdtemp(prefix=ISOLATED_PREPROCESSING_PREFIX, dir=output_dir))
+
+
+def _isolated_preprocessing_root_for_path(path, output_dir) -> Path | None:
+    output_root = Path(output_dir).resolve()
+    resolved = Path(path).resolve()
+    try:
+        relative = resolved.relative_to(output_root)
+    except ValueError:
+        return None
+    if not relative.parts:
+        return None
+    root = output_root / relative.parts[0]
+    if root.name.startswith(ISOLATED_PREPROCESSING_PREFIX):
+        return root
+    return None
+
+
+def _is_isolated_preprocessing_path(path, output_dir) -> bool:
+    return _isolated_preprocessing_root_for_path(path, output_dir) is not None
+
+
+def _cleanup_isolated_preprocessing_root(path, output_dir) -> None:
+    root = _isolated_preprocessing_root_for_path(path, output_dir)
+    if root is not None and root.is_dir():
+        shutil.rmtree(root)
 
 
 def _cleanup_intermediates(output_dir, keep_product, keep_intermediate: bool = True) -> None:
@@ -103,8 +137,8 @@ def run_sentinel_tops_pipeline(
     keep_intermediate=True,
     **_,
 ):
+    output_dir = Path(output_dir)
     gpt_kwargs = _gpt_kwargs(gpt_memory, gpt_parallelism, gpt_timeout, gpt_cache_size)
-    base_ctx = make_context(product_path, output_dir, "BEAM-DIMAP", gpt_kwargs, create_operator=create_operator)
     recipe = s1_tops.steps(
         orbit_type=orbit_type,
         orbit_continue_on_fail=orbit_continue_on_fail,
@@ -117,11 +151,23 @@ def run_sentinel_tops_pipeline(
     swaths = (swath,) if swath else s1_tops.DEFAULT_SWATHS
     results = {}
     tiling_results = []
-    tiling_metadata = _tiling_metadata(product_wkt, grid_path, cuts_outdir, product_mode, gpt_kwargs, _.get("tile_writer", "zarr"), _.get("pre_write_hook"), _.get("report_outdir"), _.get("product_name"))
+    tiling_metadata = _tiling_metadata(
+        product_wkt,
+        grid_path,
+        cuts_outdir,
+        product_mode,
+        gpt_kwargs,
+        _.get("tile_writer", "zarr"),
+        _.get("pre_write_hook"),
+        _.get("report_outdir"),
+        _.get("product_name"),
+    )
+    processing_root = _create_isolated_preprocessing_root(output_dir) if tiling_metadata else output_dir
+    base_ctx = make_context(product_path, processing_root, "BEAM-DIMAP", gpt_kwargs, create_operator=create_operator)
     for swath in swaths:
         sw_ctx = make_context(
             Path(base_ctx.op.prod_path),
-            Path(output_dir) / swath,
+            processing_root / swath,
             "BEAM-DIMAP",
             gpt_kwargs,
             create_operator=create_operator,
@@ -130,7 +176,6 @@ def run_sentinel_tops_pipeline(
         sw_ctx.metadata.update(tiling_metadata)
         sw_ctx.metadata["swath"] = swath
         sw_ctx.metadata["keep_intermediate"] = keep_intermediate
-        sw_ctx.metadata["cleanup_before_subaps"] = True
         if merge_func is not None:
             sw_ctx.metadata["merge_iq_into_pdec"] = merge_func
         split_result = run_step(
@@ -147,10 +192,23 @@ def run_sentinel_tops_pipeline(
         if "tiling" in sw_ctx.saved:
             tiling_results.append(sw_ctx.saved["tiling"])
         results[swath] = sw_ctx.op.prod_path
-        if _tiling_created_final_tiles(sw_ctx.saved.get("tiling")):
-            _cleanup_intermediates(sw_ctx.output_dir, sw_ctx.op.prod_path, keep_intermediate)
     if tiling_metadata and tiling_results:
-        finalize_tops_tiling(product_wkt, grid_path, cuts_outdir, results, tiling_results, report_outdir=_.get("report_outdir"), product_name=_.get("product_name"))
+        finalize_tops_tiling(
+            product_wkt,
+            grid_path,
+            cuts_outdir,
+            results,
+            tiling_results,
+            report_outdir=_.get("report_outdir"),
+            product_name=_.get("product_name"),
+        )
+    if (
+        tiling_metadata
+        and not keep_intermediate
+        and tiling_results
+        and all(_tiling_created_final_tiles(result) for result in tiling_results)
+    ):
+        _cleanup_isolated_preprocessing_root(processing_root, output_dir)
     return results
 
 

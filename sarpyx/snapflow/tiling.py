@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from sarpyx.hooks.worldsar import product_output_name
 from sarpyx.utils.geos import grid_cell_utm_bbox
 from sarpyx.utils.wkt_utils import sentinel1_swath_wkt_extractor_safe
 from sarpyx.utils.worldsar_h5 import normalize_expected_tile_geometries
@@ -271,6 +272,7 @@ def _run_tops_swath_tiling(product_wkt, grid_geoj_path, product_path, intermedia
     from sarpyx.snapflow.runtime import PipelineContext, PipelineStep, run_step
     from sarpyx.snapflow.tiling_runtime import finalize_tops_tiling
 
+    product_name = product_output_name(product_path)
     metadata = {
         "product_wkt": product_wkt,
         "grid_path": grid_geoj_path,
@@ -279,6 +281,7 @@ def _run_tops_swath_tiling(product_wkt, grid_geoj_path, product_path, intermedia
         "gpt_kwargs": dict(gpt_kwargs),
         "tile_writer": tile_writer,
         "pre_write_hook": pre_write_hook,
+        "product_name": product_name,
     }
     swath_results = []
     for swath, swath_product in intermediate.items():
@@ -292,7 +295,7 @@ def _run_tops_swath_tiling(product_wkt, grid_geoj_path, product_path, intermedia
             dict(gpt_kwargs),
         )
         swath_results.append(run_step(ctx, PipelineStep("WorldSARTiling", {"intermediate_ref": "tc", "collect": True}, "tiling")))
-    return finalize_tops_tiling(product_wkt, grid_geoj_path, cuts_outdir, intermediate, swath_results)
+    return finalize_tops_tiling(product_wkt, grid_geoj_path, cuts_outdir, intermediate, swath_results, product_name=product_name)
 
 
 def _verify_tops_tile_coverage(product_wkt, grid_geoj_path, cuts_outdir, swath_products, swath_wkts=None, tile_writer="zarr"):
