@@ -10,6 +10,7 @@ from sarpyx.snapflow.h5_quality import summarize_zarr_raster_quality
 from sarpyx.snapflow.tile_writers import TilePayload, tile_glob_pattern
 DEFAULT_WORLDSAR_ZARR_CHUNKS = (128, 128)
 POLARIZATION_RE = re.compile(r"(?<![A-Z0-9])(HH|HV|VH|VV)(?![A-Z0-9])", re.IGNORECASE)
+_IW_PREFIX_RE = re.compile(r"(?i)(^|_)IW\d+_")
 def product_output_name(product_path: str | Path) -> str:
     return Path(product_path).name.rstrip("/")
 @dataclass(frozen=True)
@@ -22,6 +23,9 @@ class WorldSARZarrTileHook:
 
     def __call__(self, payload: TilePayload) -> TilePayload:
         arrays, feature_band_attrs, feature_names = add_subap_features(payload.arrays, payload.band_attrs, self.subap_features)
+        if payload.output_path.suffix.lower() == ".zarr":
+            arrays, feature_band_attrs = _strip_iw_prefixes(arrays, feature_band_attrs)
+            feature_names = [_strip_iw_prefix(name) for name in feature_names]
         attrs = _minimal_training_attrs(
             payload,
             product_name=self.product_name or product_output_name(self.product_path),
@@ -206,6 +210,24 @@ def _minimal_band_attrs(band_name: str, attrs: dict[str, Any], polarizations: li
         }.items()
         if not _blank(value)
     }
+
+
+def _strip_iw_prefixes(
+    arrays: dict[str, Any],
+    band_attrs: dict[str, dict[str, Any]],
+) -> tuple[dict[str, Any], dict[str, dict[str, Any]]]:
+    normalized_arrays: dict[str, Any] = {}
+    normalized_band_attrs: dict[str, dict[str, Any]] = {}
+    for name, data in arrays.items():
+        normalized_name = _strip_iw_prefix(name)
+        normalized_arrays[normalized_name] = data
+        if name in band_attrs:
+            normalized_band_attrs[normalized_name] = band_attrs[name]
+    return normalized_arrays, normalized_band_attrs
+
+
+def _strip_iw_prefix(name: str) -> str:
+    return _IW_PREFIX_RE.sub(r"\1", name)
 
 def _polarizations(attrs: dict[str, Any], band_names: list[str]) -> list[str]:
     values: list[str] = []

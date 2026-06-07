@@ -80,11 +80,11 @@ def test_cut_single_tc_tile_to_zarr_from_dimap(tmp_path: Path, monkeypatch: pyte
     band_names = sorted(root["bands"].keys())
     assert "i_IW1_VH_SA1" not in band_names
     assert "q_IW1_VH_SA1" not in band_names
-    assert "subap_coherence_IW1_VH_gamma12" in band_names
-    assert "subap_coherence_IW1_VH_gamma_mean" in band_names
+    assert "subap_coherence_VH_gamma12" in band_names
+    assert "subap_coherence_VH_gamma_mean" in band_names
     assert "subap_covariance_IW1_VH_C1" not in band_names
-    assert "subap_covariance_IW1_VH_C11" in band_names
-    assert "subap_phase_variance_IW1_VH" in band_names
+    assert "subap_covariance_VH_C11" in band_names
+    assert "subap_phase_variance_VH" in band_names
     assert root.attrs["subap_feature_bands"]
     zarr.create_group(store=(cuts_dir / "other-swath-tile.zarr").as_posix(), zarr_format=3, overwrite=True)
     group = validate_worldsar_zarr_tile_group(
