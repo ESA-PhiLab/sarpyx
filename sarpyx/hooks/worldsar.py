@@ -112,16 +112,22 @@ def validate_worldsar_zarr_tile(tile_path: str | Path, swath: str | None = None,
     import zarr
     tile_path = Path(tile_path)
     issues: list[str] = []
+    expected_chunks = DEFAULT_WORLDSAR_ZARR_CHUNKS
     try:
         root = zarr.open(tile_path.as_posix(), mode="r")
         root_attrs = dict(root.attrs)
+        expected_chunks = _expected_zarr_chunks(root_attrs)
         bands_group = root.get("bands") if hasattr(root, "get") else None
         actual_bands = sorted(str(name) for name in bands_group.keys()) if bands_group is not None else []
         array_paths = [f"bands/{band_name}" for band_name in actual_bands]
         chunks_ok = True
         for band_name in actual_bands:
             array = bands_group[band_name]
-            chunks_ok = chunks_ok and _array_chunks_ok(tuple(array.shape), tuple(array.chunks))
+            chunks_ok = chunks_ok and _array_chunks_ok(
+                tuple(array.shape),
+                tuple(array.chunks),
+                expected_chunks,
+            )
         bands_ok = bool(actual_bands)
         metadata_ok = _metadata_ok(root_attrs)
         band_attrs_ok = chunks_ok
@@ -154,7 +160,13 @@ def validate_worldsar_zarr_tile(tile_path: str | Path, swath: str | None = None,
         "empty_metadata_fields": [],
         "missing_core_metadata_fields": [] if metadata_ok else ["pass_direction", "polarizations"],
         "empty_core_metadata_fields": [],
-        "band_attr_issues": {} if band_attrs_ok else {"chunks": {"invalid_shape": False, "missing_attrs": ["128x128 chunks"], "empty_attrs": []}},
+        "band_attr_issues": {} if band_attrs_ok else {
+            "chunks": {
+                "invalid_shape": False,
+                "missing_attrs": [f"{expected_chunks[0]}x{expected_chunks[1]} chunks"],
+                "empty_attrs": [],
+            }
+        },
         "shape_summary": [],
         "array_paths": array_paths,
         "metadata_paths": [],
@@ -281,10 +293,29 @@ def _pixel_spacing(transform: tuple[float, float, float, float, float, float] | 
     except (TypeError, ValueError):
         return None
 
-def _array_chunks_ok(shape: tuple[int, ...], chunks: tuple[int, ...]) -> bool:
+def _expected_zarr_chunks(attrs: dict[str, Any]) -> tuple[int, int]:
+    raw = attrs.get("chunk_size") or DEFAULT_WORLDSAR_ZARR_CHUNKS
+    try:
+        rows, cols = raw
+        rows = int(rows)
+        cols = int(cols)
+    except (TypeError, ValueError):
+        return DEFAULT_WORLDSAR_ZARR_CHUNKS
+    if rows <= 0 or cols <= 0:
+        return DEFAULT_WORLDSAR_ZARR_CHUNKS
+    return rows, cols
+
+def _array_chunks_ok(
+    shape: tuple[int, ...],
+    chunks: tuple[int, ...],
+    expected_chunks: tuple[int, int],
+) -> bool:
     if len(shape) < 2 or len(chunks) < 2:
         return False
-    return chunks[-2:] == (min(DEFAULT_WORLDSAR_ZARR_CHUNKS[0], shape[-2]), min(DEFAULT_WORLDSAR_ZARR_CHUNKS[1], shape[-1]))
+    return chunks[-2:] == (
+        min(expected_chunks[0], shape[-2]),
+        min(expected_chunks[1], shape[-1]),
+    )
 
 def _metadata_ok(attrs: dict[str, Any]) -> bool:
     base_ok = attrs.get("pass_direction") in {"ASC", "DESC"} and bool(attrs.get("polarizations"))
