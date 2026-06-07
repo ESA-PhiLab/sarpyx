@@ -175,6 +175,29 @@ def create_tile_database_from_rows(rows, output_db_folder, output_name):
     return db
 
 
+def create_merged_tile_database_from_groups(validation_groups, output_db_folder, output_name):
+    rows = []
+    for group in validation_groups:
+        rows.extend(group.get("rows") or [])
+    if not rows:
+        raise ValueError("No validated tile metadata rows available.")
+    db = pd.DataFrame(rows)
+    out = Path(output_db_folder)
+    out.mkdir(parents=True, exist_ok=True)
+    output_file = out / f"{output_name}.parquet"
+    db.to_parquet(output_file, index=False)
+    print(f"Merged core metadata saved to {output_file}")
+    return db
+
+
+def delete_swath_tile_databases(output_db_folder, swaths, output_name):
+    out = Path(output_db_folder)
+    for swath in swaths:
+        if not swath:
+            continue
+        (out / f"{swath}_{output_name}_core_metadata.parquet").unlink(missing_ok=True)
+
+
 def create_tile_database(input_folder, output_db_folder):
     tile_path = Path(input_folder)
     h5_tiles = list(tile_path.rglob("*.h5"))
