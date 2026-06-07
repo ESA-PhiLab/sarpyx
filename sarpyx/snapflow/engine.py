@@ -3576,6 +3576,86 @@ class GPT:
             delete_graph=not keep_graph,
         )
 
+    def stamps_lat_lon_bands(
+        self,
+        output_name: Optional[str] = None,
+        latitude_band_name: str = "orthorectifiedLat",
+        longitude_band_name: str = "orthorectifiedLon",
+        keep_graph: bool = False,
+    ) -> Optional[str]:
+        """Materialize orthorectified lat/lon bands required by StaMPS Export."""
+        source_path = Path(self.prod_path)
+        if not source_path.exists():
+            raise FileNotFoundError(f"Interferogram product path does not exist: {source_path}")
+
+        output_path = self._build_output_path(suffix="STAMPSREADY", output_name=output_name)
+        graph_path = self.outdir / f"{output_path.stem}_graph.xml"
+        graph_xml = f"""<graph id="stamps-lat-lon-bands">
+  <version>1.0</version>
+  <node id="Read">
+    <operator>Read</operator>
+    <sources/>
+    <parameters class="com.bc.ceres.binding.dom.XppDomElement">
+      <file>{escape(source_path.as_posix())}</file>
+    </parameters>
+  </node>
+  <node id="BandMaths">
+    <operator>BandMaths</operator>
+    <sources>
+      <sourceProduct refid="Read"/>
+    </sources>
+    <parameters class="com.bc.ceres.binding.dom.XppDomElement">
+      <targetBands>
+        <targetBand>
+          <name>{escape(latitude_band_name)}</name>
+          <type>float32</type>
+          <expression>latitude</expression>
+          <description>orthorectified latitude</description>
+          <unit>deg</unit>
+          <noDataValue>0.0</noDataValue>
+        </targetBand>
+        <targetBand>
+          <name>{escape(longitude_band_name)}</name>
+          <type>float32</type>
+          <expression>longitude</expression>
+          <description>orthorectified longitude</description>
+          <unit>deg</unit>
+          <noDataValue>0.0</noDataValue>
+        </targetBand>
+      </targetBands>
+      <variables/>
+    </parameters>
+  </node>
+  <node id="BandMerge">
+    <operator>BandMerge</operator>
+    <sources>
+      <sourceProduct refid="Read"/>
+      <sourceProduct.1 refid="BandMaths"/>
+    </sources>
+    <parameters class="com.bc.ceres.binding.dom.XppDomElement">
+      <sourceBands/>
+      <geographicError>1.0E-5</geographicError>
+    </parameters>
+  </node>
+  <node id="Write">
+    <operator>Write</operator>
+    <sources>
+      <sourceProduct refid="BandMerge"/>
+    </sources>
+    <parameters class="com.bc.ceres.binding.dom.XppDomElement">
+      <file>{escape(output_path.as_posix())}</file>
+      <formatName>{self.format}</formatName>
+    </parameters>
+  </node>
+</graph>
+"""
+        graph_path.write_text(graph_xml, encoding="utf-8")
+        return self.run_graph(
+            graph_path=graph_path,
+            output_path=output_path,
+            delete_graph=not keep_graph,
+        )
+
     def create_stack(
         self,
         master_bands: Optional[List[str]] = None,
@@ -6361,13 +6441,13 @@ class GPT:
         """Creates DEM band."""
         self._reset_command()
         cmd_params = [
-            f'-PdemName={dem_name}',
+            f'-PdemName="{dem_name}"',
             f'-PdemResamplingMethod={dem_resampling_method}',
-            f'-PelevationBandName={elevation_band_name}',
+            f'-PelevationBandName="{elevation_band_name}"',
             f'-PexternalDEMNoDataValue={external_dem_no_data_value}'
         ]
         if external_dem_file:
-            cmd_params.append(f'-PexternalDEMFile={external_dem_file}')
+            cmd_params.append(f'-PexternalDEMFile={Path(external_dem_file).as_posix()}')
         self.current_cmd.append(f'AddElevation {" ".join(cmd_params)}')
         return self._call(suffix='ELEV', output_name=output_name)
 

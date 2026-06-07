@@ -9,7 +9,7 @@ from pathlib import Path
 from types import ModuleType
 from typing import Any, Callable
 
-from sarpyx.pipelines.double_product import s1_insar
+from sarpyx.pipelines.double_product import s1_insar, snap2stamps
 from sarpyx.pipelines.single_product import biomass, csg, nisar, s1_strip, s1_tops, tsx
 from sarpyx.hooks.subap_features import SubapFeatureConfig
 from sarpyx.hooks.worldsar import make_worldsar_zarr_tile_hook, product_output_name
@@ -43,6 +43,7 @@ BUILTIN_PIPELINES: dict[str, PipelineSpec] = {
     "biomass": PipelineSpec("biomass", "single", biomass, run_biomass_pipeline, "BM"),
     "nisar": PipelineSpec("nisar", "single", nisar, run_nisar_pipeline, "NISAR"),
     "s1_insar": PipelineSpec("s1_insar", "double", s1_insar, product_mode="S1INSAR"),
+    "2stamps": PipelineSpec("2stamps", "double", snap2stamps, product_mode="S1STAMPS"),
 }
 
 

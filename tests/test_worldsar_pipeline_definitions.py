@@ -1,7 +1,7 @@
 import inspect
 from pathlib import Path
 
-from sarpyx.pipelines.double_product import s1_insar
+from sarpyx.pipelines.double_product import s1_insar, snap2stamps
 from sarpyx.pipelines.single_product import biomass, csg, nisar, s1_strip, s1_tops, tsx
 from sarpyx.snapflow.insar import run_insar_pipeline
 
@@ -61,7 +61,7 @@ def test_simple_pipeline_definition_shapes():
 
 
 def test_pipeline_modules_are_recipe_only():
-    for module in (biomass, csg, s1_insar, nisar, s1_strip, s1_tops, tsx):
+    for module in (biomass, csg, s1_insar, snap2stamps, nisar, s1_strip, s1_tops, tsx):
         public_functions = [
             name
             for name, value in inspect.getmembers(module, inspect.isfunction)
@@ -131,6 +131,9 @@ def test_declared_insar_runtime_executes_recipe(monkeypatch, tmp_path: Path):
 
         def interferogram(self, **kwargs):
             return self._out("ifg")
+
+        def add_elevation(self, **kwargs):
+            return self._out("elev")
 
         def topo_phase_removal(self, **kwargs):
             return self._out("topo")
