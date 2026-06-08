@@ -13,7 +13,9 @@
 <a href="LICENSE">
   <img alt="License" src="https://img.shields.io/badge/License-Apache--2.0-374151?style=for-the-badge" />
 </a>
-
+<a href="https://github.com/ESA-PhiLab/sarpyx/releases/tag/v1.0.0">
+  <img alt="Version" src="https://img.shields.io/badge/Version-1.0.0-2563eb?style=for-the-badge" />
+</a>
 </div>
 
 ##
@@ -24,6 +26,7 @@
 
 - SNAP GPT integration with configurable graphs and operator chaining.
 - WorldSAR preprocessing, tiling, validation, and H5-to-Zarr conversion.
+- Generic pipeline CLI with built-in recipes for Sentinel-1, TSX, CSG, Biomass, NISAR, and Sentinel-1 InSAR.
 - Sub-aperture decomposition for Sentinel-style BEAM-DIMAP products.
 - Geocoded outputs ready for GIS and downstream ML.
 - Utilities compatible with `rasterio`, `geopandas`, `pyproj`, `h5py`, `zarr`, and `dask`.
@@ -31,12 +34,20 @@
 ## Commands
 
 ```bash
-sarpyx --help          # WorldSAR preprocessing, tiling, validation, H5-to-Zarr
-sarpyx-pipeline --help # YAML-configured SNAP pipelines
-sarpyx-decode --help   # Sentinel-1 Level-0 decode wrapper
-sarpyx-unzip --help    # Extract Sentinel-1 ZIP products
-sarpyx-upload --help   # Upload artifacts to Hugging Face Hub
+sarpyx --help           # Top-level command dispatcher
+sarpyx worldsar --help  # WorldSAR preprocessing, tiling, validation, H5-to-Zarr
+sarpyx pipeline --help  # Explicit built-in or external pipeline recipes
+sarpyx-worldsar --help  # Compatibility WorldSAR entry point
+sarpyx-pipeline --help  # Compatibility pipeline entry point
 ```
+
+## Documentation
+
+- [Documentation site](https://esa-philab.github.io/sarpyx/)
+- [Installation guide](docs/user_guide/installation.md)
+- [CLI usage examples](docs/user_guide/cli_examples.md)
+- [User guide](docs/user_guide/README.md)
+- [API reference](docs/api/README.md)
 
 ## Install
 
@@ -55,7 +66,8 @@ Verify the installation:
 ```bash
 gpt -h
 sarpyx --help
-sarpyx-pipeline --help
+sarpyx worldsar --help
+sarpyx pipeline --help
 ```
 
 For development and tests:
@@ -90,10 +102,6 @@ The pip package is suitable for Python-side usage, but SNAP GPT workflows requir
 
 </details>
 
-## Documentation
-
-See the documentation site at https://esa-philab.github.io/sarpyx/ for installation, quick start, architecture, usage guides, testing, and contributing information.
-
 ## Container usage
 
 For container workflows, use the Docker Compose CLI plugin:
@@ -111,15 +119,15 @@ mkdir -p ./grid
 docker compose up
 ```
 
-You can also pass `--grid-path` to the `worldsar` CLI command.
+You can also pass `--grid-path` to `sarpyx worldsar`.
 
-## Community and citation
+## Project Links
 
 - [Contributing guide](CONTRIBUTING.md)
 - [Security policy](SECURITY.md)
 - [Citation metadata](CITATION.cff)
-- [Reviewer smoke test](REVIEWER_SMOKE_TEST.md)
 - [JOSS paper draft](paper.md)
+- [License](LICENSE)
 
 ##
 

@@ -4059,7 +4059,7 @@ wheels = [
 
 [[package]]
 name = "sarpyx"
-version = "0.1.10"
+version = "1.0.0"
 source = { editable = "." }
 dependencies = [
     { name = "dask" },
@@ -4086,6 +4086,7 @@ dependencies = [
     { name = "pyarrow" },
     { name = "pykeops" },
     { name = "python-dateutil" },
+    { name = "pyyaml" },
     { name = "rasterio" },
     { name = "scikit-image" },
     { name = "scikit-learn" },
@@ -4137,6 +4138,7 @@ requires-dist = [
     { name = "pyarrow", specifier = ">=23.0.0" },
     { name = "pykeops", specifier = ">=2.3" },
     { name = "python-dateutil", specifier = ">=2.9.0" },
+    { name = "pyyaml", specifier = ">=6.0.2" },
     { name = "rasterio", specifier = "==1.4.3" },
     { name = "scikit-image", specifier = ">=0.25.2" },
     { name = "scikit-learn", specifier = ">=1.7.2" },

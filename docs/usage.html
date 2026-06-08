@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="description" content="Usage Guides" />
-  <title>Usage Guides | SARPyX Documentation</title>
+  <meta name="description" content="CLI Usage Examples" />
+  <title>CLI Usage Examples | SARPyX Documentation</title>
   <link rel="stylesheet" href="assets/styles.css" />
   <script defer src="assets/scripts.js"></script>
 </head>
@@ -33,45 +33,86 @@
 
     <main id="main-content" class="content" role="main">
       <nav class="breadcrumbs" aria-label="Breadcrumb">
-        <ol><li><a href="index.html">Home</a></li><li>Usage Guides</li></ol>
+        <ol><li><a href="index.html">Home</a></li><li>CLI Usage Examples</li></ol>
       </nav>
-      <article class="doc-page" data-searchable data-search="Usage Guides">
+      <article class="doc-page" data-searchable data-search="CLI Usage Examples">
         
 <section>
-  <h1 id="usage-guides">Usage Guides</h1>
+  <h1 id="cli-usage-examples">CLI Usage Examples</h1>
 
-  <h2 id="common-workflows">Common Workflows</h2>
-  <h3 id="workflow-l0-to-focused">L0 to Focused Product</h3>
-  <pre><code class="language-bash">sarpyx unzip --input /data/raw.zip --output /data/extracted
-sarpyx decode --input /data/extracted/S1A_*.SAFE --output /data/decoded
-sarpyx focus --input /data/decoded/product.zarr --output /data/focused
+  <h2 id="installed-commands">Installed Commands</h2>
+  <pre><code class="language-bash">sarpyx --help
+sarpyx worldsar --help
+sarpyx pipeline --help
+sarpyx pipeline --list
+sarpyx-worldsar --help
+sarpyx-pipeline --help
 </code></pre>
 
-  <h3 id="workflow-worldsar-tiling">Mission Pipeline and Tiling</h3>
-  <pre><code class="language-bash">sarpyx worldsar   --input /data/product.SAFE   --output /data/preprocessed   --cuts-outdir /data/tiles   --grid-path /data/grid/grid_10km.geojson
+  <h2 id="worldsar-single-product">WorldSAR Single Product</h2>
+  <pre><code class="language-bash">sarpyx worldsar \
+  --input /data/product.SAFE \
+  --output /data/out/worldsar \
+  --cuts-outdir /data/out/worldsar/tiles \
+  --grid-path /data/grid/grid_10km.geojson \
+  --gpt-path /opt/esa-snap/bin/gpt \
+  --snap-userdir /data/out/.snap \
+  --gpt-memory 16G \
+  --gpt-cache-size 8G \
+  --gpt-parallelism 6
 </code></pre>
 
-  <h2 id="advanced-usage">Advanced Usage</h2>
-  <ul>
-    <li>Use <code>--gpt-memory</code>, <code>--gpt-parallelism</code>, and <code>--gpt-timeout</code> to tune SNAP runtime.</li>
-    <li>Use <code>ProductHandler</code> and <code>ZarrManager</code> APIs for selective slicing and export.</li>
-    <li>Use mission-specific worldsar pipelines for Sentinel, TerraSAR-X, COSMO, BIOMASS, and NISAR paths (inferred from implementation).</li>
-  </ul>
+  <h2 id="worldsar-sentinel-options">WorldSAR Sentinel-1 Options</h2>
+  <pre><code class="language-bash">sarpyx worldsar \
+  --input /data/S1A_IW_SLC_1SDV_PRODUCT.SAFE \
+  --output /data/out/iw2 \
+  --grid-path /data/grid/grid_10km.geojson \
+  --gpt-path "$GPT_PATH" \
+  --sentinel-swath IW2 \
+  --sentinel-first-burst 3 \
+  --sentinel-last-burst 8 \
+  --sentinel-subap-decompositions 2 4
+</code></pre>
 
-  <h2 id="integration-patterns">Integration Patterns</h2>
-  <ul>
-    <li>Pipeline orchestration through shell scripts or workflow managers invoking CLI commands.</li>
-    <li>Python-first integration importing processing modules directly for notebook or service use.</li>
-    <li>Containerized integration via <code>docker compose</code> for reproducible environments.</li>
-  </ul>
+  <h2 id="h5-to-zarr">Convert H5 Tiles to Zarr</h2>
+  <pre><code class="language-bash">sarpyx worldsar \
+  --input /data/tiles/tile_001.h5 \
+  --output /data/tiles/tile_001.zarr \
+  --h5-to-zarr-only \
+  --overwrite-zarr \
+  --zarr-chunk-size 256 256
+</code></pre>
 
-  <h2 id="performance-considerations">Performance Considerations</h2>
-  <ul>
-    <li>Enable slicing for large products to reduce memory pressure during focusing.</li>
-    <li>Prefer Zarr chunking defaults unless profiling shows bottlenecks.</li>
-    <li>Adjust GPT heap and worker count based on available host memory.</li>
-    <li>Use parallel tile extraction settings conservatively to avoid I/O saturation.</li>
-  </ul>
+  <h2 id="explicit-single-product-pipeline">Explicit Single-Product Pipeline</h2>
+  <pre><code class="language-bash">sarpyx pipeline s1_tops \
+  --input /data/product.SAFE \
+  --output /data/out/s1_tops \
+  --grid-path /data/grid/grid_10km.geojson \
+  --cuts-outdir /data/out/s1_tops/tiles \
+  --gpt-path "$GPT_PATH" \
+  --param sentinel_swath=IW2 \
+  --param selected_polarisations='["VV"]'
+</code></pre>
+
+  <h2 id="sentinel-insar-pipeline">Sentinel-1 InSAR Pipeline</h2>
+  <pre><code class="language-bash">sarpyx pipeline s1_insar \
+  --master /data/master.SAFE \
+  --slave /data/slave.SAFE \
+  --output /data/out/insar \
+  --grid-path /data/grid/grid_10km.geojson \
+  --cuts-outdir /data/out/insar/tiles \
+  --gpt-path "$GPT_PATH" \
+  --param subswath=IW2 \
+  --param selected_polarisations='["VV"]' \
+  --param use_esd=false
+</code></pre>
+
+  <p><code>--param NAME=VALUE</code> parses JSON values when possible. For example, <code>false</code> becomes a boolean, <code>2</code> becomes an integer, and <code>["VV"]</code> becomes a list.</p>
+
+  <h2 id="output-checks">Output Checks</h2>
+  <pre><code class="language-bash">rg --files /data/out/worldsar /data/out/worldsar/tiles \
+  | rg '\.(dim|h5|zarr|tif|tiff|npz|npy|pkl|txt|pdf|json)$'
+</code></pre>
 </section>
 
       </article>

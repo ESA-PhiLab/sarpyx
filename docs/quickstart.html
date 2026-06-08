@@ -39,39 +39,37 @@
         
 <section>
   <h1 id="quick-start">Quick Start</h1>
-  <h2 id="minimal-example">Minimal Example</h2>
-  <pre><code class="language-bash"># 1) decode
-sarpyx decode --input /data/product.dat --output /data/decoded
-
-# 2) focus
-sarpyx focus --input /data/decoded/product.zarr --output /data/focused
+  <h2 id="cli-discovery">CLI Discovery</h2>
+  <pre><code class="language-bash">sarpyx --help
+sarpyx worldsar --help
+sarpyx pipeline --help
+sarpyx pipeline --list
 </code></pre>
 
-  <h2 id="cli-usage">CLI Usage</h2>
-  <pre><code class="language-bash">sarpyx --help
-sarpyx decode --help
-sarpyx focus --help
-sarpyx shipdet --help
-sarpyx worldsar --help
+  <h2 id="minimal-worldsar-run">Minimal WorldSAR Run</h2>
+  <pre><code class="language-bash">sarpyx worldsar \
+  --input /data/product.SAFE \
+  --output /data/out/worldsar \
+  --grid-path /data/grid/grid_10km.geojson \
+  --gpt-path /opt/esa-snap/bin/gpt
+</code></pre>
+
+  <h2 id="minimal-pipeline-run">Minimal Pipeline Run</h2>
+  <pre><code class="language-bash">sarpyx pipeline s1_tops \
+  --input /data/product.SAFE \
+  --output /data/out/s1_tops \
+  --grid-path /data/grid/grid_10km.geojson \
+  --gpt-path /opt/esa-snap/bin/gpt
 </code></pre>
 
   <h2 id="common-workflow">Common Workflow</h2>
   <ol>
+    <li>Install the Python package and verify <code>sarpyx --help</code>.</li>
+    <li>Install or locate SNAP GPT and pass it with <code>--gpt-path</code>.</li>
     <li>Prepare input products and grid files.</li>
-    <li>Run decode/focus (or mission pipeline via worldsar).</li>
-    <li>Export products and inspect metrics.</li>
-    <li>Optionally upload outputs using <code>sarpyx upload</code>.</li>
+    <li>Run <code>sarpyx worldsar</code> for product inference or <code>sarpyx pipeline</code> for explicit recipe dispatch.</li>
+    <li>Inspect the declared output and tile directories.</li>
   </ol>
-
-  <h2 id="python-api-minimal">Python API Minimal</h2>
-  <pre><code class="language-python">from sarpyx.utils.zarr_utils import ZarrManager
-
-manager = ZarrManager("/data/focused/product.zarr")
-arr = manager.load()
-print(arr.shape)
-</code></pre>
-
-  <p>Behavior and imports above are inferred from implementation and current public exports.</p>
 </section>
 
       </article>

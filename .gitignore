@@ -25,7 +25,6 @@ snap12/
 !tests/fixtures/grid_smoke.geojson
 !tests/fixtures/sentinel_smoke_grid.geojson
 
-
 AGENTS.md
 hparams.yaml
 metrics_*.json
@@ -84,6 +83,7 @@ coverage.xml
 
 # Sentinel-1 data files
 S1*
+!sarpyx/pipelines/single_product/s1_*.py
 *.pkl
 *.s3cfg
 *.s5cfg
@@ -95,12 +95,28 @@ S1*
 *.pth
 *.ckpt
 **/.ipynb_checkpoints/
-worldsar.sh
+/worldsar.sh
 support/esa-snap_sentinel_linux-13.0.0.sh
 sarpyx.sif
 TOUP/snap_userdir.tar.gz
 .singularity/
 
 *.agents/
+!.agents/
+.agents/*
+!.agents/skills/
+.agents/skills/*
+!.agents/skills/sarpyx-processing/
+!.agents/skills/sarpyx-processing/**
+.agents/skills/sarpyx-processing/scripts/__pycache__/
+!.agents/iterations/
+.agents/iterations/*
+!.agents/iterations/5/
+!.agents/iterations/5/**
+!.agents/iterations/6/
+!.agents/iterations/6/**
+!.agents/memory/
+.agents/memory/*
+!.agents/memory/mistakes.md
 *.codex/
 id_ed25519
