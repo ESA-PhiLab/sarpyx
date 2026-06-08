@@ -1,5 +1,7 @@
 # Generic Pipeline CLI
 
+For end-to-end command examples, start with [CLI Usage Examples](cli_examples.md).
+
 `sarpyx pipeline` runs an explicit pipeline recipe. Use it when product-type
 inference is not desired, or when a recipe needs named inputs such as a
 master/slave pair.

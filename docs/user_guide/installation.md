@@ -1,225 +1,169 @@
 # Installation Guide
 
-This guide will help you install sarpyx and its dependencies on your system.
+This page is the detailed setup reference for local development, SNAP-backed processing, and containers.
 
-## Prerequisites
+## Requirements
 
-Before installing sarpyx, ensure you have:
+- Python `>=3.11, <4`.
+- `uv` for the repository-managed environment.
+- Git for editable installs.
+- ESA SNAP and Java for SNAP GPT workflows.
+- Docker Engine and the Docker Compose CLI plugin for container workflows.
+- A grid `*.geojson` file for WorldSAR tiling and container startup.
 
-- Python 3.11 or higher
-- pip package manager
-- Git (for development installation)
+## Local Development with uv
 
-### System-specific Requirements
-
-#### For SNAP Integration (Optional)
-- ESA SNAP Desktop (version 9.0 or higher)
-- Java Runtime Environment (JRE) 11 or higher
-- At least 8GB of RAM recommended
-
-#### For Scientific Computing
-- NumPy compatible system
-- GDAL libraries (for geospatial data handling)
-
-## Installation Methods
-
-### Containerized execution (optional)
-
-If you run `sarpyx` via the provided container, the entrypoint uses this order:
-
-1. `GRID_PATH` (or `grid_path`) if it points to an existing in-container `*.geojson`
-2. first `*.geojson` found under `/workspace/grid`
-
-If neither is available, the container exits with an error. Startup-time grid
-generation has been removed.
-
-To use your own mounted grid, place any GeoJSON in `./grid`:
-
-```bash
-mkdir -p ./grid
-# Example: cp my_region.geojson ./grid/
-docker compose up
-```
-
-If you use `docker-compose`, mount the grid directory and optionally set `GRID_PATH` to choose a specific file:
-
-```bash
-- ./grid:/workspace/grid:ro
-- GRID_PATH=/workspace/grid/my_region.geojson
-```
-
-### 1. Using pip (Recommended for Users)
-
-Once sarpyx is published to PyPI, you can install it using:
-
-```bash
-pip install sarpyx
-```
-
-For specific versions:
-```bash
-pip install sarpyx==<version>
-```
-
-### 2. Using uv (Recommended for Development and CI)
-
-`uv` is the canonical tool for local installation, testing, and builds:
-
-1. **Install uv:**
-   ```bash
-   pip install uv
-   ```
-
-2. **Clone the repository:**
-   ```bash
-   git clone https://github.com/ESA-PhiLab/sarpyx.git
-   cd sarpyx
-   ```
-
-3. **Install dependencies:**
-   ```bash
-   uv sync
-   ```
-
-4. **For development and optional Copernicus tooling:**
-   ```bash
-   uv sync --group dev
-   uv sync --group dev --extra copernicus
-   ```
-
-### 3. Development Installation
-
-For contributors or advanced users who want the latest features:
+Use this path for development, tests, and Python workflows that do not need a system SNAP install.
 
 ```bash
 git clone https://github.com/ESA-PhiLab/sarpyx.git
 cd sarpyx
 uv sync --group dev
+uv run sarpyx --help
+uv run sarpyx pipeline --list
+uv run pytest -q
 ```
 
-This creates an editable installation that reflects code changes immediately.
+Install the optional Copernicus tooling when you need phidown-backed data acquisition:
 
-## Verifying Installation
-
-To verify your installation works correctly:
-
-```python
-import sarpyx
-print(f"sarpyx version: {sarpyx.__version__}")
-
-# Test basic functionality
-from sarpyx.utils import show_image
-from sarpyx.sla import SubLookAnalysis
-print("Installation successful!")
+```bash
+uv sync --group dev --extra copernicus
 ```
 
-For the managed `uv` environment:
+## Editable pip Install
+
+Use this path when integrating `sarpyx` into an existing virtual environment.
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -e .
+sarpyx --help
+```
+
+For tests:
+
+```bash
+python -m pip install pytest
+pytest -q
+```
+
+## Conda with ESA SNAP
+
+Use this path for SNAP GPT processing outside Docker. The conda environment isolates Python, native geospatial dependencies, Java, and SNAP.
+
+```bash
+conda create -n sarpyx-snap -c sirbastiano/label/dev -c conda-forge \
+  python=3.12 pip snap13=13.0.0
+
+conda activate sarpyx-snap
+python -m pip install -e .
+```
+
+Set SNAP runtime variables after activating the environment:
+
+```bash
+source scripts/setvars.sh
+"$GPT_PATH" --help
+sarpyx worldsar --help
+```
+
+`scripts/setvars.sh` exports `SNAP_HOME`, `GPT_PATH`, `gpt_path`, `SNAP_USERDIR`, `snap_userdir`, and updates `PATH`.
+
+## Manual SNAP Install
+
+If SNAP is installed outside conda, set `GPT_PATH` explicitly. It must point to SNAP's `gpt` executable.
+
+```bash
+export GPT_PATH=/Applications/esa-snap/bin/gpt
+export SNAP_USERDIR="$PWD/.snap"
+sarpyx worldsar --help
+"$GPT_PATH" --help
+```
+
+Typical `gpt` paths:
+
+| Setup | Path |
+| --- | --- |
+| Conda SNAP package | `$CONDA_PREFIX/opt/esa-snap/bin/gpt` |
+| Docker image | `/workspace/snap13/bin/gpt` or `/usr/local/bin/gpt` |
+| macOS manual install | `/Applications/snap/bin/gpt` or `/Applications/esa-snap/bin/gpt` |
+| Linux manual install | `$HOME/ESA-STEP/snap/bin/gpt`, `/opt/snap/bin/gpt`, or `/usr/local/snap/bin/gpt` |
+| Windows manual install | `C:\Program Files\snap\bin\gpt.exe` |
+
+WorldSAR resolves GPT in this order:
+
+1. Explicit `--gpt-path`.
+2. `gpt_path` or `GPT_PATH`.
+3. `$CONDA_PREFIX/opt/esa-snap/bin/gpt`.
+4. `$SNAP_HOME/bin/gpt`.
+5. A SNAP-looking `gpt` on `PATH`.
+
+## Docker
+
+The Docker image includes SNAP and links `gpt` into the runtime path. Container startup requires an existing grid file; it does not generate one automatically.
+
+```bash
+docker compose version
+mkdir -p grid
+# place a grid GeoJSON in ./grid, for example ./grid/my_region.geojson
+make check-grid
+make recreate
+```
+
+To select a specific mounted grid:
+
+```bash
+GRID_PATH="$PWD/grid/my_region.geojson" make recreate
+```
+
+For direct Docker use, pass an in-container grid path:
+
+```bash
+docker run --rm \
+  -v "$PWD/grid:/workspace/grid:ro" \
+  -e GRID_PATH=/workspace/grid/my_region.geojson \
+  sirbastiano94/sarpyx:latest \
+  sarpyx worldsar --help
+```
+
+## Verify the Installation
+
+Run the checks that match your setup:
 
 ```bash
 uv run python -c "import sarpyx; print(sarpyx.__version__)"
 uv run sarpyx --help
+uv run sarpyx worldsar --help
+uv run sarpyx pipeline --list
 ```
 
-## Optional Dependencies
+For SNAP-backed runs:
 
-### SNAP Integration
-For full SNAP functionality, install ESA SNAP:
-
-1. Download from [ESA SNAP website](https://step.esa.int/main/download/snap-download/)
-2. Follow platform-specific installation instructions
-3. Ensure `gpt` command is available in your PATH
-
-### Jupyter Support
-For interactive notebooks:
 ```bash
-pip install jupyter matplotlib ipywidgets
-```
-
-### Visualization
-For enhanced plotting capabilities:
-```bash
-pip install matplotlib seaborn plotly
+test -x "$GPT_PATH"
+"$GPT_PATH" --help
+sarpyx worldsar \
+  --input /data/product.SAFE \
+  --output /tmp/sarpyx-check \
+  --grid-path /data/grid.geojson \
+  --gpt-path "$GPT_PATH" \
+  --help
 ```
 
 ## Troubleshooting
 
-### Common Issues
-
-#### GDAL Installation Problems
-On some systems, GDAL can be challenging to install:
-
-**Ubuntu/Debian:**
-```bash
-sudo apt-get install gdal-bin libgdal-dev
-pip install gdal
-```
-
-**macOS (using Homebrew):**
-```bash
-brew install gdal
-pip install gdal
-```
-
-**Windows:**
-Consider using conda:
-```bash
-conda install -c conda-forge gdal
-```
-
-#### Memory Issues
-For large SAR datasets, ensure sufficient memory:
-- Minimum 8GB RAM
-- 16GB+ recommended for large-scale processing
-
-#### Permission Errors
-On Unix systems, you might need:
-```bash
-pip install --user sarpyx
-```
-
-### Getting Help
-
-If you encounter installation issues:
-
-1. Check [GitHub Issues](https://github.com/ESA-PhiLab/sarpyx/issues)
-2. Create a new issue with:
-   - Your operating system
-   - Python version
-   - Complete error message
-   - Installation method used
+- `CONDA_PREFIX is not set`: activate the conda environment before `source scripts/setvars.sh`.
+- `SNAP GPT not found or not executable`: install SNAP, export `GPT_PATH`, or pass `--gpt-path`.
+- Wrong system `gpt` is found: pass an absolute `--gpt-path`; WorldSAR rejects common non-SNAP executables.
+- SNAP cache or permission errors: set `SNAP_USERDIR` to a writable run-local directory and pass `--snap-userdir`.
+- Grid errors in Docker: set `GRID_PATH` or mount a `*.geojson` file under `/workspace/grid`.
+- Large product failures: lower `--gpt-parallelism`, increase `--gpt-memory` or `--gpt-timeout`, and keep `SNAP_USERDIR` on fast local storage.
 
 ## Next Steps
 
-After successful installation:
-
-1. Read [Getting Started](getting_started.md)
-2. Explore [Basic Concepts](basic_concepts.md)
-3. Try the [Examples](../examples/README.md)
-
-## Environment Setup
-
-### Virtual Environment (Recommended)
-
-Create an isolated environment for sarpyx:
-
-```bash
-# Using venv
-python -m venv sarpyx-env
-source sarpyx-env/bin/activate  # Linux/macOS
-# or
-sarpyx-env\Scripts\activate     # Windows
-
-# Using conda
-conda create -n sarpyx python=3.9
-conda activate sarpyx
-```
-
-### Development Environment
-
-For development work, use the managed toolchain:
-
-```bash
-uv sync --group dev
-uv run pytest -q
-uv build
-```
+- [CLI usage examples](cli_examples.md)
+- [Generic Pipeline CLI](pipeline_cli.md)
+- [SNAP Integration](snap_integration.md)
+- [Troubleshooting](troubleshooting.md)
