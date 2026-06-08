@@ -143,6 +143,8 @@ def _cut_single_tile(rect, product_path, cuts_dir, product_mode, gpt_memory, gpt
 def _actual_tiles_from_run_results(results, cuts_dir, tile_writer):
     actual_tiles = set()
     for result in results:
+        if result.get("status") in {"skipped", "partial"}:
+            continue
         output_path = Path(result.get("output_path") or tile_output_path(cuts_dir, result["tile"], tile_writer))
         if output_path.exists():
             actual_tiles.add(str(result["tile"]))
