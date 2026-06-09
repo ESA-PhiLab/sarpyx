@@ -203,26 +203,49 @@ def _default_output_dir(product_path: Path) -> Path:
 
 
 def _cleanup_final_intermediates(intermediate, output_dir: Path) -> None:
-    if isinstance(intermediate, dict):
-        for path in intermediate.values():
-            _delete_dimap_product(path, output_dir)
-    else:
-        _delete_dimap_product(intermediate, output_dir)
-    _delete_generated_tiling_intermediates(output_dir)
+    products = list(intermediate.values()) if isinstance(intermediate, dict) else [intermediate]
+    for path in products:
+        _delete_dimap_product(path, output_dir)
+    _delete_generated_tiling_intermediates(output_dir, products)
     _delete_nonfinal_report_artifacts(output_dir)
 
 
-def _delete_generated_tiling_intermediates(output_dir: Path) -> None:
+def _cleanup_generated_roots(products, output_dir: Path) -> list[Path]:
     output_root = Path(output_dir).resolve()
-    for folder_name in ("worldsar_tc_epsg", "worldsar_reprojected", "worldsar_subap_tc"):
-        for folder in output_root.rglob(folder_name):
-            resolved = folder.resolve()
-            if output_root == resolved or output_root not in resolved.parents:
-                continue
-            if folder.is_dir():
-                import shutil
+    roots: set[Path] = set()
+    for product in products:
+        try:
+            resolved = Path(product).resolve()
+        except TypeError:
+            continue
+        try:
+            relative = resolved.relative_to(output_root)
+        except ValueError:
+            continue
+        if not relative.parts:
+            continue
+        candidate = output_root / relative.parts[0]
+        if candidate.name.startswith(ISOLATED_PREPROCESSING_PREFIX):
+            roots.add(candidate)
+        else:
+            roots.add(resolved.parent)
+    return sorted(roots)
 
-                shutil.rmtree(folder)
+
+def _delete_generated_tiling_intermediates(output_dir: Path, products) -> None:
+    output_root = Path(output_dir).resolve()
+    for root in _cleanup_generated_roots(products, output_dir):
+        if output_root != root and output_root not in root.parents:
+            continue
+        for folder_name in ("worldsar_tc_epsg", "worldsar_reprojected", "worldsar_subap_tc"):
+            for folder in root.rglob(folder_name):
+                resolved = folder.resolve()
+                if root == resolved or root not in resolved.parents:
+                    continue
+                if folder.is_dir():
+                    import shutil
+
+                    shutil.rmtree(folder)
 
 
 def _delete_nonfinal_report_artifacts(output_dir: Path) -> None:
