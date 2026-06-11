@@ -51,25 +51,32 @@ pytest -q
 
 ## Conda with ESA SNAP
 
-Use this path for SNAP GPT processing outside Docker. The conda environment isolates Python, native geospatial dependencies, Java, and SNAP.
+The recommended installation uses **conda first** to provide ESA SNAP and `gpt`, then installs `sarpyx` with pip from this checkout. This keeps SNAP/native dependencies managed by conda while keeping the Python package editable.
 
 ```bash
-conda create -n sarpyx-snap -c sirbastiano/label/dev -c conda-forge \
+conda create -n sarpyx -c sirbastiano/label/dev -c conda-forge \
   python=3.12 pip snap13=13.0.0
 
-conda activate sarpyx-snap
+conda activate sarpyx
 python -m pip install -e .
 ```
 
-Set SNAP runtime variables after activating the environment:
+Verify the installation:
 
 ```bash
-source scripts/setvars.sh
-"$GPT_PATH" --help
+gpt -h
+sarpyx --help
 sarpyx worldsar --help
+sarpyx pipeline --help
 ```
 
-`scripts/setvars.sh` exports `SNAP_HOME`, `GPT_PATH`, `gpt_path`, `SNAP_USERDIR`, `snap_userdir`, and updates `PATH`.
+For development and tests:
+
+```bash
+python -m pip install -e ".[copernicus]"
+python -m pip install pytest
+pytest -q
+```
 
 ## Manual SNAP Install
 

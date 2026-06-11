@@ -879,9 +879,30 @@ def make_installation_page(project: dict[str, Any]) -> str:
   <ul>
     <li>Python <code>{h(project.get('requires-python', '>=3.11'))}</code>.</li>
     <li><code>uv</code> (recommended by repository tooling).</li>
+    <li>Conda when using the recommended ESA SNAP environment.</li>
     <li>SNAP + Java when running SNAP-dependent commands (<code>shipdet</code>, <code>worldsar</code>).</li>
     <li>Docker Engine if using container workflows.</li>
   </ul>
+
+  <h2 id=\"conda-with-esa-snap\">Conda with ESA SNAP</h2>
+  <p>The recommended installation uses <strong>conda first</strong> to provide ESA SNAP and <code>gpt</code>, then installs <code>sarpyx</code> with pip from this checkout. This keeps SNAP/native dependencies managed by conda while keeping the Python package editable.</p>
+  <pre><code class=\"language-bash\">conda create -n sarpyx -c sirbastiano/label/dev -c conda-forge \\
+  python=3.12 pip snap13=13.0.0
+
+conda activate sarpyx
+python -m pip install -e .
+
+gpt -h
+sarpyx --help
+sarpyx worldsar --help
+sarpyx pipeline --help
+</code></pre>
+
+  <p>For development and tests:</p>
+  <pre><code class=\"language-bash\">python -m pip install -e \".[copernicus]\"
+python -m pip install pytest
+pytest -q
+</code></pre>
 
   <h2 id=\"setup-steps\">Setup Steps</h2>
   <pre><code class=\"language-bash\"># repository root
