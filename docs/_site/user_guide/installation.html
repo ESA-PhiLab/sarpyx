@@ -55,152 +55,156 @@
   </nav>
   <main class="main">
     <h1 id="installation-guide">Installation Guide</h1>
-<p>This guide will help you install sarpyx and its dependencies on your system.</p>
-<h2 id="prerequisites">Prerequisites</h2>
-<p>Before installing sarpyx, ensure you have:</p>
+<p>This page is the detailed setup reference for local development, SNAP-backed processing, and containers.</p>
+<h2 id="requirements">Requirements</h2>
 <ul>
-<li>Python 3.11 or higher</li>
-<li>pip package manager</li>
-<li>Git (for development installation)</li>
+<li>Python <code>&gt;=3.11, &lt;4</code>.</li>
+<li><code>uv</code> for the repository-managed environment.</li>
+<li>Git for editable installs.</li>
+<li>ESA SNAP and Java for SNAP GPT workflows.</li>
+<li>Docker Engine and the Docker Compose CLI plugin for container workflows.</li>
+<li>A grid <code>*.geojson</code> file for WorldSAR tiling and container startup.</li>
 </ul>
-<h3 id="system-specific-requirements">System-specific Requirements</h3>
-<h4 id="for-snap-integration-optional">For SNAP Integration (Optional)</h4>
-<ul>
-<li>ESA SNAP Desktop (version 9.0 or higher)</li>
-<li>Java Runtime Environment (JRE) 11 or higher</li>
-<li>At least 8GB of RAM recommended</li>
-</ul>
-<h4 id="for-scientific-computing">For Scientific Computing</h4>
-<ul>
-<li>NumPy compatible system</li>
-<li>GDAL libraries (for geospatial data handling)</li>
-</ul>
-<h2 id="installation-methods">Installation Methods</h2>
-<h3 id="1-using-pip-recommended-for-users">1. Using pip (Recommended for Users)</h3>
-<p>Once sarpyx is published to PyPI, you can install it using:</p>
-<pre class="codehilite"><code>pip<span class="w"> </span>install<span class="w"> </span>sarpyx
-</code></pre>
-<p>For specific versions:</p>
-<pre class="codehilite"><code>pip<span class="w"> </span>install<span class="w"> </span><span class="nv">sarpyx</span><span class="o">==</span>&lt;version&gt;
-</code></pre>
-<h3 id="2-using-uv-recommended-for-development-and-ci">2. Using uv (Recommended for Development and CI)</h3>
-<p><code>uv</code> is the canonical tool for local installation, testing, and builds:</p>
-<ol>
-<li>
-<p><strong>Install uv:</strong>
-   <code>bash
-   pip install uv</code></p>
-</li>
-<li>
-<p><strong>Clone the repository:</strong>
-   <code>bash
-   git clone https://github.com/ESA-PhiLab/sarpyx.git
-   cd sarpyx</code></p>
-</li>
-<li>
-<p><strong>Install dependencies:</strong>
-   <code>bash
-   uv sync</code></p>
-</li>
-<li>
-<p><strong>For development and optional Copernicus tooling:</strong>
-   <code>bash
-   uv sync --group dev
-   uv sync --group dev --extra copernicus</code></p>
-</li>
-</ol>
-<h3 id="3-development-installation">3. Development Installation</h3>
-<p>For contributors or advanced users who want the latest features:</p>
+<h2 id="local-development-with-uv">Local Development with uv</h2>
+<p>Use this path for development, tests, and Python workflows that do not need a system SNAP install.</p>
 <pre class="codehilite"><code>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/ESA-PhiLab/sarpyx.git
 <span class="nb">cd</span><span class="w"> </span>sarpyx
 uv<span class="w"> </span>sync<span class="w"> </span>--group<span class="w"> </span>dev
+uv<span class="w"> </span>run<span class="w"> </span>sarpyx<span class="w"> </span>--help
+uv<span class="w"> </span>run<span class="w"> </span>sarpyx<span class="w"> </span>pipeline<span class="w"> </span>--list
+uv<span class="w"> </span>run<span class="w"> </span>pytest<span class="w"> </span>-q
 </code></pre>
-<p>This creates an editable installation that reflects code changes immediately.</p>
-<h2 id="verifying-installation">Verifying Installation</h2>
-<p>To verify your installation works correctly:</p>
-<pre class="codehilite"><code><span class="kn">import</span><span class="w"> </span><span class="nn">sarpyx</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;sarpyx version: </span><span class="si">{</span><span class="n">sarpyx</span><span class="o">.</span><span class="n">__version__</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<p>Install the optional Copernicus tooling when you need phidown-backed data acquisition:</p>
+<pre class="codehilite"><code>uv<span class="w"> </span>sync<span class="w"> </span>--group<span class="w"> </span>dev<span class="w"> </span>--extra<span class="w"> </span>copernicus
+</code></pre>
+<h2 id="editable-pip-install">Editable pip Install</h2>
+<p>Use this path when integrating <code>sarpyx</code> into an existing virtual environment.</p>
+<pre class="codehilite"><code>python<span class="w"> </span>-m<span class="w"> </span>venv<span class="w"> </span>.venv
+<span class="nb">source</span><span class="w"> </span>.venv/bin/activate
+python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>--upgrade<span class="w"> </span>pip
+python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span>.
+sarpyx<span class="w"> </span>--help
+</code></pre>
+<p>For tests:</p>
+<pre class="codehilite"><code>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>pytest
+pytest<span class="w"> </span>-q
+</code></pre>
+<h2 id="conda-with-esa-snap">Conda with ESA SNAP</h2>
+<p>The recommended installation uses <strong>conda first</strong> to provide ESA SNAP and <code>gpt</code>, then installs <code>sarpyx</code> with pip from this checkout. This keeps SNAP/native dependencies managed by conda while keeping the Python package editable.</p>
+<pre class="codehilite"><code>conda<span class="w"> </span>create<span class="w"> </span>-n<span class="w"> </span>sarpyx<span class="w"> </span>-c<span class="w"> </span>sirbastiano/label/dev<span class="w"> </span>-c<span class="w"> </span>conda-forge<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="nv">python</span><span class="o">=</span><span class="m">3</span>.12<span class="w"> </span>pip<span class="w"> </span><span class="nv">snap13</span><span class="o">=</span><span class="m">13</span>.0.0
 
-<span class="c1"># Test basic functionality</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">sarpyx.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">show_image</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">sarpyx.sla</span><span class="w"> </span><span class="kn">import</span> <span class="n">SubLookAnalysis</span>
-<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Installation successful!&quot;</span><span class="p">)</span>
+conda<span class="w"> </span>activate<span class="w"> </span>sarpyx
+python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span>.
 </code></pre>
-<h2 id="optional-dependencies">Optional Dependencies</h2>
-<h3 id="snap-integration">SNAP Integration</h3>
-<p>For full SNAP functionality, install ESA SNAP:</p>
+<p>Verify the installation:</p>
+<pre class="codehilite"><code>gpt<span class="w"> </span>-h
+sarpyx<span class="w"> </span>--help
+sarpyx<span class="w"> </span>worldsar<span class="w"> </span>--help
+sarpyx<span class="w"> </span>pipeline<span class="w"> </span>--help
+</code></pre>
+<p>For development and tests:</p>
+<pre class="codehilite"><code>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s2">&quot;.[copernicus]&quot;</span>
+python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>pytest
+pytest<span class="w"> </span>-q
+</code></pre>
+<h2 id="manual-snap-install">Manual SNAP Install</h2>
+<p>If SNAP is installed outside conda, set <code>GPT_PATH</code> explicitly. It must point to SNAP&rsquo;s <code>gpt</code> executable.</p>
+<pre class="codehilite"><code><span class="nb">export</span><span class="w"> </span><span class="nv">GPT_PATH</span><span class="o">=</span>/Applications/esa-snap/bin/gpt
+<span class="nb">export</span><span class="w"> </span><span class="nv">SNAP_USERDIR</span><span class="o">=</span><span class="s2">&quot;</span><span class="nv">$PWD</span><span class="s2">/.snap&quot;</span>
+sarpyx<span class="w"> </span>worldsar<span class="w"> </span>--help
+<span class="s2">&quot;</span><span class="nv">$GPT_PATH</span><span class="s2">&quot;</span><span class="w"> </span>--help
+</code></pre>
+<p>Typical <code>gpt</code> paths:</p>
+<table>
+<thead>
+<tr>
+<th>Setup</th>
+<th>Path</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Conda SNAP package</td>
+<td><code>$CONDA_PREFIX/opt/esa-snap/bin/gpt</code></td>
+</tr>
+<tr>
+<td>Docker image</td>
+<td><code>/workspace/snap13/bin/gpt</code> or <code>/usr/local/bin/gpt</code></td>
+</tr>
+<tr>
+<td>macOS manual install</td>
+<td><code>/Applications/snap/bin/gpt</code> or <code>/Applications/esa-snap/bin/gpt</code></td>
+</tr>
+<tr>
+<td>Linux manual install</td>
+<td><code>$HOME/ESA-STEP/snap/bin/gpt</code>, <code>/opt/snap/bin/gpt</code>, or <code>/usr/local/snap/bin/gpt</code></td>
+</tr>
+<tr>
+<td>Windows manual install</td>
+<td><code>C:\Program Files\snap\bin\gpt.exe</code></td>
+</tr>
+</tbody>
+</table>
+<p>WorldSAR resolves GPT in this order:</p>
 <ol>
-<li>Download from <a href="https://step.esa.int/main/download/snap-download/">ESA SNAP website</a></li>
-<li>Follow platform-specific installation instructions</li>
-<li>Ensure <code>gpt</code> command is available in your PATH</li>
+<li>Explicit <code>--gpt-path</code>.</li>
+<li><code>gpt_path</code> or <code>GPT_PATH</code>.</li>
+<li><code>$CONDA_PREFIX/opt/esa-snap/bin/gpt</code>.</li>
+<li><code>$SNAP_HOME/bin/gpt</code>.</li>
+<li>A SNAP-looking <code>gpt</code> on <code>PATH</code>.</li>
 </ol>
-<h3 id="jupyter-support">Jupyter Support</h3>
-<p>For interactive notebooks:</p>
-<pre class="codehilite"><code>pip<span class="w"> </span>install<span class="w"> </span>jupyter<span class="w"> </span>matplotlib<span class="w"> </span>ipywidgets
+<h2 id="docker">Docker</h2>
+<p>The Docker image includes SNAP and links <code>gpt</code> into the runtime path. Container startup requires an existing grid file; it does not generate one automatically.</p>
+<pre class="codehilite"><code>docker<span class="w"> </span>compose<span class="w"> </span>version
+mkdir<span class="w"> </span>-p<span class="w"> </span>grid
+<span class="c1"># place a grid GeoJSON in ./grid, for example ./grid/my_region.geojson</span>
+make<span class="w"> </span>check-grid
+make<span class="w"> </span>recreate
 </code></pre>
-<h3 id="visualization">Visualization</h3>
-<p>For enhanced plotting capabilities:</p>
-<pre class="codehilite"><code>pip<span class="w"> </span>install<span class="w"> </span>matplotlib<span class="w"> </span>seaborn<span class="w"> </span>plotly
+<p>To select a specific mounted grid:</p>
+<pre class="codehilite"><code><span class="nv">GRID_PATH</span><span class="o">=</span><span class="s2">&quot;</span><span class="nv">$PWD</span><span class="s2">/grid/my_region.geojson&quot;</span><span class="w"> </span>make<span class="w"> </span>recreate
+</code></pre>
+<p>For direct Docker use, pass an in-container grid path:</p>
+<pre class="codehilite"><code>docker<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-v<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$PWD</span><span class="s2">/grid:/workspace/grid:ro&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-e<span class="w"> </span><span class="nv">GRID_PATH</span><span class="o">=</span>/workspace/grid/my_region.geojson<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>sirbastiano94/sarpyx:latest<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>sarpyx<span class="w"> </span>worldsar<span class="w"> </span>--help
+</code></pre>
+<h2 id="verify-the-installation">Verify the Installation</h2>
+<p>Run the checks that match your setup:</p>
+<pre class="codehilite"><code>uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;import sarpyx; print(sarpyx.__version__)&quot;</span>
+uv<span class="w"> </span>run<span class="w"> </span>sarpyx<span class="w"> </span>--help
+uv<span class="w"> </span>run<span class="w"> </span>sarpyx<span class="w"> </span>worldsar<span class="w"> </span>--help
+uv<span class="w"> </span>run<span class="w"> </span>sarpyx<span class="w"> </span>pipeline<span class="w"> </span>--list
+</code></pre>
+<p>For SNAP-backed runs:</p>
+<pre class="codehilite"><code><span class="nb">test</span><span class="w"> </span>-x<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$GPT_PATH</span><span class="s2">&quot;</span>
+<span class="s2">&quot;</span><span class="nv">$GPT_PATH</span><span class="s2">&quot;</span><span class="w"> </span>--help
+sarpyx<span class="w"> </span>worldsar<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--input<span class="w"> </span>/data/product.SAFE<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--output<span class="w"> </span>/tmp/sarpyx-check<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--grid-path<span class="w"> </span>/data/grid.geojson<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--gpt-path<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$GPT_PATH</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--help
 </code></pre>
 <h2 id="troubleshooting">Troubleshooting</h2>
-<h3 id="common-issues">Common Issues</h3>
-<h4 id="gdal-installation-problems">GDAL Installation Problems</h4>
-<p>On some systems, GDAL can be challenging to install:</p>
-<p><strong>Ubuntu/Debian:</strong></p>
-<pre class="codehilite"><code>sudo<span class="w"> </span>apt-get<span class="w"> </span>install<span class="w"> </span>gdal-bin<span class="w"> </span>libgdal-dev
-pip<span class="w"> </span>install<span class="w"> </span>gdal
-</code></pre>
-<p><strong>macOS (using Homebrew):</strong></p>
-<pre class="codehilite"><code>brew<span class="w"> </span>install<span class="w"> </span>gdal
-pip<span class="w"> </span>install<span class="w"> </span>gdal
-</code></pre>
-<p><strong>Windows:</strong>
-Consider using conda:</p>
-<pre class="codehilite"><code>conda<span class="w"> </span>install<span class="w"> </span>-c<span class="w"> </span>conda-forge<span class="w"> </span>gdal
-</code></pre>
-<h4 id="memory-issues">Memory Issues</h4>
-<p>For large SAR datasets, ensure sufficient memory:
-- Minimum 8GB RAM
-- 16GB+ recommended for large-scale processing</p>
-<h4 id="permission-errors">Permission Errors</h4>
-<p>On Unix systems, you might need:</p>
-<pre class="codehilite"><code>pip<span class="w"> </span>install<span class="w"> </span>--user<span class="w"> </span>sarpyx
-</code></pre>
-<h3 id="getting-help">Getting Help</h3>
-<p>If you encounter installation issues:</p>
-<ol>
-<li>Check <a href="https://github.com/ESA-PhiLab/sarpyx/issues">GitHub Issues</a></li>
-<li>Create a new issue with:
-   - Your operating system
-   - Python version
-   - Complete error message
-   - Installation method used</li>
-</ol>
+<ul>
+<li><code>CONDA_PREFIX is not set</code>: activate the conda environment before <code>source scripts/setvars.sh</code>.</li>
+<li><code>SNAP GPT not found or not executable</code>: install SNAP, export <code>GPT_PATH</code>, or pass <code>--gpt-path</code>.</li>
+<li>Wrong system <code>gpt</code> is found: pass an absolute <code>--gpt-path</code>; WorldSAR rejects common non-SNAP executables.</li>
+<li>SNAP cache or permission errors: set <code>SNAP_USERDIR</code> to a writable run-local directory and pass <code>--snap-userdir</code>.</li>
+<li>Grid errors in Docker: set <code>GRID_PATH</code> or mount a <code>*.geojson</code> file under <code>/workspace/grid</code>.</li>
+<li>Large product failures: lower <code>--gpt-parallelism</code>, increase <code>--gpt-memory</code> or <code>--gpt-timeout</code>, and keep <code>SNAP_USERDIR</code> on fast local storage.</li>
+</ul>
 <h2 id="next-steps">Next Steps</h2>
-<p>After successful installation:</p>
-<ol>
-<li>Read <a href="getting_started.html">Getting Started</a></li>
-<li>Explore <a href="basic_concepts.html">Basic Concepts</a></li>
-<li>Try the <a href="../examples/index.html">Examples</a></li>
-</ol>
-<h2 id="environment-setup">Environment Setup</h2>
-<h3 id="virtual-environment-recommended">Virtual Environment (Recommended)</h3>
-<p>Create an isolated environment for sarpyx:</p>
-<pre class="codehilite"><code><span class="c1"># Using venv</span>
-python<span class="w"> </span>-m<span class="w"> </span>venv<span class="w"> </span>sarpyx-env
-<span class="nb">source</span><span class="w"> </span>sarpyx-env/bin/activate<span class="w">  </span><span class="c1"># Linux/macOS</span>
-<span class="c1"># or</span>
-sarpyx-env<span class="se">\S</span>cripts<span class="se">\a</span>ctivate<span class="w">     </span><span class="c1"># Windows</span>
-
-<span class="c1"># Using conda</span>
-conda<span class="w"> </span>create<span class="w"> </span>-n<span class="w"> </span>sarpyx<span class="w"> </span><span class="nv">python</span><span class="o">=</span><span class="m">3</span>.9
-conda<span class="w"> </span>activate<span class="w"> </span>sarpyx
-</code></pre>
-<h3 id="development-environment">Development Environment</h3>
-<p>For development work, also install development tools:</p>
-<pre class="codehilite"><code>pip<span class="w"> </span>install<span class="w"> </span>pytest<span class="w"> </span>black<span class="w"> </span>flake8<span class="w"> </span>mypy<span class="w"> </span>sphinx
-</code></pre>
-<p>This ensures you have all tools needed for testing, linting, and documentation generation.</p>
+<ul>
+<li><a href="cli_examples.html">CLI usage examples</a></li>
+<li><a href="pipeline_cli.html">Generic Pipeline CLI</a></li>
+<li><a href="snap_integration.html">SNAP Integration</a></li>
+<li><a href="troubleshooting.html">Troubleshooting</a></li>
+</ul>
     <div class="footer">
       sarpyx Documentation &nbsp;·&nbsp; built with <code>build_site.py</code>
     </div>
