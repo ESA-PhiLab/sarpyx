@@ -24,6 +24,7 @@
 
 ## Highlights
 
+- SNAP v13 ported into a conda package no needing additional installations.
 - SNAP GPT integration with configurable graphs and operator chaining.
 - WorldSAR preprocessing, tiling, validation, and H5-to-Zarr conversion.
 - Generic pipeline CLI with built-in recipes for Sentinel-1, TSX, CSG, Biomass, NISAR, and Sentinel-1 InSAR.
