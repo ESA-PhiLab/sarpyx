@@ -46,7 +46,7 @@
     <li>Python <code>&gt;=3.11, &lt;4</code>.</li>
     <li><code>uv</code> (recommended by repository tooling).</li>
     <li>Conda or mamba when using the conda + SNAP engine workflow.</li>
-    <li>ESA SNAP + Java when running SNAP-dependent commands such as <code>shipdet</code> and <code>worldsar</code>.</li>
+    <li>ESA SNAP + Java when running SNAP-dependent commands such as <code>worldsar</code> and explicit pipeline recipes.</li>
     <li>Docker Engine if using container workflows.</li>
   </ul>
 
@@ -60,19 +60,24 @@ uv run sarpyx --help
 </code></pre>
 
   <h2 id="conda-snap-engine">Conda + SNAP Engine Setup</h2>
-  <p>Use this path when SNAP processing must run outside Docker. The helper scripts assume the conda environment is active and default SNAP to <code>$CONDA_PREFIX/opt/esa-snap</code>.</p>
-  <pre><code class="language-bash">conda create -n sarpyx-snap python=3.11 -y
-conda activate sarpyx-snap
+  <p>The recommended installation uses <strong>conda first</strong> to provide ESA SNAP and <code>gpt</code>, then installs <code>sarpyx</code> with pip from this checkout. This keeps SNAP/native dependencies managed by conda while keeping the Python package editable.</p>
+  <pre><code class="language-bash">conda create -n sarpyx -c sirbastiano/label/dev -c conda-forge \
+  python=3.12 pip snap13=13.0.0
+
+conda activate sarpyx
 python -m pip install -e .
 
-# Linux helper install. Set SNAP_HOME first so SNAP lands inside the conda env.
-SNAP_HOME="$CONDA_PREFIX/opt/esa-snap" SNAP_SKIP_UPDATES=1 bash support/snap-install.sh
-
-# Export SNAP_HOME, GPT_PATH, gpt_path, SNAP_USERDIR, snap_userdir, and PATH.
-source scripts/setvars.sh
-"$GPT_PATH" --help
+gpt -h
+sarpyx --help
+sarpyx worldsar --help
+sarpyx pipeline --help
 </code></pre>
-  <p><code>support/snap-install.sh</code> is Linux-oriented. On macOS or Windows, install ESA SNAP manually, then set <code>SNAP_HOME</code> or <code>GPT_PATH</code> before sourcing <code>scripts/setvars.sh</code>.</p>
+
+  <p>For development and tests:</p>
+  <pre><code class="language-bash">python -m pip install -e ".[copernicus]"
+python -m pip install pytest
+pytest -q
+</code></pre>
 
   <h2 id="gpt-path">GPT Path Setting</h2>
   <p><code>GPT_PATH</code> must point to the SNAP <code>gpt</code> executable, not another system command named <code>gpt</code>. Prefer an absolute path and keep <code>SNAP_USERDIR</code> writable and isolated per environment or run.</p>
@@ -98,12 +103,12 @@ test -x "$GPT_PATH"
   <h2 id="helper-scripts">Helper Scripts</h2>
   <ul>
     <li><code>scripts/setvars.sh</code> is the user-facing helper; it sources the existing <code>scripts/setvar.sh</code> implementation. It requires an active conda environment, sets <code>SNAP_HOME</code>, <code>GPT_PATH</code>, lowercase compatibility variables, <code>SNAP_USERDIR</code>, and prepends SNAP to <code>PATH</code>.</li>
-    <li><code>scripts/worldsar.sh</code> activates <code>CONDA_ENV</code> (default <code>sarpyx-snap</code>), sources the same helper, prints the resolved SNAP GPT path, and runs <code>sarpyx.cli.worldsar</code>.</li>
+    <li><code>scripts/worldsar.sh</code> activates <code>CONDA_ENV</code>, sources the same helper, prints the resolved SNAP GPT path, and runs <code>sarpyx.cli.worldsar</code>.</li>
     <li><code>support/snap-install.sh</code> installs SNAP 12 or 13 on Linux. It honors <code>SNAP_HOME</code>, <code>SNAP_SKIP_UPDATES</code>, and <code>SNAP_SKIP_SYSTEM_PACKAGES</code>.</li>
     <li><code>make install-snap</code> is the Makefile wrapper for a Linux SNAP install under <code>./snap</code>, with default GPT memory set to 8G.</li>
   </ul>
   <pre><code class="language-bash"># Run WorldSAR through the conda/SNAP helper.
-CONDA_ENV=sarpyx-snap scripts/worldsar.sh /data/product.SAFE outputs/run --grid-path grid/grid_10km.geojson
+CONDA_ENV=sarpyx scripts/worldsar.sh /data/product.SAFE outputs/run --grid-path grid/grid_10km.geojson
 
 # Or run the installed CLI with explicit SNAP paths.
 sarpyx-worldsar \
@@ -116,12 +121,11 @@ sarpyx-worldsar \
 
   <h2 id="validation">Validation</h2>
   <p>Run these checks after any SNAP or path change.</p>
-  <pre><code class="language-bash">conda activate sarpyx-snap
-source scripts/setvars.sh
-test -x "$GPT_PATH"
-"$GPT_PATH" --help
-python -c "from sarpyx.snapflow.config import resolve_gpt_path; print(resolve_gpt_path())"
-python -c "import sarpyx; print(sarpyx.__version__)"
+  <pre><code class="language-bash">conda activate sarpyx
+gpt -h
+sarpyx --help
+sarpyx worldsar --help
+sarpyx pipeline --help
 </code></pre>
 
   <h2 id="docker">Docker</h2>
@@ -141,7 +145,7 @@ make docker-build
 
   <h2 id="troubleshooting">Troubleshooting</h2>
   <ul>
-    <li><code>scripts/setvars.sh</code> reports <code>CONDA_PREFIX is not set</code>: run <code>conda activate sarpyx-snap</code> first.</li>
+    <li><code>scripts/setvars.sh</code> reports <code>CONDA_PREFIX is not set</code>: run <code>conda activate sarpyx</code> first.</li>
     <li><code>SNAP GPT not found or not executable</code>: check <code>SNAP_HOME</code>, install SNAP at <code>$CONDA_PREFIX/opt/esa-snap</code>, or export an absolute <code>GPT_PATH</code>.</li>
     <li>WorldSAR finds the wrong <code>gpt</code>: pass <code>--gpt-path "$GPT_PATH"</code>. The resolver rejects common non-SNAP paths such as <code>/usr/sbin/gpt</code>.</li>
     <li>SNAP cache or permission errors: set <code>SNAP_USERDIR</code> to a writable run-local directory and pass <code>--snap-userdir "$SNAP_USERDIR"</code>.</li>

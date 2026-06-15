@@ -270,7 +270,10 @@ def test_epsg_terrain_correction_merges_geocoded_subap_bands(monkeypatch: pytest
         tmp_path / "pdec.dim",
         ["i_IW1_VV", "q_IW1_VV", "i_IW1_VV_SA1", "q_IW1_VV_SA1"],
     )
-    target = _dimap_with_bands(tmp_path / "worldsar_tc_epsg" / "pdec_TC_EPSG32633.dim", ["i_IW1_VV", "q_IW1_VV"])
+    target = _dimap_with_bands(
+        tmp_path / "worldsar_tc_epsg" / "pdec_TC_EPSG32633.dim",
+        ["i_IW1_VV", "q_IW1_VV"],
+    )
     calls: list[dict[str, object]] = []
 
     def fake_run_gpt_op(product_path, output_dir, _format, op_name, **kwargs):
@@ -294,11 +297,131 @@ def test_epsg_terrain_correction_merges_geocoded_subap_bands(monkeypatch: pytest
     hrefs = [node.get("href") for node in redirect_root.findall(".//*[@href]")]
     assert hrefs
     assert all(not Path(href).is_absolute() for href in hrefs if href)
+    assert all(".." not in Path(href).parts for href in hrefs if href)
     assert all((redirect_product.parent / href).resolve().exists() for href in hrefs if href)
+    assert (redirect_product.with_suffix(".data") / "i_IW1_VV_SA1.img").exists()
+    assert (redirect_product.with_suffix(".data") / "q_IW1_VV_SA1.img").exists()
     assert "i_IW1_VV_SA1" in materialized_band_names(target)
     assert "q_IW1_VV_SA1" in materialized_band_names(target)
     assert (target.with_suffix(".data") / "i_IW1_VV_SA1.img").exists()
     assert (target.with_suffix(".data") / "q_IW1_VV_SA1.img").exists()
+
+
+def test_subap_terrain_correction_fails_before_gpt_when_payload_missing(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    from sarpyx.snapflow import tile_crs
+
+    source = _dimap_with_bands(
+        tmp_path / "pdec.dim",
+        ["i_IW1_VV", "q_IW1_VV", "i_IW1_VV_SA1", "q_IW1_VV_SA1"],
+    )
+    target = _dimap_with_bands(tmp_path / "tc.dim", ["i_IW1_VV", "q_IW1_VV"])
+    (source.with_suffix(".data") / "i_IW1_VV_SA1.img").unlink()
+
+    def fail_if_called(*_args, **_kwargs):
+        raise AssertionError("run_gpt_op should not be called for incomplete redirect payloads")
+
+    monkeypatch.setattr(tile_crs, "run_gpt_op", fail_if_called)
+
+    with pytest.raises(FileNotFoundError, match="i_IW1_VV_SA1.img"):
+        tile_crs._ensure_subap_bands_terrain_corrected(
+            source,
+            target,
+            32633,
+            {"map_projection": "EPSG:32633", "pixel_spacing_in_meter": 10.0},
+            {"gpt_memory": "4G"},
+        )
+
+
+def test_subap_terrain_correction_discards_partial_existing_output(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    from sarpyx.snapflow import tile_crs
+    from sarpyx.snapflow.dimap import materialized_band_names
+
+    source = _dimap_with_bands(
+        tmp_path / "pdec.dim",
+        ["i_IW1_VV", "q_IW1_VV", "i_IW1_VV_SA1", "q_IW1_VV_SA1"],
+    )
+    target = _dimap_with_bands(
+        tmp_path / "worldsar_tc_epsg" / "pdec_TC_EPSG32633.dim",
+        ["i_IW1_VV", "q_IW1_VV"],
+    )
+    partial = _dimap_with_bands(
+        target.parent / "worldsar_subap_tc" / "pdec_SA1_TC_EPSG32633.dim",
+        ["i_IW1_VV", "q_IW1_VV"],
+    )
+    (partial.with_suffix(".data") / "i_IW1_VV.img").unlink()
+    calls: list[Path] = []
+
+    def fake_run_gpt_op(product_path, output_dir, _format, _op_name, **kwargs):
+        calls.append(Path(product_path))
+        return _dimap_with_bands(
+            Path(output_dir) / f"{kwargs['output_name']}.dim",
+            ["i_IW1_VV", "q_IW1_VV"],
+        )
+
+    monkeypatch.setattr(tile_crs, "run_gpt_op", fake_run_gpt_op)
+
+    tile_crs._ensure_subap_bands_terrain_corrected(
+        source,
+        target,
+        32633,
+        {"map_projection": "EPSG:32633", "pixel_spacing_in_meter": 10.0},
+        {"gpt_memory": "4G"},
+    )
+
+    assert calls == [target.parent / "worldsar_subap_tc" / "pdec_SA1_source.dim"]
+    assert "i_IW1_VV_SA1" in materialized_band_names(target)
+    assert "q_IW1_VV_SA1" in materialized_band_names(target)
+
+
+def test_subap_terrain_correction_retries_with_rebuilt_redirect_after_gpt_failure(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    from sarpyx.snapflow import tile_crs
+    from sarpyx.snapflow.dimap import materialized_band_names
+
+    source = _dimap_with_bands(
+        tmp_path / "pdec.dim",
+        ["i_IW1_VV", "q_IW1_VV", "i_IW1_VV_SA1", "q_IW1_VV_SA1"],
+    )
+    target = _dimap_with_bands(
+        tmp_path / "worldsar_tc_epsg" / "pdec_TC_EPSG32633.dim",
+        ["i_IW1_VV", "q_IW1_VV"],
+    )
+    calls: list[Path] = []
+
+    def fake_run_gpt_op(product_path, output_dir, _format, _op_name, **kwargs):
+        calls.append(Path(product_path))
+        if len(calls) == 1:
+            _dimap_with_bands(Path(output_dir) / f"{kwargs['output_name']}.dim", ["i_IW1_VV"])
+            raise RuntimeError("transient SNAP failure")
+        return _dimap_with_bands(
+            Path(output_dir) / f"{kwargs['output_name']}.dim",
+            ["i_IW1_VV", "q_IW1_VV"],
+        )
+
+    monkeypatch.setattr(tile_crs, "run_gpt_op", fake_run_gpt_op)
+
+    tile_crs._ensure_subap_bands_terrain_corrected(
+        source,
+        target,
+        32633,
+        {"map_projection": "EPSG:32633", "pixel_spacing_in_meter": 10.0},
+        {"gpt_memory": "4G"},
+    )
+
+    assert calls == [
+        target.parent / "worldsar_subap_tc" / "pdec_SA1_source.dim",
+        target.parent / "worldsar_subap_tc" / "pdec_SA1_source.dim",
+    ]
+    assert "i_IW1_VV_SA1" in materialized_band_names(target)
+    assert "q_IW1_VV_SA1" in materialized_band_names(target)
 
 
 def test_prepare_products_by_epsg_merges_subaps_when_source_epsg_matches(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

@@ -60,6 +60,8 @@ CONDA_BASE="$(conda info --base)"
 source "$CONDA_BASE/etc/profile.d/conda.sh"
 conda activate "$CONDA_ENV"
 source "$SCRIPT_DIR/setvar.sh"
+source "$SCRIPT_DIR/snap_userdir.sh"
+worldsar_configure_snap_userdir "$(basename "$PRODUCT_PATH")" "$OUTPUT_DIR"
 
 if ! command -v python >/dev/null 2>&1; then
   echo "python not found after activating conda env: $CONDA_ENV" >&2
@@ -67,6 +69,7 @@ if ! command -v python >/dev/null 2>&1; then
 fi
 
 export PYTHONPATH="${REPO_DIR}${PYTHONPATH:+:$PYTHONPATH}"
+LOCK_TIMEOUT="${LOCK_TIMEOUT:-0}"
 
 CMD=(
   python
@@ -76,11 +79,14 @@ CMD=(
   --output "$OUTPUT_DIR"
   --cuts-outdir "$CUTS_DIR"
   --db-dir "$DB_DIR"
+  --lock-timeout "$LOCK_TIMEOUT"
 )
 
 CMD+=("$@")
 
 echo "Conda env: $CONDA_ENV"
 echo "SNAP GPT:  $GPT_PATH"
+echo "SNAP user: $SNAP_USERDIR"
+echo "SNAP seed: ${SNAP_USERDIR_SEED_MODE:-light}"
 echo "Running:   ${CMD[*]}"
 exec "${CMD[@]}"

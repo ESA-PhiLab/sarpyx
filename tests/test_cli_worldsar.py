@@ -16,6 +16,7 @@ WORLDSAR_DEFAULT_FIELDS = (
     'gpt_cache_size',
     'gpt_parallelism',
     'gpt_timeout',
+    'lock_timeout',
     'snap_userdir',
     'orbit_type',
 )
@@ -49,6 +50,8 @@ def test_create_parser_parses_worldsar_arguments() -> None:
             '--sentinel-subap-feature-window-size',
             '7',
             '--orbit-continue-on-fail',
+            '--lock-timeout',
+            '15',
         ]
     )
 
@@ -60,6 +63,7 @@ def test_create_parser_parses_worldsar_arguments() -> None:
     assert args.zarr_chunk_size == [64, 64]
     assert args.sentinel_subap_feature_window_size == 7
     assert args.orbit_continue_on_fail is True
+    assert args.lock_timeout == 15
 
 
 def test_create_parser_defaults_are_stable() -> None:
@@ -79,6 +83,15 @@ def test_validate_runtime_args_rejects_even_subap_feature_window() -> None:
     args = create_parser().parse_args(["--input", "/tmp/product.SAFE", "--sentinel-subap-feature-window-size", "4"])
 
     with pytest.raises(ValueError, match="sentinel-subap-feature-window-size"):
+        config.validate_runtime_args(args)
+
+
+def test_validate_runtime_args_rejects_negative_lock_timeout() -> None:
+    from sarpyx.snapflow import config
+
+    args = create_parser().parse_args(["--input", "/tmp/product.SAFE", "--lock-timeout", "-1"])
+
+    with pytest.raises(ValueError, match="lock-timeout"):
         config.validate_runtime_args(args)
 
 
@@ -161,3 +174,30 @@ def test_run_defaults_outputs_next_to_input(monkeypatch: pytest.MonkeyPatch, tmp
     assert not (product.parent / "output" / "tc.dim").exists()
     assert (product.parent / "output" / "keep.txt").exists()
     assert config.DB_DIR == str(product.parent / "output" / "db")
+
+
+def test_run_fails_fast_when_product_lock_is_held(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    import fcntl
+
+    from sarpyx.snapflow import config
+    from sarpyx.snapflow import runner
+    from sarpyx.snapflow.locks import worldsar_product_lock_path
+
+    product = tmp_path / "product.SAFE"
+    product.mkdir()
+    output_dir = tmp_path / "output"
+    lock_path = worldsar_product_lock_path(product, output_dir)
+    lock_path.parent.mkdir(parents=True)
+    handle = lock_path.open("a+", encoding="utf-8")
+    fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+    monkeypatch.setattr(config, "CUTS_OUTDIR", None)
+    monkeypatch.setattr(config, "DB_DIR", None)
+    monkeypatch.setattr(config, "db_indexing", True)
+    args = create_parser().parse_args(["--input", str(product), "--output", str(output_dir)])
+
+    try:
+        with pytest.raises(RuntimeError, match="WorldSAR product lock is held"):
+            runner.run(args)
+    finally:
+        fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+        handle.close()

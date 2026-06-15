@@ -72,7 +72,7 @@ def build_band_plan(suffixes: list[str], start_index: int) -> list[dict]:
                     "file_name": None,
                     "physical_unit": "intensity",
                     "virtual": True,
-                    "expr": f"i_{suffix} * i_{suffix} + q_{suffix} * q_{suffix}",
+                    "expr": f"i_{suffix} == 0.0 ? 0.0 : i_{suffix} * i_{suffix} + q_{suffix} * q_{suffix}",
                 },
             ]
         )

@@ -271,6 +271,19 @@ def test_validate_tile_group_fails_all_nodata_tile(tmp_path: Path) -> None:
     assert result['valid_pixels'] == 0
 
 
+def test_validate_tile_group_uses_tiling_actual_tiles_filter(tmp_path: Path) -> None:
+    cuts_dir = tmp_path / 'cuts'
+    cuts_dir.mkdir()
+    _write_two_band_tile(cuts_dir / 'current.h5', np.ones((2, 2), dtype=np.float32), np.ones((2, 2), dtype=np.float32))
+    _write_two_band_tile(cuts_dir / 'stale_other_swath.h5', np.ones((2, 2), dtype=np.float32), np.ones((2, 2), dtype=np.float32))
+    dim = tmp_path / 'product.dim'
+    _write_two_band_dim(dim)
+
+    group = _validate_tile_group(cuts_dir, dim, tiling_result={'actual_tiles': ['current']})
+
+    assert [result['tile'] for result in group['results']] == ['current']
+
+
 def test_validate_tile_result_skips_and_removes_partial_nodata_tile(tmp_path: Path) -> None:
     tile = tmp_path / 'empty.h5'
     _write_two_band_tile(
@@ -301,6 +314,7 @@ def test_run_tiling_routes_rectangles_to_matching_epsg_products(tmp_path: Path, 
 
     rect_32 = rectangle('tile32', 'EPSG:32632', 0.0)
     rect_33 = rectangle('tile33', 'EPSG:32633', 1.0)
+    rect_stale = rectangle('stale_other_swath', 'EPSG:32632', 2.0)
     source = tmp_path / 'source.SAFE'
     intermediate = tmp_path / 'intermediate.dim'
     grid = tmp_path / 'grid.geojson'
@@ -311,9 +325,12 @@ def test_run_tiling_routes_rectangles_to_matching_epsg_products(tmp_path: Path, 
     product_33 = tmp_path / 'intermediate_EPSG32633.dim'
     product_32.write_text('32', encoding='utf-8')
     product_33.write_text('33', encoding='utf-8')
+    stale_dir = tmp_path / 'cuts' / 'PRODUCT'
+    stale_dir.mkdir(parents=True)
+    (stale_dir / 'stale_other_swath.h5').write_bytes(b'h5')
     calls = []
 
-    monkeypatch.setattr(tiling_mod, 'select_intersecting_grid_rectangles', lambda *_args, **_kwargs: [rect_32, rect_33])
+    monkeypatch.setattr(tiling_mod, 'select_intersecting_grid_rectangles', lambda *_args, **_kwargs: [rect_32, rect_33, rect_stale])
     monkeypatch.setattr(tiling_mod, 'extract_product_id', lambda _path: 'PRODUCT')
     monkeypatch.setattr(
         tiling_mod,
@@ -324,6 +341,8 @@ def test_run_tiling_routes_rectangles_to_matching_epsg_products(tmp_path: Path, 
     def fake_cut(rect, product, cuts_dir, *_args):
         tile = rect['BL']['properties']['name']
         calls.append((tile, Path(product)))
+        if tile == 'stale_other_swath':
+            return {'tile': tile, 'status': 'skipped', 'reason': 'outside raster bounds', 'output_path': str(cuts_dir / f'{tile}.h5')}
         output = cuts_dir / f'{tile}.h5'
         output.write_bytes(b'h5')
         return {'tile': tile, 'status': 'success', 'output_path': str(output), 'valid_fraction': 1.0, 'nodata_fraction': 0.0}
@@ -342,12 +361,16 @@ def test_run_tiling_routes_rectangles_to_matching_epsg_products(tmp_path: Path, 
         None,
     )
 
-    assert calls == [('tile32', product_32), ('tile33', product_33)]
-    assert result['crs_groups'] == {'EPSG:32632': 1, 'EPSG:32633': 1}
+    assert calls == [('tile32', product_32), ('stale_other_swath', product_32), ('tile33', product_33)]
+    assert result['actual_tiles'] == ['tile32', 'tile33']
+    assert result['expected_tiles'] == ['tile32', 'tile33']
+    assert result['skipped_tiles'] == ['stale_other_swath']
+    assert result['extra_tiles'] == []
+    assert result['crs_groups'] == {'EPSG:32632': 2, 'EPSG:32633': 1}
     report = Path(result['report_path']).read_text(encoding='utf-8')
     assert 'Full-data tile policy' in report
     assert 'Tile selection policy' in report
-    assert '- EPSG:32632: 1 candidate intersecting tiles' in report
+    assert '- EPSG:32632: 2 candidate intersecting tiles' in report
 
 
 def test_grid_cell_intersection_selection_keeps_edge_tiles(tmp_path: Path) -> None:
@@ -385,7 +408,10 @@ def test_prepare_products_by_epsg_reruns_terrain_correction_from_pre_tc_source(t
 
     source = tmp_path / 'calibrated.dim'
     intermediate = tmp_path / 'terrain_corrected.dim'
-    source.write_text('source', encoding='utf-8')
+    source.write_text(
+        '<Dimap_Document><Raster_Dimensions><NBANDS>0</NBANDS></Raster_Dimensions><Image_Interpretation/><Data_Access/></Dimap_Document>',
+        encoding='utf-8',
+    )
     intermediate.write_text('intermediate', encoding='utf-8')
     calls = []
 

@@ -126,22 +126,27 @@ def _ensure_subap_bands_terrain_corrected(
     workdir = target_product.parent / "worldsar_subap_tc"
     workdir.mkdir(parents=True, exist_ok=True)
     for sa, redirect in missing_groups.items():
-        redirect_product = _write_subap_redirect_product(source_product, workdir, sa, redirect)
         output_name = f"{source_product.stem}_SA{sa}_TC_EPSG{epsg}"
         subap_tc = workdir / f"{output_name}.dim"
+        if subap_tc.exists():
+            try:
+                _validate_dimap_payload(subap_tc, set(redirect))
+            except FileNotFoundError as exc:
+                print(f"Discarding incomplete WorldSAR subap TC intermediate {subap_tc}: {exc}")
+                _remove_dimap_product(subap_tc)
         if not subap_tc.exists():
             params = dict(terrain_params)
             params["map_projection"] = f"EPSG:{epsg}"
             params["source_bands"] = sorted(redirect)
-            print(f"Creating WorldSAR subap TC intermediate for SA{sa}, EPSG:{epsg}: {source_product}")
-            subap_tc = run_gpt_op(
-                redirect_product,
+            subap_tc = _create_subap_tc_intermediate(
+                source_product,
                 workdir,
-                "BEAM-DIMAP",
-                "TerrainCorrection",
-                output_name=output_name,
-                **params,
-                **gpt_kwargs,
+                sa,
+                redirect,
+                epsg,
+                params,
+                gpt_kwargs,
+                output_name,
             )
         _merge_subap_tc_bands(target_product, subap_tc, redirect)
 
@@ -166,11 +171,75 @@ def _complete_iq_pairs(mapping: dict[str, str]) -> bool:
     return bool(prefixes) and all({"i", "q"} <= parts for parts in prefixes.values())
 
 
-def _write_subap_redirect_product(source_product: Path, workdir: Path, sa: int, redirect: dict[str, str]) -> Path:
+def _create_subap_tc_intermediate(
+    source_product: Path,
+    workdir: Path,
+    sa: int,
+    redirect: dict[str, str],
+    epsg: int,
+    params: dict,
+    gpt_kwargs: dict,
+    output_name: str,
+) -> Path:
+    subap_tc = workdir / f"{output_name}.dim"
+    last_error: Exception | None = None
+    for hardlink_rasters in (True, False):
+        _remove_dimap_product(subap_tc)
+        redirect_product = _write_subap_redirect_product(
+            source_product,
+            workdir,
+            sa,
+            redirect,
+            hardlink_rasters=hardlink_rasters,
+        )
+        try:
+            _validate_dimap_payload(redirect_product, set(redirect.values()))
+            mode = "hardlinked" if hardlink_rasters else "copied"
+            print(
+                f"Creating WorldSAR subap TC intermediate for SA{sa}, "
+                f"EPSG:{epsg} using {mode} rasters: {source_product}"
+            )
+            result = run_gpt_op(
+                redirect_product,
+                workdir,
+                "BEAM-DIMAP",
+                "TerrainCorrection",
+                output_name=output_name,
+                **params,
+                **gpt_kwargs,
+            )
+            _validate_dimap_payload(result, set(redirect))
+            return result
+        except (FileNotFoundError, RuntimeError) as exc:
+            last_error = exc
+            _remove_dimap_product(subap_tc)
+            if hardlink_rasters:
+                print(
+                    f"Retrying WorldSAR subap TC intermediate for SA{sa}, "
+                    f"EPSG:{epsg} with copied rasters after failure: {exc}"
+                )
+                continue
+            raise
+    raise RuntimeError(
+        f"WorldSAR subap TC intermediate failed for SA{sa}, EPSG:{epsg}: {last_error}"
+    )
+
+
+def _write_subap_redirect_product(
+    source_product: Path,
+    workdir: Path,
+    sa: int,
+    redirect: dict[str, str],
+    hardlink_rasters: bool = True,
+) -> Path:
     redirect_product = workdir / f"{source_product.stem}_SA{sa}_source.dim"
     source_data_dir = source_product.with_suffix(".data")
+    redirect_data_dir = redirect_product.with_suffix(".data")
     if redirect_product.exists():
         redirect_product.unlink()
+    if redirect_data_dir.exists():
+        shutil.rmtree(redirect_data_dir)
+    redirect_data_dir.mkdir(parents=True, exist_ok=True)
     tree = ET.parse(source_product)
     root = tree.getroot()
     _rebase_hrefs(root, source_product.parent, redirect_product.parent)
@@ -192,7 +261,14 @@ def _write_subap_redirect_product(source_product: Path, workdir: Path, sa: int, 
             data_access.remove(data_file)
             continue
         if band_name in redirect and href is not None:
-            href.set("href", _relative_href(source_data_dir / f"{redirect[band_name]}.hdr", redirect_product.parent))
+            _copy_band_files(
+                source_data_dir,
+                redirect_data_dir,
+                redirect[band_name],
+                redirect[band_name],
+                hardlink=hardlink_rasters,
+            )
+            href.set("href", _relative_href(redirect_data_dir / f"{redirect[band_name]}.hdr", redirect_product.parent))
     _set_nbands(root)
     indent_xml(root)
     tree.write(redirect_product, encoding="UTF-8", xml_declaration=False)
@@ -212,6 +288,48 @@ def _rebase_hrefs(root: ET.Element, source_base: Path, target_base: Path) -> Non
 
 def _relative_href(path: Path, base: Path) -> str:
     return Path(os.path.relpath(Path(path).resolve(), Path(base).resolve())).as_posix()
+
+
+def _validate_dimap_payload(dim_path: Path, required_bands: set[str] | None = None) -> None:
+    if not dim_path.is_file():
+        raise FileNotFoundError(f"DIMAP product file is missing: {dim_path}")
+    root = ET.parse(dim_path).getroot()
+    payload_bands: set[str] = set()
+    missing_paths: list[Path] = []
+    for data_file in root.findall(".//Data_File"):
+        href = data_file.find("DATA_FILE_PATH")
+        href_value = href.get("href") if href is not None else None
+        if not href_value:
+            continue
+        hdr_path = Path(href_value)
+        if not hdr_path.is_absolute():
+            hdr_path = dim_path.parent / hdr_path
+        hdr_path = hdr_path.resolve()
+        payload_bands.add(hdr_path.stem)
+        img_path = hdr_path.with_suffix(".img")
+        for path in (hdr_path, img_path):
+            if not path.is_file():
+                missing_paths.append(path)
+    missing_bands = sorted((required_bands or set()) - payload_bands)
+    if not missing_paths and not missing_bands:
+        return
+    details = []
+    if missing_bands:
+        details.append(f"missing bands: {', '.join(missing_bands)}")
+    if missing_paths:
+        shown = ", ".join(str(path) for path in missing_paths[:8])
+        details.append(f"missing files: {shown}")
+    raise FileNotFoundError(f"Incomplete DIMAP payload for {dim_path}: {'; '.join(details)}")
+
+
+def _remove_dimap_product(dim_path: Path) -> None:
+    if dim_path.exists():
+        dim_path.unlink()
+    data_dir = dim_path.with_suffix(".data")
+    if data_dir.is_dir():
+        shutil.rmtree(data_dir)
+    elif data_dir.exists():
+        data_dir.unlink()
 
 
 def _merge_subap_tc_bands(target_product: Path, subap_tc_product: Path, redirect: dict[str, str]) -> None:
@@ -248,21 +366,30 @@ def _merge_subap_tc_bands(target_product: Path, subap_tc_product: Path, redirect
     target_tree.write(target_product, encoding="UTF-8", xml_declaration=False)
 
 
-def _copy_band_files(src_data_dir: Path, dst_data_dir: Path, src_name: str, dst_name: str) -> None:
+def _copy_band_files(src_data_dir: Path, dst_data_dir: Path, src_name: str, dst_name: str, hardlink: bool = True) -> None:
     dst_data_dir.mkdir(parents=True, exist_ok=True)
     for ext in ("hdr", "img"):
         src = src_data_dir / f"{src_name}.{ext}"
         dst = dst_data_dir / f"{dst_name}.{ext}"
+        if not src.is_file():
+            raise FileNotFoundError(f"Expected DIMAP raster payload missing: {src}")
         if dst.exists():
-            continue
-        if ext == "img":
+            if dst.is_file() and dst.stat().st_size == src.stat().st_size:
+                continue
+            if dst.is_dir():
+                shutil.rmtree(dst)
+            else:
+                dst.unlink()
+        if ext == "img" and hardlink:
             try:
                 dst.hardlink_to(src)
                 shutil.copystat(src, dst)
-                continue
             except OSError:
-                pass
-        shutil.copy2(src, dst)
+                shutil.copy2(src, dst)
+        else:
+            shutil.copy2(src, dst)
+        if not dst.is_file():
+            raise FileNotFoundError(f"Failed to materialize DIMAP raster payload: {dst}")
 
 
 def _spectral_band(root: ET.Element, band_name: str) -> ET.Element | None:

@@ -1,5 +1,7 @@
 # Generic Pipeline CLI
 
+For end-to-end command examples, start with [CLI Usage Examples](cli_examples.md).
+
 `sarpyx pipeline` runs an explicit pipeline recipe. Use it when product-type
 inference is not desired, or when a recipe needs named inputs such as a
 master/slave pair.
@@ -21,7 +23,7 @@ Run a single-product recipe by name:
 sarpyx pipeline s1_tops \
   --input /data/product.SAFE \
   --output /data/out \
-  --gpt-path /opt/miniconda3/envs/sarpyx-snap/opt/esa-snap/bin/gpt \
+  --gpt-path /opt/miniconda3/envs/sarpyx/opt/esa-snap/bin/gpt \
   --param sentinel_swath=IW2
 ```
 
@@ -32,7 +34,7 @@ sarpyx pipeline s1_insar \
   --master /data/master.SAFE \
   --slave /data/slave.SAFE \
   --output /data/insar-out \
-  --gpt-path /opt/miniconda3/envs/sarpyx-snap/opt/esa-snap/bin/gpt \
+  --gpt-path /opt/miniconda3/envs/sarpyx/opt/esa-snap/bin/gpt \
   --param subswath=IW2 \
   --param selected_polarisations='["VV"]' \
   --param use_esd=false

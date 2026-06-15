@@ -13,33 +13,45 @@
 <a href="LICENSE">
   <img alt="License" src="https://img.shields.io/badge/License-Apache--2.0-374151?style=for-the-badge" />
 </a>
+<a href="https://github.com/ESA-PhiLab/sarpyx/releases/tag/v1.0.0">
+  <img alt="Version" src="https://img.shields.io/badge/Version-1.0.0-2563eb?style=for-the-badge" />
+</a>
 </div>
 
 ##
 
-**sarpyx** is a specialized Python toolkit for **Synthetic Aperture Radar (SAR)** processing with tight integration to ESA **SNAP**. It focuses on reproducible pipelines, fast tiling workflows, and advanced research features like **sub-aperture decomposition**.
+**sarpyx** is a specialized Python toolkit for **Synthetic Aperture Radar (SAR)** processing with tight integration to ESA **SNAP**. It focuses on reproducible SAR workflows, SNAP GPT orchestration, fast tiling, validation, and research features such as **sub-aperture decomposition**.
 
 ## Highlights
 
 - SNAP GPT integration with configurable graphs and operator chaining.
-- Sub-aperture decomposition for squint-angle diversity and motion sensitivity.
-- Parallel tiling and batch processing for large product volumes.
+- WorldSAR preprocessing, tiling, validation, and H5-to-Zarr conversion.
+- Generic pipeline CLI with built-in recipes for Sentinel-1, TSX, CSG, Biomass, NISAR, and Sentinel-1 InSAR.
+- Sub-aperture decomposition for Sentinel-style BEAM-DIMAP products.
 - Geocoded outputs ready for GIS and downstream ML.
-- Extensible architecture compatible with `rasterio`, `geopandas`, and `pyproj`.
+- Utilities compatible with `rasterio`, `geopandas`, `pyproj`, `h5py`, `zarr`, and `dask`.
+
+## Commands
+
+```bash
+sarpyx --help           # Top-level command dispatcher
+sarpyx worldsar --help  # WorldSAR preprocessing, tiling, validation, H5-to-Zarr
+sarpyx pipeline --help  # Explicit built-in or external pipeline recipes
+sarpyx-worldsar --help  # Compatibility WorldSAR entry point
+sarpyx-pipeline --help  # Compatibility pipeline entry point
+```
+
+## Documentation
+
+- [Documentation site](https://esa-philab.github.io/sarpyx/)
+- [Installation guide](docs/user_guide/installation.md)
+- [CLI usage examples](docs/user_guide/cli_examples.md)
+- [User guide](docs/user_guide/README.md)
+- [API reference](docs/api/README.md)
 
 ## Install
 
-For container workflows, use the Docker Compose CLI plugin (`docker compose`) with full commands:
-
-```bash
-docker compose version
-make recreate
-```
-
-<details open>
-<summary><strong>Using conda (preferred, avoids global SNAP installs)</strong></summary>
-
-The recommended installation uses conda first to provide ESA SNAP and `gpt`, then installs `sarpyx` with `pip` from this checkout. This keeps SNAP/native dependencies isolated in the environment while keeping the Python package editable.
+The recommended installation uses **conda first** to provide ESA SNAP and `gpt`, then installs `sarpyx` with pip from this checkout. This keeps SNAP/native dependencies managed by conda while keeping the Python package editable.
 
 ```bash
 conda create -n sarpyx -c sirbastiano/label/dev -c conda-forge \
@@ -54,7 +66,8 @@ Verify the installation:
 ```bash
 gpt -h
 sarpyx --help
-sarpyx-pipeline --help
+sarpyx worldsar --help
+sarpyx pipeline --help
 ```
 
 For development and tests:
@@ -65,80 +78,40 @@ python -m pip install pytest
 pytest -q
 ```
 
-</details>
-
 <details>
-<summary><strong>Using uv</strong></summary>
+<summary><strong>Using uv for repository maintenance</strong></summary>
 
 ```bash
 uv sync
-```
-
-For development, testing, and optional Copernicus tooling:
-
-```bash
 uv sync --group dev
 uv sync --group dev --extra copernicus
 uv run pytest -q
 uv build
 ```
+
 </details>
 
 <details>
-<summary><strong>Using pip (editable)</strong></summary>
+<summary><strong>Published pip package</strong></summary>
 
 ```bash
-python -m pip install -e .
-```
-</details>
-
-<details>
-<summary><strong>SNAP GPT / WorldSAR setup</strong></summary>
-
-SNAP-driven workflows need ESA SNAP's `gpt` executable. The full setup is in
-[Installation](docs/installation.html), including the `GPT_PATH` resolution order,
-conda + SNAP engine setup, and helper scripts.
-
-For the conda workflow:
-
-```bash
-conda activate sarpyx-snap
-source scripts/setvars.sh
-"$GPT_PATH" --help
+python -m pip install sarpyx
 ```
 
-`scripts/setvars.sh` exports `SNAP_HOME`, `GPT_PATH`, `gpt_path`,
-`SNAP_USERDIR`, `snap_userdir`, and updates `PATH`. `scripts/worldsar.sh`
-activates `CONDA_ENV` (default `sarpyx-snap`), sources the same helper, prints
-the resolved SNAP GPT path, and runs WorldSAR.
+The pip package is suitable for Python-side usage, but SNAP GPT workflows require a working SNAP installation available in the environment.
 
 </details>
 
+## Container usage
 
-## Docs
+For container workflows, use the Docker Compose CLI plugin:
 
-See the documentation site at https://esa-philab.github.io/sarpyx/ for installation,
-quick start, architecture, usage guides, testing, and contributing information.
+```bash
+docker compose version
+make recreate
+```
 
-## Community and citation
-
-- [Contributing guide](CONTRIBUTING.md)
-- [Security policy](SECURITY.md)
-- [Citation metadata](CITATION.cff)
-- [Reviewer smoke test](REVIEWER_SMOKE_TEST.md)
-- [JOSS paper draft](paper.md)
-
-## Container grid configuration
-
-At startup the container checks for grid files in this order:
-
-1. `GRID_PATH` (or `grid_path`) if it points to an existing in-container `*.geojson`
-2. First `*.geojson` found in `/workspace/grid`
-
-If neither exists, the container exits with an error. Automatic grid generation
-on startup has been removed.
-
-To use a mounted grid:
+At startup, the container expects a mounted grid file. Provide either `GRID_PATH` or place a `*.geojson` file under `/workspace/grid`.
 
 ```bash
 mkdir -p ./grid
@@ -146,21 +119,20 @@ mkdir -p ./grid
 docker compose up
 ```
 
-For direct `docker run`, pass an explicit in-container path when needed:
+You can also pass `--grid-path` to `sarpyx worldsar`.
 
-```bash
-docker run --rm \
-  -v "$PWD/grid:/workspace/grid:ro" \
-  -e GRID_PATH=/workspace/grid/my_region.geojson \
-  sirbastiano94/sarpyx:latest \
-  /usr/local/bin/start-jupyter.sh
-```
+## Project Links
 
-You can also pass `--grid-path` to the `worldsar` CLI command.
+- [Contributing guide](CONTRIBUTING.md)
+- [Security policy](SECURITY.md)
+- [Citation metadata](CITATION.cff)
+- [JOSS paper draft](paper.md)
+- [License](LICENSE)
 
 ##
+
 <div align="center">
 
-**With Love By:** Roberto Del Prete, Gabriele Daga, Sebastian Fieldhouse, Juanfrancisco Amieva, Cedric Leonard, Valerio Marsocci, Eva Gmelich Mejling
+**Maintainers:** Roberto Del Prete, Gabriele Daga, Sebastian Fieldhouse, Juanfrancisco Amieva, Cedric Leonard, Valerio Marsocci, Eva Gmelich Mejling
 
 </div>
