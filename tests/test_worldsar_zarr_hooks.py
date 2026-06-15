@@ -42,6 +42,48 @@ def test_worldsar_zarr_hook_writes_minimal_metadata_and_128_chunks(tmp_path: Pat
     assert dict(root["bands"]["Sigma0_VV"].attrs) == {"polarization": "VV", "unit": "linear"}
 
 
+def test_zarr_writer_promotes_stage_only_after_success(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    from sarpyx.snapflow import tile_writers
+
+    tile_path = tmp_path / "tile-a.zarr"
+    write_tile_payloads(
+        [
+            TilePayload(
+                tile_name="tile-a",
+                output_path=tile_path,
+                arrays={"Band_A": np.ones((2, 2), dtype=np.float32)},
+                abstract_attrs={},
+                band_attrs={},
+            )
+        ],
+        "zarr",
+    )
+
+    def fail_after_stage(payload: TilePayload) -> None:
+        zarr.create_group(store=payload.output_path.as_posix(), zarr_format=3, overwrite=True)
+        raise RuntimeError("simulated zarr writer failure")
+
+    monkeypatch.setitem(tile_writers._WRITERS, "zarr", fail_after_stage)
+    with pytest.raises(RuntimeError, match="simulated zarr writer failure"):
+        write_tile_payloads(
+            [
+                TilePayload(
+                    tile_name="tile-a",
+                    output_path=tile_path,
+                    arrays={"Band_B": np.full((2, 2), 2, dtype=np.float32)},
+                    abstract_attrs={},
+                    band_attrs={},
+                )
+            ],
+            "zarr",
+        )
+
+    root = zarr.open(tile_path.as_posix(), mode="r")
+    assert sorted(root["bands"].keys()) == ["Band_A"]
+    np.testing.assert_array_equal(root["bands"]["Band_A"][:], np.ones((2, 2), dtype=np.float32))
+    assert list(tmp_path.glob(".tile-a.tmp-*.zarr")) == []
+
+
 def test_cut_single_tc_tile_to_zarr_from_dimap(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     from sarpyx.snapflow import tiling as tiling_mod
 
@@ -186,13 +228,13 @@ def _write_synthetic_tc_dimap(dim_path: Path) -> Path:
     data_dir = dim_path.with_suffix(".data")
     data_dir.mkdir(parents=True)
     data = np.arange(128 * 128, dtype=np.float32).reshape(128, 128)
-    _write_envi_band(data_dir / "Sigma0_VH.img", data)
-    _write_envi_band(data_dir / "i_IW1_VH_SA1.img", np.ones((128, 128), dtype=np.float32))
-    _write_envi_band(data_dir / "q_IW1_VH_SA1.img", np.full((128, 128), 0.25, dtype=np.float32))
-    _write_envi_band(data_dir / "i_IW1_VH_SA2.img", np.full((128, 128), 0.5, dtype=np.float32))
-    _write_envi_band(data_dir / "q_IW1_VH_SA2.img", np.full((128, 128), 0.75, dtype=np.float32))
-
     crs_wkt = pyproj.CRS.from_epsg(32633).to_wkt()
+    _write_envi_band(data_dir / "Sigma0_VH.img", data, crs_wkt)
+    _write_envi_band(data_dir / "i_IW1_VH_SA1.img", np.ones((128, 128), dtype=np.float32), crs_wkt)
+    _write_envi_band(data_dir / "q_IW1_VH_SA1.img", np.full((128, 128), 0.25, dtype=np.float32), crs_wkt)
+    _write_envi_band(data_dir / "i_IW1_VH_SA2.img", np.full((128, 128), 0.5, dtype=np.float32), crs_wkt)
+    _write_envi_band(data_dir / "q_IW1_VH_SA2.img", np.full((128, 128), 0.75, dtype=np.float32), crs_wkt)
+
     band_xml = "\n".join(_spectral_band_xml(name) for name in ("Sigma0_VH", "i_IW1_VH_SA1", "q_IW1_VH_SA1", "i_IW1_VH_SA2", "q_IW1_VH_SA2"))
     data_xml = "\n".join(
         f'<Data_File><BAND_INDEX>{index}</BAND_INDEX><DATA_FILE_PATH href="./TC.data/{name}.hdr" /></Data_File>'
@@ -220,7 +262,7 @@ def _write_synthetic_tc_dimap(dim_path: Path) -> Path:
     return dim_path
 
 
-def _write_envi_band(path: Path, data: np.ndarray) -> None:
+def _write_envi_band(path: Path, data: np.ndarray, crs_wkt: str) -> None:
     import rasterio
     from rasterio.transform import from_origin
 
@@ -233,7 +275,7 @@ def _write_envi_band(path: Path, data: np.ndarray) -> None:
         count=1,
         dtype="float32",
         transform=from_origin(500000.0, 1280.0, 10.0, 10.0),
-        crs="EPSG:32633",
+        crs=crs_wkt,
     ) as dst:
         dst.write(data, 1)
 

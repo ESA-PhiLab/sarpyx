@@ -76,6 +76,13 @@ def add_worldsar_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--gpt-cache-size", dest="gpt_cache_size", type=str, default="8G")
     parser.add_argument("--gpt-parallelism", dest="gpt_parallelism", type=int, default=6)
     parser.add_argument("--gpt-timeout", dest="gpt_timeout", type=int, default=None)
+    parser.add_argument(
+        "--lock-timeout",
+        dest="lock_timeout",
+        type=float,
+        default=0.0,
+        help="Seconds to wait for a matching WorldSAR product/output lock. Defaults to fail-fast.",
+    )
     parser.add_argument("--snap-userdir", dest="snap_userdir", type=str, default=None)
     parser.add_argument(
         "--keep-intermediate",
