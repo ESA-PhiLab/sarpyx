@@ -108,11 +108,18 @@ def test_insar_pipeline_with_grid_does_not_require_product_wkt(monkeypatch, tmp_
     assert captured["master"] == master
     assert captured["slave"] == slave
     assert captured["recipe"][0].params["subswath"] is None
+    assert captured["recipe"][0].params["selected_polarisations"] is None
     assert "product_wkt" not in captured["metadata"]
     assert captured["metadata"]["product_mode"] == "S1INSAR"
     assert captured["metadata"]["grid_path"] == grid
     assert captured["metadata"]["cuts_outdir"] == tmp_path / "cuts"
     assert captured["metadata"]["tile_writer"] == "zarr"
+
+
+def test_insar_pair_script_uses_automatic_polarisation_selection_by_default():
+    script = Path("scripts/insar_pair.sh").read_text(encoding="utf-8")
+
+    assert "selected_polarisations" not in script
 
 
 def test_pipeline_runner_loads_external_single_product_file(tmp_path: Path):
