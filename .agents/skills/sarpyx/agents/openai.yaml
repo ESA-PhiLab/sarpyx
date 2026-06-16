@@ -1,0 +1,7 @@
+interface:
+  display_name: "Sarpyx Processing"
+  short_description: "Run sarpyx and any registered SNAP GPT operator"
+  default_prompt: "Use $sarpyx to run a WorldSAR, pipeline, or any SNAP GPT operator from my SAR product inputs."
+
+policy:
+  allow_implicit_invocation: true

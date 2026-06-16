@@ -895,6 +895,61 @@ def test_run_tops_swath_tiling_validates_existing_tiles_when_tiling_disabled(tmp
     ]
 
 
+def test_tiling_step_derives_wkt_when_metadata_has_no_product_wkt(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    calls = {}
+    intermediate = tmp_path / "terrain_corrected.dim"
+
+    class Ctx:
+        original_product = tmp_path / "master.SAFE"
+        gpt_kwargs = {"gpt_memory": None, "gpt_parallelism": None, "gpt_timeout": None, "gpt_cache_size": None}
+        metadata = {
+            "grid_path": tmp_path / "grid.geojson",
+            "cuts_outdir": tmp_path / "cuts",
+            "product_mode": "S1INSAR",
+            "tile_writer": "zarr",
+        }
+
+    def fake_resolve(product_wkt, source_product, intermediate_product, product_mode, swath=None):
+        calls["resolve"] = (product_wkt, Path(source_product), Path(intermediate_product), product_mode, swath)
+        return "POLYGON ((10 45, 10.1 45, 10.1 44.9, 10 44.9, 10 45))"
+
+    def fake_run_tiling(product_wkt, grid_path, source_product, intermediate_product, cuts_outdir, product_mode, **kwargs):
+        calls["tiling"] = (product_wkt, Path(grid_path), Path(source_product), Path(intermediate_product), Path(cuts_outdir), product_mode, kwargs)
+        return {
+            "name": "terrain_corrected",
+            "cut_failed": False,
+            "report_path": tmp_path / "cuts" / "cut_report.json",
+            "cuts_dir": tmp_path / "cuts",
+            "actual_tiles": ["tile-a"],
+        }
+
+    monkeypatch.setattr(tiling_runtime_mod.config, "tiling", True)
+    monkeypatch.setattr(tiling_runtime_mod, "_resolve_tiling_wkt", fake_resolve)
+    monkeypatch.setattr(tiling_runtime_mod, "_run_tiling", fake_run_tiling)
+    monkeypatch.setattr(
+        tiling_runtime_mod,
+        "validate_worldsar_zarr_tile_group",
+        lambda *_args, **_kwargs: {"name": "terrain_corrected", "rows": [], "results": [{"status": "success"}], "tile_writer": "zarr"},
+    )
+    monkeypatch.setattr(tiling_runtime_mod, "_write_h5_validation_report_pdf", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(tiling_runtime_mod, "_write_tiling_manifest", lambda *_args, **_kwargs: None)
+
+    result = tiling_runtime_mod.run_tiling_step(Ctx(), intermediate)
+
+    expected_wkt = "POLYGON ((10 45, 10.1 45, 10.1 44.9, 10 44.9, 10 45))"
+    assert calls["resolve"] == (None, tmp_path / "master.SAFE", intermediate, "S1INSAR", None)
+    assert calls["tiling"][:6] == (
+        expected_wkt,
+        tmp_path / "grid.geojson",
+        tmp_path / "master.SAFE",
+        intermediate,
+        tmp_path / "cuts",
+        "S1INSAR",
+    )
+    assert result["tiling_result"]["pre_tc_wkt"] == expected_wkt
+    assert result["tiling_result"]["post_tc_wkt"] == expected_wkt
+
+
 def test_finalize_tops_tiling_merges_swath_db_rows_with_product_name(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     merge_calls: list[tuple[tuple[tuple[dict[str, str], ...], ...], Path, str]] = []
     delete_calls: list[tuple[Path, tuple[str, ...], str]] = []

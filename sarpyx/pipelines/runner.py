@@ -22,7 +22,6 @@ from sarpyx.snapflow.preprocessing import (
     run_sentinel_tops_pipeline,
     run_tsx_csg_pipeline,
 )
-from sarpyx.snapflow.product import resolve_product_wkt
 from sarpyx.snapflow.runtime import make_context, run_steps
 
 
@@ -140,8 +139,6 @@ def _run_double(spec, master, slave, output_dir, params, gpt_memory, gpt_paralle
     if master is None or slave is None:
         raise ValueError(f"Pipeline {spec.name!r} requires --master and --slave.")
     master_path = Path(master).expanduser()
-    if product_wkt is None and grid_path is not None and cuts_outdir is not None:
-        product_wkt = resolve_product_wkt(type("Args", (), {"product_wkt": None})(), master_path, spec.product_mode or "CUSTOM")
     cuts_outdir = Path(cuts_outdir).expanduser() if cuts_outdir else output_dir / "tiles"
     return run_insar_pipeline(
         master_path,
@@ -174,15 +171,17 @@ def _recipe(module: ModuleType, params: dict[str, Any]):
 
 
 def _tiling_metadata(spec, product_wkt, grid_path, cuts_outdir, tile_writer, pre_write_hook=None, product_name=None):
-    if product_wkt is None or grid_path is None or cuts_outdir is None:
+    if grid_path is None or cuts_outdir is None:
         return {}
+    product_mode = getattr(spec.module, "PRODUCT_MODE", spec.product_mode or "CUSTOM")
     metadata = {
-        "product_wkt": product_wkt,
         "grid_path": Path(grid_path).expanduser(),
         "cuts_outdir": Path(cuts_outdir).expanduser(),
-        "product_mode": getattr(spec.module, "PRODUCT_MODE", spec.product_mode or "CUSTOM"),
+        "product_mode": product_mode,
         "tile_writer": tile_writer,
     }
+    if product_wkt is not None:
+        metadata["product_wkt"] = product_wkt
     if pre_write_hook is not None:
         metadata["pre_write_hook"] = pre_write_hook
     if product_name is not None:

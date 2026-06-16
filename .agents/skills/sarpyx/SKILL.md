@@ -1,6 +1,6 @@
 ---
-name: sarpyx-processing
-description: Use when asked to run, automate, preflight, validate, or summarize sarpyx SAR processing jobs, including WorldSAR, explicit sarpyx pipeline recipes, SNAP GPT operators listed in sarpyx/snapflow/op.py, tiling, H5-to-Zarr conversion, mission recipes, validation targets, Docker/SIF workflows, or HPC upload operations.
+name: sarpyx
+description: Use when asked to run, automate, preflight, validate, or summarize sarpyx SAR processing jobs, including WorldSAR, pipeline recipes, any SNAP GPT operator declared in sarpyx/snapflow/op.py, operator discovery/help, tiling, H5-to-Zarr conversion, mission recipes, validation targets, Docker/SIF workflows, or HPC upload operations.
 ---
 
 # Sarpyx Processing
@@ -12,20 +12,20 @@ The authoritative CLI surface is:
 - `uv run sarpyx pipeline ...`
 
 Treat older examples such as `uv run sarpyx --input ...` as stale until `uv run sarpyx --help` proves otherwise.
-For arbitrary SNAP GPT operations, use `scripts/snap_operator.py`; it validates the requested operator against `sarpyx/snapflow/op.py`.
+For arbitrary SNAP GPT operations, use `scripts/snap_operator.py`; it parses `sarpyx/snapflow/op.py` and validates the requested operator against the live `snap_operators` registry.
 
 ## Preflight First
 
 Before heavy processing or operational Makefile targets, run:
 
 ```bash
-python .agents/skills/sarpyx-processing/scripts/preflight.py --repo /Users/roberto.delprete/Downloads/sarpyx
+python .agents/skills/sarpyx/scripts/preflight.py --repo /Users/roberto.delprete/Downloads/sarpyx
 ```
 
 Add known inputs, for example:
 
 ```bash
-python .agents/skills/sarpyx-processing/scripts/preflight.py \
+python .agents/skills/sarpyx/scripts/preflight.py \
   --repo /Users/roberto.delprete/Downloads/sarpyx \
   --mode worldsar \
   --input /data/product.SAFE \
@@ -44,7 +44,15 @@ Stop and ask for missing values when preflight reports blockers for input produc
 - `s1_insar` is double-product and needs `--master` and `--slave`; the other built-ins are single-product and need `--input`.
 - Use `--param NAME=VALUE` for recipe options; values are parsed as JSON when possible.
 - Use `--h5-to-zarr-only` only with `sarpyx worldsar`.
-- Use `scripts/snap_operator.py` when the user asks for any SNAP operation/operator from `sarpyx/snapflow/op.py`, including operators not wrapped by `sarpyx pipeline` or `worldsar`.
+- Use `scripts/snap_operator.py` when the user asks for any SNAP GPT operation/operator from `sarpyx/snapflow/op.py`, including operators not wrapped by `sarpyx pipeline` or `worldsar`.
+
+## Full GPT Operator Coverage
+
+- Do not maintain a copied operator list in this skill. `snap_operator.py --list` is the coverage source because it reads `snap_operators` from `sarpyx/snapflow/op.py`.
+- Use exact operator names from `--list`; quote names containing spaces, for example `"Multi-size Mosaic"`.
+- Use `--dry-run` to validate registry coverage and command shape without SNAP installed. A dry run can prove the operator is declared and the command can be built; it cannot prove SNAP runtime parameters are sufficient.
+- Use `--help-operator --gpt-path /path/to/gpt` before running unfamiliar operators so SNAP reports required `-S` sources and `-P` parameters.
+- Use `--source NAME=PATH` for named source inputs, `--input PATH` for the default `source`, repeat `--param NAME=VALUE`, and append unusual GPT options with `--raw-arg`.
 
 ## Autonomy Rules
 
@@ -91,7 +99,7 @@ uv run sarpyx pipeline s1_insar \
 Generic SNAP operator from `sarpyx/snapflow/op.py`:
 
 ```bash
-python .agents/skills/sarpyx-processing/scripts/snap_operator.py \
+python .agents/skills/sarpyx/scripts/snap_operator.py \
   --repo /Users/roberto.delprete/Downloads/sarpyx \
   --operator Calibration \
   --input /data/product.SAFE \
@@ -104,8 +112,9 @@ python .agents/skills/sarpyx-processing/scripts/snap_operator.py \
 For operator discovery or parameters:
 
 ```bash
-python .agents/skills/sarpyx-processing/scripts/snap_operator.py --repo /Users/roberto.delprete/Downloads/sarpyx --list
-python .agents/skills/sarpyx-processing/scripts/snap_operator.py --repo /Users/roberto.delprete/Downloads/sarpyx --operator Terrain-Correction --help-operator --gpt-path /opt/esa-snap/bin/gpt
+python .agents/skills/sarpyx/scripts/snap_operator.py --repo /Users/roberto.delprete/Downloads/sarpyx --list
+python .agents/skills/sarpyx/scripts/snap_operator.py --repo /Users/roberto.delprete/Downloads/sarpyx --operator Terrain-Correction --help-operator --gpt-path /opt/esa-snap/bin/gpt
+python .agents/skills/sarpyx/scripts/snap_operator.py --repo /Users/roberto.delprete/Downloads/sarpyx --operator "Multi-size Mosaic" --dry-run
 ```
 
 Use `--source NAME=PATH` for non-default source parameters, repeat `--param NAME=VALUE` for `-P` parameters, and use `--dry-run` before destructive or expensive runs.

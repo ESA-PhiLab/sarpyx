@@ -76,6 +76,45 @@ def test_pipeline_cli_dispatches_builtin_double_product(monkeypatch, tmp_path: P
     assert captured["metadata"]["tile_writer"] == "zarr"
 
 
+def test_insar_pipeline_with_grid_does_not_require_product_wkt(monkeypatch, tmp_path: Path):
+    master = tmp_path / "master.SAFE"
+    slave = tmp_path / "slave.SAFE"
+    grid = tmp_path / "grid.geojson"
+    master.mkdir()
+    slave.mkdir()
+    grid.write_text("{}", encoding="utf-8")
+    captured = {}
+
+    def fake_run_insar_pipeline(master_path, slave_path, outdir, **kwargs):
+        captured["master"] = Path(master_path)
+        captured["slave"] = Path(slave_path)
+        captured["recipe"] = kwargs["recipe"]
+        captured["metadata"] = kwargs["metadata"]
+        return Path(outdir) / "pair" / "tc.dim"
+
+    monkeypatch.setattr(pipeline_runner, "run_insar_pipeline", fake_run_insar_pipeline)
+
+    result = pipeline_runner.run_pipeline_target(
+        "s1_insar",
+        master=master,
+        slave=slave,
+        output_dir=tmp_path / "out",
+        gpt_path=sys.executable,
+        grid_path=grid,
+        cuts_outdir=tmp_path / "cuts",
+    )
+
+    assert result == tmp_path / "out" / "pair" / "tc.dim"
+    assert captured["master"] == master
+    assert captured["slave"] == slave
+    assert captured["recipe"][0].params["subswath"] is None
+    assert "product_wkt" not in captured["metadata"]
+    assert captured["metadata"]["product_mode"] == "S1INSAR"
+    assert captured["metadata"]["grid_path"] == grid
+    assert captured["metadata"]["cuts_outdir"] == tmp_path / "cuts"
+    assert captured["metadata"]["tile_writer"] == "zarr"
+
+
 def test_pipeline_runner_loads_external_single_product_file(tmp_path: Path):
     pipeline_file = tmp_path / "custom_pipeline.py"
     pipeline_file.write_text(

@@ -14,18 +14,19 @@ from sarpyx.snapflow.reports import (
     create_merged_tile_database_from_groups,
     delete_swath_tile_databases,
 )
-from sarpyx.snapflow.tiling import _resolve_tiling_wkt, _run_tiling, _verify_tops_tile_coverage
+from sarpyx.snapflow.footprint_wkt import resolve_tiling_wkt as _resolve_tiling_wkt
+from sarpyx.snapflow.tiling import _run_tiling, _verify_tops_tile_coverage
 from sarpyx.snapflow.tile_writers import normalize_tile_writer
 
 
 def _tiling_metadata(ctx):
     metadata = ctx.metadata
-    required = ("product_wkt", "grid_path", "cuts_outdir", "product_mode")
+    required = ("grid_path", "cuts_outdir", "product_mode")
     missing = [name for name in required if name not in metadata]
     if missing:
         return None
     return {
-        "product_wkt": metadata["product_wkt"],
+        "product_wkt": metadata.get("product_wkt"),
         "grid_path": Path(metadata["grid_path"]),
         "cuts_outdir": Path(metadata["cuts_outdir"]),
         "product_mode": metadata["product_mode"],
@@ -76,6 +77,8 @@ def run_tiling_step(ctx, intermediate_product, swath: str | None = None, collect
         direct_cuts_dir = collapse_swath_tiles
     name = intermediate_product.stem
     tiling_wkt = _resolve_tiling_wkt(product_wkt, source_product, intermediate_product, product_mode, swath=swath)
+    if not tiling_wkt:
+        raise ValueError(f"No product WKT provided and failed to derive a raster footprint from: {intermediate_product}")
     if config.tiling:
         terrain_correction = data.get("terrain_correction_runs", {}).get(str(intermediate_product))
         tiling_result = _run_tiling(
@@ -93,7 +96,7 @@ def run_tiling_step(ctx, intermediate_product, swath: str | None = None, collect
             report_outdir=cut_report_outdir,
             **data["gpt_kwargs"],
         )
-        tiling_result["pre_tc_wkt"] = product_wkt
+        tiling_result["pre_tc_wkt"] = product_wkt or tiling_wkt
         tiling_result["post_tc_wkt"] = tiling_wkt
         _write_tiling_manifest(tiling_result["report_path"], tiling_result)
         name = tiling_result["name"]
@@ -109,7 +112,7 @@ def run_tiling_step(ctx, intermediate_product, swath: str | None = None, collect
             validation_cuts_dir,
             intermediate_product,
             swath=swath,
-            tiling_result={"pre_tc_wkt": product_wkt, "post_tc_wkt": tiling_wkt, "source_wkt": tiling_wkt, "report_source_wkt": tiling_wkt},
+            tiling_result={"pre_tc_wkt": product_wkt or tiling_wkt, "post_tc_wkt": tiling_wkt, "source_wkt": tiling_wkt, "report_source_wkt": tiling_wkt},
         )
         tiling_result = {"cut_failed": False, "name": name, "cuts_dir": validation_cuts_dir}
     if validation_group["rows"]:
