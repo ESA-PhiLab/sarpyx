@@ -94,7 +94,7 @@ COPY sarpyx ./sarpyx
 
 # Install sarpyx once in the final image.
 RUN python3.11 -m pip install --upgrade pip setuptools wheel && \
-    python3.11 -m pip install --no-cache-dir . && \
+    python3.11 -m pip install --no-cache-dir ".[geo,io,processing,viz]" && \
     python3.11 -c "import sarpyx; print('sarpyx installed successfully')" && \
     rm -rf /tmp/* /var/tmp/*
 

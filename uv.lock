@@ -4293,7 +4293,7 @@ viz = [
 [package.dev-dependencies]
 dev = [
     { name = "pytest" },
-    { name = "sarpyx", extra = ["processing", "torch", "viz"] },
+    { name = "sarpyx", extra = ["geo", "io", "processing", "torch", "viz"] },
 ]
 
 [package.metadata]
@@ -4352,7 +4352,7 @@ provides-extras = ["copernicus", "geo", "hf", "io", "notebook", "processing", "t
 [package.metadata.requires-dev]
 dev = [
     { name = "pytest", specifier = "==8.4.0" },
-    { name = "sarpyx", extras = ["processing", "torch", "viz"] },
+    { name = "sarpyx", extras = ["geo", "io", "processing", "torch", "viz"] },
 ]
 
 [[package]]

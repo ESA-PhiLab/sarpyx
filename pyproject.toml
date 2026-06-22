@@ -106,8 +106,13 @@ all = [
 
 [project.scripts]
 sarpyx = "sarpyx.cli.main:main"
+sarpyx-decode = "sarpyx.cli.legacy:decode_main"
+sarpyx-focus = "sarpyx.cli.legacy:focus_main"
 sarpyx-worldsar = "sarpyx.cli.worldsar:main"
 sarpyx-pipeline = "sarpyx.cli.pipeline:main"
+sarpyx-shipdet = "sarpyx.cli.legacy:shipdet_main"
+sarpyx-unzip = "sarpyx.cli.legacy:unzip_main"
+sarpyx-upload = "sarpyx.cli.legacy:upload_main"
 
 [tool.setuptools]
 include-package-data = false
@@ -119,5 +124,5 @@ namespaces = false
 [dependency-groups]
 dev = [
     "pytest==8.4.0",
-    "sarpyx[processing,torch,viz]",
+    "sarpyx[geo,io,processing,torch,viz]",
 ]
