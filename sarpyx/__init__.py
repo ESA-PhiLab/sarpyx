@@ -11,16 +11,17 @@ from pathlib import Path
 
 def _resolve_version() -> str:
     try:
+        import tomllib
+
+        pyproject = Path(__file__).resolve().parents[1] / 'pyproject.toml'
+        with pyproject.open('rb') as handle:
+            return tomllib.load(handle)['project']['version']
+    except Exception:
+        pass
+    try:
         return version('sarpyx')
     except PackageNotFoundError:
-        try:
-            import tomllib
-
-            pyproject = Path(__file__).resolve().parents[1] / 'pyproject.toml'
-            with pyproject.open('rb') as handle:
-                return tomllib.load(handle)['project']['version']
-        except Exception:
-            return '0+unknown'
+        return '0+unknown'
 
 
 __version__ = _resolve_version()

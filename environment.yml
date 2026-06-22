@@ -1,8 +1,8 @@
 # Conda environment for installing sarpyx with ESA SNAP GPT.
 #
-# Create/update from the repository root:
-#   conda env create -f environment.yml
-#   conda activate sarpyx
+# Create/update a local prefix from the repository root:
+#   conda env create -p .conda/sarpyx -f environment.yml
+#   conda activate .conda/sarpyx
 #
 # Verify SNAP and sarpyx:
 #   gpt -h
@@ -10,10 +10,10 @@
 #   sarpyx-pipeline --help
 #
 # For SNAP-heavy workflows, source the helper after activation:
-#   source scripts/setvars.sh
+#   gpt -h
 #
-# The README pins SNAP through the sirbastiano dev label and installs sarpyx
-# editable from this checkout.
+# SNAP is installed through the sirbastiano dev label. sarpyx is installed
+# editable with the copernicus extra so phidown is available in the env.
 name: sarpyx
 channels:
   - sirbastiano/label/dev
@@ -23,4 +23,4 @@ dependencies:
   - pip
   - snap13=13.0.0
   - pip:
-      - -e .
+      - -e .[copernicus]

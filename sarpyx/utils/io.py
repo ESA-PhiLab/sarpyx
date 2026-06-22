@@ -8,7 +8,6 @@ from scipy import io
 import gc
 from typing import Optional, Tuple, Union, Dict, Any, List, Callable
 import numpy as np
-import matplotlib.pyplot as plt
 
 from .meta import extract_core_metadata_sentinel
 
@@ -137,6 +136,8 @@ class ArraySlicer:
         Args:
             figsize (Tuple[int, int]): Figure size for the plot
         """
+        import matplotlib.pyplot as plt
+
         if not self.slice_info:
             raise ValueError('No slice information available. Call slice_array() first.')
             

@@ -113,6 +113,8 @@ def validate_runtime_args(args) -> None:
         raise ValueError(f"--gpt-parallelism must be > 0, got {args.gpt_parallelism}")
     if args.gpt_timeout is not None and args.gpt_timeout < 0:
         raise ValueError(f"--gpt-timeout must be >= 0, got {args.gpt_timeout}")
+    if args.lock_timeout is not None and args.lock_timeout < 0:
+        raise ValueError(f"--lock-timeout must be >= 0, got {args.lock_timeout}")
     if len(args.zarr_chunk_size) != 2 or any(size <= 0 for size in args.zarr_chunk_size):
         raise ValueError(f"--zarr-chunk-size must contain two positive integers, got {args.zarr_chunk_size}")
     if args.sentinel_first_burst is not None and args.sentinel_first_burst < 1:

@@ -14,7 +14,6 @@ authors = [
     { name = "Juanfrancisco Amieva" },
     { name = "Cedric Leonard" },
     { name = "Valerio Marsocci" },
-    { name = "Solene Debuysere" },
     { name = "Eva Gmelich Mejling" },
 ]
 license = "Apache-2.0"

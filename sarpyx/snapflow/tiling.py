@@ -6,14 +6,14 @@ from pathlib import Path
 
 from sarpyx.hooks.worldsar import product_output_name
 from sarpyx.utils.geos import grid_cell_utm_bbox
-from sarpyx.utils.wkt_utils import sentinel1_swath_wkt_extractor_safe
 from sarpyx.utils.worldsar_h5 import normalize_expected_tile_geometries
 from sarpyx.snapflow import config
+from sarpyx.snapflow.footprint_wkt import resolve_tiling_wkt as _resolve_tiling_wkt
 from sarpyx.snapflow.gpt import run_gpt_op
 from sarpyx.snapflow.h5_quality import summarize_h5_raster_quality, summarize_zarr_raster_quality
 from sarpyx.snapflow.nisar_tiles import write_nisar_bbox_tile
 from sarpyx.snapflow.product import extract_product_id
-from sarpyx.snapflow.raster import _dim_footprint_wkt, _pixel_region_is_within_bounds, _read_geotransform, _read_raster_size, _update_h5_corners, _utm_bbox_to_pixel_region, _write_tile_subsets_from_dim, _write_tile_subsets_from_dim_rectangles
+from sarpyx.snapflow.raster import _pixel_region_is_within_bounds, _read_geotransform, _read_raster_size, _update_h5_corners, _utm_bbox_to_pixel_region, _write_tile_subsets_from_dim, _write_tile_subsets_from_dim_rectangles
 from sarpyx.snapflow.report_manifest import write_tiling_manifest
 from sarpyx.snapflow.reports import _write_cut_report
 from sarpyx.snapflow.tile_writers import normalize_tile_writer, tile_glob_pattern, tile_output_path
@@ -263,20 +263,6 @@ def _run_tiling(
     }
     write_tiling_manifest(report_path, tiling_result)
     return tiling_result
-
-
-def _resolve_tiling_wkt(product_wkt, source_product, intermediate_product, product_mode, swath=None):
-    intermediate_path = Path(intermediate_product)
-    if intermediate_path.suffix.lower() == ".dim":
-        try:
-            return _dim_footprint_wkt(intermediate_path)
-        except Exception as exc:
-            print(f"[WARN] Failed to derive raster footprint from {intermediate_path}: {type(exc).__name__}: {exc}")
-    if product_mode == "S1TOPS" and swath:
-        derived_wkt = sentinel1_swath_wkt_extractor_safe(source_product, swath, display_results=False, verbose=False)
-        if derived_wkt:
-            return derived_wkt
-    return product_wkt
 
 
 def _run_tops_swath_tiling(product_wkt, grid_geoj_path, product_path, intermediate, cuts_outdir, product_mode, gpt_kwargs, tile_writer="zarr", pre_write_hook=None):

@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import json
+import os
 import pickle
 import shutil
-from dataclasses import dataclass, field
+import uuid
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any, Callable
 
@@ -80,8 +82,11 @@ def write_tile_payloads(payloads: list[TilePayload], writer: str | None = None, 
         prepared = pre_write_hook(payload) if pre_write_hook else None
         payload = prepared or payload
         payload.output_path.parent.mkdir(parents=True, exist_ok=True)
-        _remove_existing(payload.output_path)
-        _WRITERS[normalized](payload)
+        if normalized == "zarr":
+            _write_staged_zarr(payload)
+        else:
+            _remove_existing(payload.output_path)
+            _WRITERS[normalized](payload)
         paths.append(payload.output_path)
     return paths
 
@@ -93,6 +98,22 @@ def _remove_existing(path: Path) -> None:
         path.unlink(missing_ok=True)
     if path.suffix == ".npy":
         path.with_suffix(path.suffix + ".json").unlink(missing_ok=True)
+
+
+def _write_staged_zarr(payload: TilePayload) -> None:
+    stage = _staged_zarr_path(payload.output_path)
+    _remove_existing(stage)
+    try:
+        _WRITERS["zarr"](replace(payload, output_path=stage))
+        _remove_existing(payload.output_path)
+        stage.replace(payload.output_path)
+    except Exception:
+        _remove_existing(stage)
+        raise
+
+
+def _staged_zarr_path(path: Path) -> Path:
+    return path.parent / f".{path.stem}.tmp-{os.getpid()}-{uuid.uuid4().hex}.zarr"
 
 
 def _json_safe(value: Any) -> Any:

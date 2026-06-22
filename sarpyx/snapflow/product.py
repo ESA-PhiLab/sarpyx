@@ -8,12 +8,11 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 
 from sarpyx.utils.wkt_utils import (
-    nisar_wkt_extractor,
     sentinel1_wkt_extractor_cdse,
     sentinel1_wkt_extractor_manifest,
-    terrasar_wkt_extractor,
 )
 from sarpyx.snapflow.config import _env
+from sarpyx.snapflow.footprint_wkt import resolve_source_product_wkt
 
 TERRASAR_GEOCODED_VARIANTS = frozenset({"EEC", "GEC"})
 TERRASAR_COMPLEX_VARIANTS = frozenset({"SSC", "SLC"})
@@ -220,8 +219,8 @@ def resolve_product_wkt(args, product_path, product_mode) -> str:
         if product_wkt is None:
             raise ValueError(f"Failed to extract Sentinel-1 WKT for product: {product_path}")
         return product_wkt
-    if product_mode == "NISAR":
-        return nisar_wkt_extractor(product_path)
-    if product_mode == "TSX":
-        return terrasar_wkt_extractor(_resolve_terrasar_product_xml(product_path))
+    if product_mode in {"NISAR", "TSX", "BM", "BIOMASS"}:
+        product_wkt = resolve_source_product_wkt(product_path, product_mode)
+        if product_wkt is not None:
+            return product_wkt
     raise ValueError("No --product-wkt/PRODUCT_WKT provided and automatic WKT extraction is unavailable.")

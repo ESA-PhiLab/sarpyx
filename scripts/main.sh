@@ -112,6 +112,7 @@ PRODUCT_NAME="$(basename "${PROD_PATH}")"
 # ---- Parameters ----
 GPT_MEMORY="${GPT_MEMORY:-64G}"
 GPT_TIMEOUT="${GPT_TIMEOUT:-3600}"
+LOCK_TIMEOUT="${LOCK_TIMEOUT:-0}"
 SENTINEL_SUBAPS="${SENTINEL_SUBAPS:-2}"
 # SNAP userdir stores cache/config; GPT binary location is independent.
 GPT_PATH="${GPT_PATH:-gpt}"
@@ -128,7 +129,6 @@ GRID_HOST_DIR="${GRID_HOST_DIR:-}"
 [[ -d "${PY_SCRIPT_DIR}" ]] || { echo "ERROR: PY_SCRIPT_DIR not found: ${PY_SCRIPT_DIR}" >&2; exit 2; }
 [[ -f "${SIF_IMAGE}" ]]    || { echo "ERROR: SIF_IMAGE not found: ${SIF_IMAGE}" >&2; exit 2; }
 [[ -e "${PROD_PATH}" ]]    || { echo "ERROR: PROD_PATH not found: ${PROD_PATH}" >&2; exit 2; }
-[[ -d "${SNAP_USER_DIR}" ]] || { echo "ERROR: SNAP_USER_DIR not found: ${SNAP_USER_DIR}" >&2; exit 2; }
 [[ "${GRID_PATH}" == /* ]] || { echo "ERROR: GRID_PATH must be an absolute in-container path: ${GRID_PATH}" >&2; exit 2; }
 [[ "${GRID_PATH}" == *.geojson ]] || { echo "ERROR: GRID_PATH must end with .geojson: ${GRID_PATH}" >&2; exit 2; }
 [[ "${SENTINEL_SUBAPS}" =~ ^[0-9]+$ ]] || { echo "ERROR: SENTINEL_SUBAPS must be an integer: ${SENTINEL_SUBAPS}" >&2; exit 2; }
@@ -165,6 +165,10 @@ if ! mkdir -p "${OUTPUT_PATH}" "${CUTS_OUTDIR}" "${DB_DIR}"; then
     exit 2
   fi
 fi
+
+source "${SCRIPT_DIR}/snap_userdir.sh"
+worldsar_configure_snap_userdir "${PRODUCT_NAME}" "${OUTPUT_PATH}"
+[[ -d "${SNAP_USER_DIR}" ]] || { echo "ERROR: SNAP_USER_DIR not found: ${SNAP_USER_DIR}" >&2; exit 2; }
 
 # ---- Grid binding ----
 # Preferred mode: bind one exact host grid file to GRID_PATH in the container.
@@ -229,6 +233,9 @@ echo "OUTPUT_PATH=${OUTPUT_PATH}"
 echo "CUTS_OUTDIR=${CUTS_OUTDIR}"
 echo "DB_DIR=${DB_DIR}"
 echo "SNAP_USER_DIR=${SNAP_USER_DIR}"
+echo "SNAP_USER_BASE_DIR=${SNAP_USER_BASE_DIR:-}"
+echo "SNAP_USERDIR_MODE=${SNAP_USERDIR_MODE:-isolated}"
+echo "SNAP_USERDIR_SEED_MODE=${SNAP_USERDIR_SEED_MODE:-light}"
 echo "GRID_FILE=${GRID_FILE}"
 echo "GRID_HOST_DIR=${GRID_HOST_DIR}"
 echo "GRID_BIND=${GRID_BIND_SOURCE}:${GRID_BIND_TARGET}:ro"
@@ -260,4 +267,5 @@ echo "SENTINEL_SUBAPS=${SENTINEL_SUBAPS}"
     --gpt-memory "${GPT_MEMORY}" \
     --gpt-parallelism "${GPT_PARALLELISM}" \
     --gpt-timeout "${GPT_TIMEOUT}" \
+    --lock-timeout "${LOCK_TIMEOUT}" \
     --sentinel-subaps "${SENTINEL_SUBAPS}"

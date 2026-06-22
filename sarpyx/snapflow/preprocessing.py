@@ -36,10 +36,9 @@ def _tiling_metadata(
     report_outdir=None,
     product_name=None,
 ) -> dict:
-    if product_wkt is None or grid_path is None or cuts_outdir is None or product_mode is None:
+    if grid_path is None or cuts_outdir is None or product_mode is None:
         return {}
     metadata = {
-        "product_wkt": product_wkt,
         "grid_path": grid_path,
         "cuts_outdir": cuts_outdir,
         "product_mode": product_mode,
@@ -47,6 +46,8 @@ def _tiling_metadata(
         "tile_writer": tile_writer,
         "pre_write_hook": pre_write_hook,
     }
+    if product_wkt is not None:
+        metadata["product_wkt"] = product_wkt
     if report_outdir is not None:
         metadata["report_outdir"] = report_outdir
     if product_name is not None:

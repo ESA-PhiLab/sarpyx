@@ -135,10 +135,13 @@ uv run sarpyx pipeline s1_insar \
   --grid-path /data/grid/grid_10km.geojson \
   --cuts-outdir /data/out/insar/tiles \
   --gpt-path "$GPT_PATH" \
-  --param subswath=IW2 \
   --param selected_polarisations='["VV"]' \
   --param use_esd=false
 ```
+
+This runs the full swath by default. Add `--param subswath=IW2` only when you
+want a single-subswath InSAR run. Do not pass `--product-wkt`; `s1_insar` derives
+the tiling footprint from the terrain-corrected BEAM-DIMAP output.
 
 `--param NAME=VALUE` parses JSON values when possible. For example, `false` becomes a boolean, `2` becomes an integer, and `'["VV"]'` becomes a list.
 
@@ -179,5 +182,24 @@ After a run, inspect only the declared output roots:
 rg --files /data/out/worldsar /data/out/worldsar/tiles \
   | rg '\.(dim|h5|zarr|tif|tiff|npz|npy|pkl|txt|pdf|json)$'
 ```
+
+For `s1_insar`, check the pair output and the declared tile directory:
+
+```bash
+INSAR_OUT=/data/out/insar
+INSAR_TILES=/data/out/insar/tiles
+
+rg --files "$INSAR_OUT" "$INSAR_TILES" \
+  | rg '\.(dim|zarr|json|pdf)$|cut_report'
+```
+
+Expected InSAR artifacts include the terrain-corrected BEAM-DIMAP product,
+Zarr tile stores under `--cuts-outdir`, a cut report, and a validation PDF.
+
+For the August 2024 Sentinel-1 pair used in local regression work, the helper
+`scripts/insar_pair.sh` downloads the exact products with phidown, runs the
+full-swath recipe, and performs the same artifact checks. Run
+`scripts/insar_pair.sh --preflight` first to validate local tooling, paths, and
+free space without starting the download.
 
 For setup details, see [Installation](installation.md). For more pipeline-specific detail, see [Generic Pipeline CLI](pipeline_cli.md).

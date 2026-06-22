@@ -9,6 +9,7 @@ from sarpyx.hooks.subap_features import SubapFeatureConfig
 from sarpyx.hooks.worldsar import make_worldsar_zarr_tile_hook, product_output_name
 from sarpyx.utils.worldsar_h5 import convert_tile_h5_to_zarr
 from sarpyx.snapflow import config
+from sarpyx.snapflow.locks import worldsar_product_lock
 from sarpyx.snapflow.tile_writers import normalize_tile_writer
 from sarpyx.pipelines.single_product import s1_tops
 from sarpyx.snapflow.preprocessing import (
@@ -299,49 +300,51 @@ def run(args) -> int:
         db_dir = config._expand_path(config.DB_DIR) if config.DB_DIR else output_dir / "db"
         config.DB_DIR = str(db_dir)
         db_dir.mkdir(parents=True, exist_ok=True)
-    base_path = config._expand_path(config.BASE_PATH)
-    grid_path = config._expand_path(config.GRID_PATH) if config.GRID_PATH else base_path / "grid" / "grid_10km.geojson"
-    grid_path = config.ensure_grid_file(grid_path, base_path)
-    product_mode = infer_product_mode(product_path)
-    print(f"Inferred product mode: {product_mode}")
-    tile_writer = normalize_tile_writer(args.tile_writer)
-    product_name = product_output_name(product_path)
-    pre_write_hook = None
-    if tile_writer == "zarr":
-        pre_write_hook = make_worldsar_zarr_tile_hook(
+    with worldsar_product_lock(product_path, output_dir, timeout=args.lock_timeout) as lock_path:
+        print(f"WorldSAR product lock: {lock_path}")
+        base_path = config._expand_path(config.BASE_PATH)
+        grid_path = config._expand_path(config.GRID_PATH) if config.GRID_PATH else base_path / "grid" / "grid_10km.geojson"
+        grid_path = config.ensure_grid_file(grid_path, base_path)
+        product_mode = infer_product_mode(product_path)
+        print(f"Inferred product mode: {product_mode}")
+        tile_writer = normalize_tile_writer(args.tile_writer)
+        product_name = product_output_name(product_path)
+        pre_write_hook = None
+        if tile_writer == "zarr":
+            pre_write_hook = make_worldsar_zarr_tile_hook(
+                product_path,
+                product_mode=product_mode,
+                product_name=product_name,
+                chunk_size=tuple(args.zarr_chunk_size),
+                subap_features=SubapFeatureConfig(
+                    enabled=product_mode.startswith("S1"),
+                    window_size=args.sentinel_subap_feature_window_size,
+                ),
+            )
+        product_wkt = resolve_product_wkt(args, product_path, product_mode)
+        gpt_kwargs = dict(gpt_memory=args.gpt_memory, gpt_parallelism=args.gpt_parallelism, gpt_timeout=args.gpt_timeout, gpt_cache_size=args.gpt_cache_size)
+        intermediate = _run_preprocessing(
             product_path,
-            product_mode=product_mode,
+            output_dir,
+            product_mode,
+            orbit_type=args.orbit_type,
+            orbit_continue_on_fail=args.orbit_continue_on_fail,
+            sentinel_swath=args.sentinel_swath,
+            sentinel_first_burst=args.sentinel_first_burst or s1_tops.DEFAULT_FIRST_BURST,
+            sentinel_last_burst=args.sentinel_last_burst or s1_tops.DEFAULT_LAST_BURST,
+            sentinel_tc_source_band=args.sentinel_tc_source_band,
+            sentinel_subap_decompositions=args.sentinel_subap_decompositions,
+            product_wkt=product_wkt,
+            grid_path=grid_path,
+            cuts_outdir=cuts_outdir,
+            tile_writer=tile_writer,
+            pre_write_hook=pre_write_hook,
+            report_outdir=report_outdir,
             product_name=product_name,
-            chunk_size=tuple(args.zarr_chunk_size),
-            subap_features=SubapFeatureConfig(
-                enabled=product_mode.startswith("S1"),
-                window_size=args.sentinel_subap_feature_window_size,
-            ),
+            keep_intermediate=args.keep_intermediate,
+            skip=args.skip_preprocessing,
+            **gpt_kwargs,
         )
-    product_wkt = resolve_product_wkt(args, product_path, product_mode)
-    gpt_kwargs = dict(gpt_memory=args.gpt_memory, gpt_parallelism=args.gpt_parallelism, gpt_timeout=args.gpt_timeout, gpt_cache_size=args.gpt_cache_size)
-    intermediate = _run_preprocessing(
-        product_path,
-        output_dir,
-        product_mode,
-        orbit_type=args.orbit_type,
-        orbit_continue_on_fail=args.orbit_continue_on_fail,
-        sentinel_swath=args.sentinel_swath,
-        sentinel_first_burst=args.sentinel_first_burst or s1_tops.DEFAULT_FIRST_BURST,
-        sentinel_last_burst=args.sentinel_last_burst or s1_tops.DEFAULT_LAST_BURST,
-        sentinel_tc_source_band=args.sentinel_tc_source_band,
-        sentinel_subap_decompositions=args.sentinel_subap_decompositions,
-        product_wkt=product_wkt,
-        grid_path=grid_path,
-        cuts_outdir=cuts_outdir,
-        tile_writer=tile_writer,
-        pre_write_hook=pre_write_hook,
-        report_outdir=report_outdir,
-        product_name=product_name,
-        keep_intermediate=args.keep_intermediate,
-        skip=args.skip_preprocessing,
-        **gpt_kwargs,
-    )
-    if not args.keep_intermediate and not args.skip_preprocessing:
-        _cleanup_final_intermediates(intermediate, output_dir)
+        if not args.keep_intermediate and not args.skip_preprocessing:
+            _cleanup_final_intermediates(intermediate, output_dir)
     return 0
