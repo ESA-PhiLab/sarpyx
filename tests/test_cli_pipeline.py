@@ -2,6 +2,7 @@ import sys
 from pathlib import Path
 
 from sarpyx.cli.main import create_parser as create_main_parser
+from sarpyx.cli import pipeline as pipeline_cli
 from sarpyx.cli.pipeline import create_parser, parse_params, run
 from sarpyx.pipelines import runner as pipeline_runner
 
@@ -12,6 +13,13 @@ def test_parse_params_coerces_json_values():
         "use_esd": False,
         "selected_polarisations": ["VV"],
         "count": 2,
+    }
+
+
+def test_parse_params_accepts_python_style_bool_values():
+    assert parse_params(["use_esd=False", "orbit_continue_on_fail=True"]) == {
+        "use_esd": False,
+        "orbit_continue_on_fail": True,
     }
 
 
@@ -76,6 +84,37 @@ def test_pipeline_cli_dispatches_builtin_double_product(monkeypatch, tmp_path: P
     assert captured["metadata"]["tile_writer"] == "zarr"
 
 
+def test_pipeline_cli_prints_warnings_at_end(monkeypatch, tmp_path: Path, capsys):
+    master = tmp_path / "master.SAFE"
+    slave = tmp_path / "slave.SAFE"
+    master.mkdir()
+    slave.mkdir()
+
+    monkeypatch.setattr(pipeline_cli, "run_pipeline_target", lambda *_, **__: tmp_path / "out" / "pair" / "tc.dim")
+    args = create_parser().parse_args(
+        [
+            "s1_insar",
+            "--master",
+            str(master),
+            "--slave",
+            str(slave),
+            "--output",
+            str(tmp_path / "out"),
+            "--cuts-outdir",
+            str(tmp_path / "cuts"),
+            "--gpt-path",
+            sys.executable,
+        ]
+    )
+
+    assert run(args) == 0
+    lines = capsys.readouterr().out.splitlines()
+    assert lines[0].startswith("Pipeline result:")
+    assert lines[1] == "Pipeline warnings:"
+    assert "WARNING: --grid-path was not supplied; using the default grid when cuts are requested." in lines
+    assert "WARNING: --product-wkt was not supplied; sarpyx will derive the tiling footprint from the processed raster when possible." in lines
+
+
 def test_insar_pipeline_with_grid_does_not_require_product_wkt(monkeypatch, tmp_path: Path):
     master = tmp_path / "master.SAFE"
     slave = tmp_path / "slave.SAFE"
@@ -114,6 +153,37 @@ def test_insar_pipeline_with_grid_does_not_require_product_wkt(monkeypatch, tmp_
     assert captured["metadata"]["grid_path"] == grid
     assert captured["metadata"]["cuts_outdir"] == tmp_path / "cuts"
     assert captured["metadata"]["tile_writer"] == "zarr"
+
+
+def test_insar_pipeline_with_cuts_outdir_uses_default_grid(monkeypatch, tmp_path: Path):
+    master = tmp_path / "master.SAFE"
+    slave = tmp_path / "slave.SAFE"
+    default_grid = tmp_path / "grid" / "grid_10km.geojson"
+    master.mkdir()
+    slave.mkdir()
+    default_grid.parent.mkdir()
+    default_grid.write_text("{}", encoding="utf-8")
+    captured = {}
+
+    def fake_run_insar_pipeline(master_path, slave_path, outdir, **kwargs):
+        captured["metadata"] = kwargs["metadata"]
+        return Path(outdir) / "pair" / "tc.dim"
+
+    monkeypatch.setattr(pipeline_runner, "run_insar_pipeline", fake_run_insar_pipeline)
+    monkeypatch.setattr(pipeline_runner.config, "BASE_PATH", str(tmp_path))
+
+    result = pipeline_runner.run_pipeline_target(
+        "s1_insar",
+        master=master,
+        slave=slave,
+        output_dir=tmp_path / "out",
+        gpt_path=sys.executable,
+        cuts_outdir=tmp_path / "cuts",
+    )
+
+    assert result == tmp_path / "out" / "pair" / "tc.dim"
+    assert captured["metadata"]["grid_path"] == default_grid
+    assert captured["metadata"]["cuts_outdir"] == tmp_path / "cuts"
 
 
 def test_insar_pair_script_uses_automatic_polarisation_selection_by_default():

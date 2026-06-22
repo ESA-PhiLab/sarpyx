@@ -169,7 +169,6 @@ run_pipeline() {
     --cuts-outdir "$CUTS_OUTDIR" \
     --gpt-path "$GPT_PATH" \
     --tile-writer zarr \
-    --param selected_polarisations='["VV"]' \
     --param use_esd=false
 }
 

@@ -57,10 +57,42 @@ def parse_params(values: list[str]) -> dict[str, object]:
 
 
 def _parse_value(raw: str):
+    if raw in {"True", "False"}:
+        return raw == "True"
+    if raw == "None":
+        return None
     try:
         return json.loads(raw)
     except json.JSONDecodeError:
         return raw
+
+
+def _has_worldsar_tiling_step(pipeline: str, params: dict[str, object]) -> bool:
+    spec = BUILTIN_PIPELINES.get(pipeline)
+    if spec is None:
+        return False
+    steps = getattr(spec.module, "steps", None)
+    if steps is None:
+        return False
+    return any(getattr(step, "name", None) == "WorldSARTiling" for step in steps(**params))
+
+
+def _pipeline_warnings(args, params: dict[str, object]) -> list[str]:
+    if not _has_worldsar_tiling_step(args.pipeline, params):
+        return []
+    warnings = []
+    if args.cuts_outdir:
+        if not args.grid_path:
+            warnings.append("--grid-path was not supplied; using the default grid when cuts are requested.")
+        if not args.product_wkt:
+            warnings.append("--product-wkt was not supplied; sarpyx will derive the tiling footprint from the processed raster when possible.")
+    elif args.grid_path:
+        warnings.append("--cuts-outdir was not supplied; using the default output tiles directory.")
+        if not args.product_wkt:
+            warnings.append("--product-wkt was not supplied; sarpyx will derive the tiling footprint from the processed raster when possible.")
+    else:
+        warnings.append("--cuts-outdir and --grid-path were not supplied; WorldSARTiling will be skipped for this explicit pipeline run.")
+    return warnings
 
 
 def run(args) -> int:
@@ -72,13 +104,15 @@ def run(args) -> int:
         raise ValueError("pipeline is required unless --list is used.")
     if not args.output_dir:
         raise ValueError("--output is required unless --list is used.")
+    params = parse_params(args.params)
+    warnings = _pipeline_warnings(args, params)
     result = run_pipeline_target(
         args.pipeline,
         input_path=args.input_path,
         master=args.master,
         slave=args.slave,
         output_dir=args.output_dir,
-        params=parse_params(args.params),
+        params=params,
         gpt_path=args.gpt_path,
         gpt_memory=args.gpt_memory,
         gpt_parallelism=args.gpt_parallelism,
@@ -92,6 +126,10 @@ def run(args) -> int:
         keep_intermediate=args.keep_intermediate,
     )
     print(f"Pipeline result: {result}")
+    if warnings:
+        print("Pipeline warnings:")
+        for warning in warnings:
+            print(f"WARNING: {warning}")
     return 0
 
 

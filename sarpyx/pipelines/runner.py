@@ -104,12 +104,23 @@ def _configure_snap(gpt_path, snap_userdir) -> None:
         config.SNAP_USERDIR = str(Path(snap_userdir).expanduser())
 
 
+def _resolve_grid_path(grid_path):
+    if grid_path is not None:
+        return Path(grid_path).expanduser()
+    base_path = config._expand_path(config.BASE_PATH)
+    default_grid = config._expand_path(config.GRID_PATH) if config.GRID_PATH else base_path / "grid" / "grid_10km.geojson"
+    return config.ensure_grid_file(default_grid, base_path)
+
+
 def _run_single(spec, input_path, output_dir, params, gpt_memory, gpt_parallelism, gpt_timeout, gpt_cache_size, product_wkt, grid_path, cuts_outdir, tile_writer, keep_intermediate):
     if input_path is None:
         raise ValueError(f"Pipeline {spec.name!r} requires --input.")
     input_path = Path(input_path).expanduser()
+    cuts_requested = cuts_outdir is not None
     if spec.runner is not None:
         cuts_outdir = Path(cuts_outdir).expanduser() if cuts_outdir else output_dir / "tiles"
+        if grid_path is not None or cuts_requested:
+            grid_path = _resolve_grid_path(grid_path)
         params.setdefault("pre_write_hook", _pre_write_hook(spec, input_path, tile_writer))
         params.setdefault("product_name", product_output_name(input_path))
         return spec.runner(
@@ -120,7 +131,7 @@ def _run_single(spec, input_path, output_dir, params, gpt_memory, gpt_parallelis
             gpt_timeout=gpt_timeout,
             gpt_cache_size=gpt_cache_size,
             product_wkt=product_wkt,
-            grid_path=Path(grid_path).expanduser() if grid_path else None,
+            grid_path=grid_path,
             cuts_outdir=cuts_outdir,
             product_mode=spec.product_mode,
             tile_writer=tile_writer,
@@ -129,6 +140,8 @@ def _run_single(spec, input_path, output_dir, params, gpt_memory, gpt_parallelis
         )
     recipe = _recipe(spec.module, params)
     gpt_kwargs = dict(gpt_memory=gpt_memory, gpt_parallelism=gpt_parallelism, gpt_timeout=gpt_timeout, gpt_cache_size=gpt_cache_size)
+    if grid_path is not None or cuts_requested:
+        grid_path = _resolve_grid_path(grid_path)
     metadata = _tiling_metadata(spec, product_wkt, grid_path, cuts_outdir, tile_writer)
     ctx = make_context(input_path, output_dir, getattr(spec.module, "OUTPUT_FORMAT", "BEAM-DIMAP"), gpt_kwargs, metadata=metadata)
     run_steps(ctx, recipe)
@@ -139,7 +152,10 @@ def _run_double(spec, master, slave, output_dir, params, gpt_memory, gpt_paralle
     if master is None or slave is None:
         raise ValueError(f"Pipeline {spec.name!r} requires --master and --slave.")
     master_path = Path(master).expanduser()
+    cuts_requested = cuts_outdir is not None
     cuts_outdir = Path(cuts_outdir).expanduser() if cuts_outdir else output_dir / "tiles"
+    if grid_path is not None or cuts_requested:
+        grid_path = _resolve_grid_path(grid_path)
     return run_insar_pipeline(
         master_path,
         slave,
