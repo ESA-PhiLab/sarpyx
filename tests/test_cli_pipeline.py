@@ -1,3 +1,5 @@
+import os
+import subprocess
 import sys
 from pathlib import Path
 
@@ -28,6 +30,45 @@ def test_top_level_parser_exposes_pipeline_command():
 
     assert args.command == "pipeline"
     assert args.list_pipelines is True
+
+
+def test_top_level_cli_help_does_not_import_worldsar_runtime():
+    repo = Path(__file__).resolve().parents[1]
+    env = os.environ.copy()
+    env["PYTHONPATH"] = f"{repo}{os.pathsep}{env.get('PYTHONPATH', '')}"
+    script = """
+import importlib.abc
+import sys
+
+class BlockHeavyRuntime(importlib.abc.MetaPathFinder):
+    blocked = {
+        "sarpyx.snapflow.runner",
+        "sarpyx.hooks.subap_features",
+        "sarpyx.hooks.worldsar",
+    }
+
+    def find_spec(self, fullname, path=None, target=None):
+        if fullname in self.blocked or fullname.startswith("scipy"):
+            raise RuntimeError(f"blocked heavy import: {fullname}")
+        return None
+
+sys.meta_path.insert(0, BlockHeavyRuntime())
+from sarpyx.cli.main import create_parser
+
+help_text = create_parser().format_help()
+assert "worldsar" in help_text
+assert "pipeline" in help_text
+"""
+    result = subprocess.run(
+        [sys.executable, "-c", script],
+        cwd=repo,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
 
 
 def test_pipeline_cli_dispatches_builtin_double_product(monkeypatch, tmp_path: Path):

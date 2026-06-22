@@ -1,6 +1,8 @@
 import importlib
 from pathlib import Path
 
+from setuptools import find_packages
+
 
 def test_package_exports_snapflow_and_snap_alias() -> None:
     import sarpyx
@@ -32,6 +34,12 @@ def test_dim_updater_lives_in_snapflow() -> None:
     assert not (package_root / 'processor' / 'core' / 'dim_updater.py').exists()
     assert (package_root / 'snapflow' / 'dim_updater.py').exists()
     assert snapflow.update_dim_add_bands_from_data_dir.__name__ == 'update_dim_add_bands_from_data_dir'
+
+
+def test_variance_package_is_in_installable_package_set() -> None:
+    packages = find_packages(include=["sarpyx*"])
+
+    assert "sarpyx.sla.variance" in packages
 
 
 def test_data_and_processor_utils_exports_are_explicit() -> None:
