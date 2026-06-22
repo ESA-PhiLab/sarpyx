@@ -6,8 +6,6 @@ import argparse
 import json
 import sys
 
-from sarpyx.pipelines.runner import BUILTIN_PIPELINES, run_pipeline_target
-
 
 def add_pipeline_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("pipeline", nargs="?", help="Built-in pipeline name, dotted module, or path to a pipeline .py file.")
@@ -67,8 +65,20 @@ def _parse_value(raw: str):
         return raw
 
 
+def _builtin_pipelines():
+    from sarpyx.pipelines.runner import BUILTIN_PIPELINES
+
+    return BUILTIN_PIPELINES
+
+
+def run_pipeline_target(*args, **kwargs):
+    from sarpyx.pipelines.runner import run_pipeline_target as dispatch
+
+    return dispatch(*args, **kwargs)
+
+
 def _has_worldsar_tiling_step(pipeline: str, params: dict[str, object]) -> bool:
-    spec = BUILTIN_PIPELINES.get(pipeline)
+    spec = _builtin_pipelines().get(pipeline)
     if spec is None:
         return False
     steps = getattr(spec.module, "steps", None)
@@ -97,7 +107,7 @@ def _pipeline_warnings(args, params: dict[str, object]) -> list[str]:
 
 def run(args) -> int:
     if args.list_pipelines:
-        for name, spec in sorted(BUILTIN_PIPELINES.items()):
+        for name, spec in sorted(_builtin_pipelines().items()):
             print(f"{name}\t{spec.input_kind}")
         return 0
     if not args.pipeline:

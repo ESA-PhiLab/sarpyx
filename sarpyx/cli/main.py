@@ -8,7 +8,12 @@ import sys
 from sarpyx.cli.pipeline import add_pipeline_arguments
 from sarpyx.cli.pipeline import run as run_pipeline
 from sarpyx.snapflow.parser import add_worldsar_arguments
-from sarpyx.snapflow.runner import run as run_worldsar
+
+
+def run_worldsar(args):
+    from sarpyx.snapflow.runner import run
+
+    return run(args)
 
 
 def create_parser() -> argparse.ArgumentParser:

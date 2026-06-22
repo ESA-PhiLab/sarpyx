@@ -1,5 +1,11 @@
-"""CLI package exposing the WorldSAR entry point only."""
+"""CLI package helpers."""
 
-from .worldsar import main
+from __future__ import annotations
 
-__all__ = ['main']
+
+def main(argv=None):
+    from sarpyx.cli.main import main as dispatch
+
+    return dispatch(argv)
+
+__all__ = ["main"]
