@@ -21,14 +21,16 @@
 # - sarpyx is installed editable with the copernicus extra.
 # - GLIBC is intentionally NOT installed here. If SNAP/JLinda/jblas requires
 #   GLIBC >= 2.29 on an older HPC node, use Apptainer/Singularity or a newer node.
+# - The nodefaults channel entry prevents defaults from being mixed into the solve.
+# - conda-forge provides the HDF5 shared library through the hdf5 package; there
+#   is no separate installable libhdf5 package name on conda-forge.
 
 name: sarpyx
 
 channels:
-  - sirbastiano/label/dev
-  - conda-forge
-
-channel_priority: strict
+  - https://conda.anaconda.org/sirbastiano/label/dev
+  - https://conda.anaconda.org/conda-forge
+  - nodefaults
 
 dependencies:
   # Core runtime
@@ -38,7 +40,7 @@ dependencies:
   - wheel
 
   # SNAP / Java runtime
-  - snap13=13.0.0
+  - snap13=13.0.0=3
   - openjdk
 
   # Native numerical/runtime libraries
@@ -52,7 +54,6 @@ dependencies:
 
   # HDF / NetCDF / geospatial native stack
   - hdf5
-  - libhdf5
   - netcdf4
   - libnetcdf
   - gdal

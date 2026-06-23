@@ -1,3 +1,5 @@
+[![Anaconda-Server Badge](https://anaconda.org/sirbastiano/snap13/badges/downloads.svg)](https://anaconda.org/sirbastiano/snap13)
+
 <div align="center">
 
 <img src="src/sarpyx_logo.png" width="1400px" alt="sarpyx">
@@ -14,7 +16,7 @@
   <img alt="License" src="https://img.shields.io/badge/License-Apache--2.0-374151?style=for-the-badge" />
 </a>
 <a href="https://github.com/ESA-PhiLab/sarpyx/releases/tag/v1.0.0">
-  <img alt="Version" src="https://img.shields.io/badge/Version-1.0.0-2563eb?style=for-the-badge" />
+  <img alt="Version" src="https://img.shields.io/badge/Version-1.0.1-2563eb?style=for-the-badge" />
 </a>
 </div>
 
@@ -54,10 +56,12 @@ sarpyx-pipeline --help  # Compatibility pipeline entry point
 The recommended installation uses **conda first** to provide ESA SNAP and `gpt`, then installs `sarpyx` with pip from this checkout. This keeps SNAP/native dependencies managed by conda while keeping the Python package editable.
 
 ```bash
-conda create -n sarpyx -c sirbastiano/label/dev -c conda-forge \
-  python=3.12 pip snap13=13.0.0
+conda create -n sarpyx python=3.12 pip
+conda install --override-channels \
+  -c sirbastiano/label/dev \
+  -c conda-forge \
+  snap13=13.0.0=3 
 
-conda activate sarpyx
 python -m pip install -e .
 ```
 
