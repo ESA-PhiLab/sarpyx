@@ -1,1 +1,0 @@
-Remote queue check showed no active `20260608_` WorldSAR jobs after cancellation. Remote `runner.py` compiled, `bash -n` passed for the wrapper/dispatcher scripts, and `make -f Makefilev2 -n _run-hpc` showed `KEEP_INTERMEDIATE="1"`. Local and remote cleanup-scope checks confirmed cleanup of one `worldsar_tmp_*` root does not delete a sibling product's `worldsar_subap_tc`.

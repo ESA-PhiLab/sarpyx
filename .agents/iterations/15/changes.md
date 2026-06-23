@@ -1,1 +1,0 @@
-Killed the rolling dispatcher and qdel'd its active PBS jobs on SpaceHPC. Patched remote `sarpyx/sarpyx/snapflow/runner.py` and local `sarpyx/snapflow/runner.py` so generated tiling cleanup is scoped to the current product's isolated root. Patched remote `Makefilev2` to default `KEEP_INTERMEDIATE ?= 1`, export it, log it, and pass it through `qsub -v`.

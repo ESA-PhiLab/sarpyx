@@ -1,1 +1,0 @@
-Failed jobs showed `worldsar_subap_tc` files disappearing during or immediately after SNAP Terrain-Correction. The failing upstream PDEC SA2 `.img` files still existed, and recreating a redirect DIMAP in a debug folder produced valid references. The run used `--no-keep-intermediate`, and final cleanup recursively removed every `worldsar_subap_tc` under the shared output root.

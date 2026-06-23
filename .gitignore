@@ -103,6 +103,7 @@ TOUP/snap_userdir.tar.gz
 
 *.agents/
 !.agents/
+.agents/iterations/
 !.agents/skills/
 .agents/skills/*
 !.agents/skills/sarpyx/
