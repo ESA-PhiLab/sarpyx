@@ -1,26 +1,86 @@
 # Conda environment for installing sarpyx with ESA SNAP GPT.
 #
 # Create/update a local prefix from the repository root:
+#
 #   conda env create -p .conda/sarpyx -f environment.yml
 #   conda activate .conda/sarpyx
 #
+# Or update an existing environment:
+#
+#   conda env update -p .conda/sarpyx -f environment.yml --prune
+#
 # Verify SNAP and sarpyx:
+#
+#   which gpt
 #   gpt -h
 #   sarpyx --help
 #   sarpyx-pipeline --help
 #
-# For SNAP-heavy workflows, source the helper after activation:
-#   gpt -h
-#
-# SNAP is installed through the sirbastiano dev label. sarpyx is installed
-# editable with the copernicus extra so phidown is available in the env.
+# Notes:
+# - This environment installs SNAP 13 through the sirbastiano dev label.
+# - sarpyx is installed editable with the copernicus extra.
+# - GLIBC is intentionally NOT installed here. If SNAP/JLinda/jblas requires
+#   GLIBC >= 2.29 on an older HPC node, use Apptainer/Singularity or a newer node.
+
 name: sarpyx
+
 channels:
   - sirbastiano/label/dev
   - conda-forge
+
+channel_priority: strict
+
 dependencies:
+  # Core runtime
   - python=3.12
   - pip
+  - setuptools
+  - wheel
+
+  # SNAP / Java runtime
   - snap13=13.0.0
+  - openjdk
+
+  # Native numerical/runtime libraries
+  - libgcc-ng
+  - libstdcxx-ng
+  - libgfortran-ng
+  - libgfortran5
+  - openblas
+  - libblas=*=*openblas
+  - liblapack=*=*openblas
+
+  # HDF / NetCDF / geospatial native stack
+  - hdf5
+  - libhdf5
+  - netcdf4
+  - libnetcdf
+  - gdal
+  - proj
+  - geos
+  - sqlite
+
+  # Python geospatial/scientific stack often needed by SAR/EO workflows
+  - numpy
+  - scipy
+  - pandas
+  - xarray
+  - dask
+  - zarr
+  - rasterio
+  - shapely
+  - pyproj
+  - fiona
+  - geopandas
+  - rioxarray
+  - tqdm
+  - pyyaml
+  - click
+
+  # Optional but useful for downloads / Copernicus workflows
+  - requests
+  - aiohttp
+  - lxml
+
   - pip:
       - -e .[copernicus]

@@ -40,7 +40,6 @@ def steps(
         PipelineStep("Deburst", {"source_ref": "coreg", "outdir": "pair"}, "coreg_deb"),
         PipelineStep("Interferogram", {"source_ref": "coreg_deb", "outdir": "pair", "subtract_flat_earth_phase": True}, "ifg"),
         PipelineStep("TopoPhaseRemoval", {"source_ref": "ifg", "outdir": "pair", "dem_name": dem_name}, "topo"),
-        PipelineStep("Subset", {"source_ref": "topo", "outdir": "pair"}, "subset"),
         PipelineStep("TerrainCorrection", {"source_ref": "subset", "outdir": "pair", "dem_name": dem_name, "pixel_spacing_in_meter": pixel_spacing_in_meter, "map_projection": map_projection}, "terrain_corrected"),
         PipelineStep("WorldSARTiling", {"intermediate_ref": "terrain_corrected"}, "tiling"),
     ]
