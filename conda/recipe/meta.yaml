@@ -1,5 +1,5 @@
 {% set name = "sarpyx" %}
-{% set version = "0.1.5" %}
+{% set version = "1.0.2" %}
 
 package:
   name: {{ name|lower }}
@@ -63,7 +63,7 @@ test:
 
 about:
   summary: A swissknife for SAR processing.
-  home: https://github.com/sirbastiano/srp
+  home: https://github.com/ESA-PhiLab/sarpyx
   license: Apache-2.0
   license_family: Apache
   license_file: LICENSE

@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Generic Pipeline CLI – sarpyx Docs</title>
+  <link rel="stylesheet" href="../assets/style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="icon" href="../assets/sarpyx_logo.png" type="image/png">
+</head>
+<body>
+  <button class="menu-toggle" onclick="document.querySelector('.sidebar').classList.toggle('open')">☰</button>
+  <nav class="sidebar">
+    <a href="../index.html"><img class="logo" src="../assets/sarpyx_logo.png" alt="sarpyx"></a>
+    <h3>Home</h3>
+<a href="../index.html">Introduction</a>
+<h3>User Guide</h3>
+<a href="../user_guide/index.html">Overview</a>
+<a href="../user_guide/installation.html">Installation</a>
+<a href="../user_guide/getting_started.html">Getting Started</a>
+<a href="../user_guide/basic_concepts.html">Basic Concepts</a>
+<a href="../user_guide/data_formats.html">Data Formats</a>
+<a href="../user_guide/snap_integration.html">SNAP Integration</a>
+<a href="../user_guide/processing_workflows.html">Processing Workflows</a>
+<a href="../user_guide/science_applications.html">Science Applications</a>
+<a href="../user_guide/troubleshooting.html">Troubleshooting</a>
+<a href="../user_guide/INSTALL_S1ISP.html">Install S1-ISP</a>
+<h3>Tutorials</h3>
+<a href="../tutorials/index.html">Overview</a>
+<a href="../tutorials/01_first_sublook_analysis.html">01 – Sub-Look Analysis</a>
+<a href="../tutorials/02_snap_integration_basics.html">02 – SNAP Basics</a>
+<a href="../tutorials/03_visualization_quality.html">03 – Visualisation</a>
+<a href="../tutorials/04_multitemporal_analysis.html">04 – Multi-temporal</a>
+<a href="../tutorials/05_polarimetric_analysis.html">05 – Polarimetry</a>
+<a href="../tutorials/06_custom_workflows.html">06 – Custom Workflows</a>
+<a href="../tutorials/07_ship_detection.html">07 – Ship Detection</a>
+<a href="../tutorials/08_interferometric_analysis.html">08 – InSAR</a>
+<h3>API Reference</h3>
+<a href="../api/index.html">Overview</a>
+<a href="../api/snapflow/index.html">Snapflow</a>
+<a href="../api/snapflow/Snapflow_usage_example.html">Snapflow Examples</a>
+<a href="../api/science/index.html">Science</a>
+<a href="../api/sla/index.html">SLA</a>
+<a href="../api/processor/index.html">Processor</a>
+<a href="../api/utils/index.html">Utils</a>
+<a href="../api/utils/dem_utils.html">DEM Utilities</a>
+<h3>Examples</h3>
+<a href="../examples/index.html">Overview</a>
+<h3>Developer Guide</h3>
+<a href="../developer_guide/architecture.html">Architecture</a>
+<a href="../developer_guide/contributing.html">Contributing</a>
+<h3>Reference</h3>
+<a href="../metaParams.html">MetaParams</a>
+  </nav>
+  <main class="main">
+    <h1 id="generic-pipeline-cli">Generic Pipeline CLI</h1>
+<p>For end-to-end command examples, start with <a href="cli_examples.html">CLI Usage Examples</a>.</p>
+<p><code>sarpyx pipeline</code> runs an explicit pipeline recipe. Use it when product-type
+inference is not desired, or when a recipe needs named inputs such as a
+master/slave pair.</p>
+<p>Use <code>sarpyx worldsar</code> for the opinionated single-product WorldSAR workflow.
+Use <code>sarpyx pipeline</code> when you want to choose the recipe yourself.</p>
+<h2 id="built-in-pipelines">Built-In Pipelines</h2>
+<p>List the built-in recipes:</p>
+<pre class="codehilite"><code>sarpyx<span class="w"> </span>pipeline<span class="w"> </span>--list
+</code></pre>
+<p>Run a single-product recipe by name:</p>
+<pre class="codehilite"><code>sarpyx<span class="w"> </span>pipeline<span class="w"> </span>s1_tops<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--input<span class="w"> </span>/data/product.SAFE<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--output<span class="w"> </span>/data/out<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--gpt-path<span class="w"> </span>/opt/miniconda3/envs/sarpyx/opt/esa-snap/bin/gpt<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--param<span class="w"> </span><span class="nv">sentinel_swath</span><span class="o">=</span>IW2
+</code></pre>
+<p>Run the double-product Sentinel-1 InSAR recipe:</p>
+<pre class="codehilite"><code>sarpyx<span class="w"> </span>pipeline<span class="w"> </span>s1_insar<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--master<span class="w"> </span>/data/master.SAFE<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--slave<span class="w"> </span>/data/slave.SAFE<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--output<span class="w"> </span>/data/insar-out<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--grid-path<span class="w"> </span>/data/grid/grid_10km.geojson<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--cuts-outdir<span class="w"> </span>/data/insar-out/tiles<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--gpt-path<span class="w"> </span>/opt/miniconda3/envs/sarpyx/opt/esa-snap/bin/gpt<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--param<span class="w"> </span><span class="nv">selected_polarisations</span><span class="o">=</span><span class="s1">&#39;[&quot;VV&quot;]&#39;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--param<span class="w"> </span><span class="nv">use_esd</span><span class="o">=</span><span class="nb">false</span>
+</code></pre>
+<p>By default, <code>s1_insar</code> processes the full swath. Add <code>--param subswath=IW2</code>
+only when intentionally limiting the run to one subswath. Tiling does not need
+<code>--product-wkt</code> for <code>s1_insar</code>; the footprint is derived from the terrain-corrected
+BEAM-DIMAP product.</p>
+<p><code>--param NAME=VALUE</code> values are parsed as JSON when possible. Unquoted values
+such as <code>IW2</code> remain strings; <code>false</code>, <code>2</code>, and <code>["VV"]</code> become a boolean,
+integer, and list.</p>
+<p>After an InSAR run, validate the declared output and tile roots:</p>
+<pre class="codehilite"><code>rg<span class="w"> </span>--files<span class="w"> </span>/data/insar-out<span class="w"> </span>/data/insar-out/tiles<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="p">|</span><span class="w"> </span>rg<span class="w"> </span><span class="s1">&#39;\.(dim|zarr|json|pdf)$|cut_report&#39;</span>
+</code></pre>
+<p>Expected artifacts include the terrain-corrected BEAM-DIMAP product, Zarr tile
+stores, a cut report, and a validation PDF.</p>
+<h2 id="external-pipeline-files">External Pipeline Files</h2>
+<p>An external pipeline file must declare its input kind and a <code>steps</code> function:</p>
+<pre class="codehilite"><code><span class="kn">from</span><span class="w"> </span><span class="nn">sarpyx.snapflow.runtime</span><span class="w"> </span><span class="kn">import</span> <span class="n">PipelineStep</span>
+
+<span class="n">INPUT_KIND</span> <span class="o">=</span> <span class="s2">&quot;double&quot;</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">steps</span><span class="p">(</span><span class="n">subswath</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="k">return</span> <span class="p">[</span>
+        <span class="n">PipelineStep</span><span class="p">(</span><span class="s2">&quot;TopsarSplit&quot;</span><span class="p">,</span> <span class="p">{</span><span class="s2">&quot;source_ref&quot;</span><span class="p">:</span> <span class="s2">&quot;master&quot;</span><span class="p">,</span> <span class="s2">&quot;outdir&quot;</span><span class="p">:</span> <span class="s2">&quot;master&quot;</span><span class="p">,</span> <span class="s2">&quot;subswath&quot;</span><span class="p">:</span> <span class="n">subswath</span><span class="p">},</span> <span class="s2">&quot;master_split&quot;</span><span class="p">),</span>
+    <span class="p">]</span>
+</code></pre>
+<p>Then run it by path:</p>
+<pre class="codehilite"><code>sarpyx<span class="w"> </span>pipeline<span class="w"> </span>/path/to/my_pipeline.py<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--master<span class="w"> </span>/data/master.SAFE<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--slave<span class="w"> </span>/data/slave.SAFE<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--output<span class="w"> </span>/data/out<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--param<span class="w"> </span><span class="nv">subswath</span><span class="o">=</span>IW2
+</code></pre>
+<p>Supported input kinds are:</p>
+<ul>
+<li><code>single</code>: requires <code>--input</code>.</li>
+<li><code>double</code>: requires <code>--master</code> and <code>--slave</code>.</li>
+</ul>
+<p>The generic command uses the same GPT performance defaults as <code>worldsar</code>:</p>
+<pre class="codehilite"><code>--gpt-parallelism 6
+--gpt-memory 16G
+--gpt-cache-size 8G
+</code></pre>
+    <div class="footer">
+      sarpyx Documentation &nbsp;·&nbsp; built with <code>build_site.py</code>
+    </div>
+  </main>
+</body>
+</html>

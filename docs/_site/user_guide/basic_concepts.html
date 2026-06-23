@@ -139,15 +139,15 @@
 <span class="n">focused_data</span> <span class="o">=</span> <span class="n">focus</span><span class="o">.</span><span class="n">range_compression</span><span class="p">(</span><span class="n">processed_data</span><span class="p">)</span>
 <span class="n">focused_data</span> <span class="o">=</span> <span class="n">focus</span><span class="o">.</span><span class="n">azimuth_compression</span><span class="p">(</span><span class="n">focused_data</span><span class="p">)</span>
 </code></pre>
-<h4 id="3-autofocus-if-needed">3. Autofocus (if needed)</h4>
-<pre class="codehilite"><code><span class="c1"># Check focus quality</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">sarpyx.processor.autofocus</span><span class="w"> </span><span class="kn">import</span> <span class="n">metrics</span>
-<span class="n">focus_quality</span> <span class="o">=</span> <span class="n">metrics</span><span class="o">.</span><span class="n">calculate_entropy</span><span class="p">(</span><span class="n">focused_data</span><span class="p">)</span>
+<h4 id="3-quality-check">3. Quality Check</h4>
+<pre class="codehilite"><code><span class="c1"># Check image energy and contrast before deciding on more processing</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
 
-<span class="c1"># Apply autofocus if necessary</span>
-<span class="k">if</span> <span class="n">focus_quality</span> <span class="o">&lt;</span> <span class="n">threshold</span><span class="p">:</span>
-    <span class="kn">from</span><span class="w"> </span><span class="nn">sarpyx.processor.autofocus</span><span class="w"> </span><span class="kn">import</span> <span class="n">compressor</span>
-    <span class="n">autofocused</span> <span class="o">=</span> <span class="n">compressor</span><span class="o">.</span><span class="n">autofocus</span><span class="p">(</span><span class="n">focused_data</span><span class="p">)</span>
+<span class="n">intensity</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">focused_data</span><span class="p">)</span> <span class="o">**</span> <span class="mi">2</span>
+<span class="n">focus_quality</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">&quot;mean_intensity&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">intensity</span><span class="p">)),</span>
+    <span class="s2">&quot;contrast&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">std</span><span class="p">(</span><span class="n">intensity</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">intensity</span><span class="p">)</span> <span class="o">+</span> <span class="mf">1e-12</span><span class="p">)),</span>
+<span class="p">}</span>
 </code></pre>
 <h2 id="frequency-domain-processing">Frequency Domain Processing</h2>
 <h3 id="discrete-fourier-transform-dft">Discrete Fourier Transform (DFT)</h3>
@@ -217,18 +217,15 @@
 </code></pre>
 <h2 id="quality-metrics">Quality Metrics</h2>
 <h3 id="focus-quality-assessment">Focus Quality Assessment</h3>
-<pre class="codehilite"><code><span class="kn">from</span><span class="w"> </span><span class="nn">sarpyx.processor.autofocus.metrics</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
-    <span class="n">calculate_entropy</span><span class="p">,</span>
-    <span class="n">calculate_contrast</span><span class="p">,</span>
-    <span class="n">calculate_sharpness</span>
-<span class="p">)</span>
+<pre class="codehilite"><code><span class="kn">from</span><span class="w"> </span><span class="nn">sarpyx.processor.utils.metrics</span><span class="w"> </span><span class="kn">import</span> <span class="n">psnr</span><span class="p">,</span> <span class="n">ssim</span>
 
-<span class="c1"># Assess image focus quality</span>
-<span class="n">entropy</span> <span class="o">=</span> <span class="n">calculate_entropy</span><span class="p">(</span><span class="n">sar_image</span><span class="p">)</span>
-<span class="n">contrast</span> <span class="o">=</span> <span class="n">calculate_contrast</span><span class="p">(</span><span class="n">sar_image</span><span class="p">)</span>
-<span class="n">sharpness</span> <span class="o">=</span> <span class="n">calculate_sharpness</span><span class="p">(</span><span class="n">sar_image</span><span class="p">)</span>
+<span class="c1"># Compare a candidate image against a reference or previous processing result</span>
+<span class="n">reference_image</span> <span class="o">=</span> <span class="n">previous_result</span>
+<span class="n">candidate_image</span> <span class="o">=</span> <span class="n">current_result</span>
+<span class="n">similarity</span> <span class="o">=</span> <span class="n">ssim</span><span class="p">(</span><span class="n">reference_image</span><span class="p">,</span> <span class="n">candidate_image</span><span class="p">)</span>
+<span class="n">signal_quality</span> <span class="o">=</span> <span class="n">psnr</span><span class="p">(</span><span class="n">reference_image</span><span class="p">,</span> <span class="n">candidate_image</span><span class="p">)</span>
 
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Focus Quality - Entropy: </span><span class="si">{</span><span class="n">entropy</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2">, Contrast: </span><span class="si">{</span><span class="n">contrast</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;SSIM: </span><span class="si">{</span><span class="nb">float</span><span class="p">(</span><span class="n">similarity</span><span class="p">)</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2">, PSNR: </span><span class="si">{</span><span class="nb">float</span><span class="p">(</span><span class="n">signal_quality</span><span class="p">)</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 </code></pre>
 <h3 id="statistical-measures">Statistical Measures</h3>
 <pre class="codehilite"><code><span class="c1"># Common SAR statistics</span>
@@ -299,12 +296,12 @@
     <span class="n">sla</span><span class="o">.</span><span class="n">SpectrumComputation</span><span class="p">()</span>
 
     <span class="c1"># Calculate quality metrics</span>
-    <span class="n">entropy</span> <span class="o">=</span> <span class="n">calculate_entropy</span><span class="p">(</span><span class="n">sla</span><span class="o">.</span><span class="n">Box</span><span class="p">)</span>
+    <span class="n">intensity</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">sla</span><span class="o">.</span><span class="n">Box</span><span class="p">)</span> <span class="o">**</span> <span class="mi">2</span>
 
     <span class="c1"># Generate report</span>
     <span class="k">return</span> <span class="p">{</span>
-        <span class="s1">&#39;entropy&#39;</span><span class="p">:</span> <span class="n">entropy</span><span class="p">,</span>
-        <span class="s1">&#39;mean_intensity&#39;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">sla</span><span class="o">.</span><span class="n">Box</span><span class="p">)</span><span class="o">**</span><span class="mi">2</span><span class="p">),</span>
+        <span class="s1">&#39;mean_intensity&#39;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">intensity</span><span class="p">)),</span>
+        <span class="s1">&#39;contrast&#39;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">std</span><span class="p">(</span><span class="n">intensity</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">intensity</span><span class="p">)</span> <span class="o">+</span> <span class="mf">1e-12</span><span class="p">)),</span>
         <span class="s1">&#39;data_shape&#39;</span><span class="p">:</span> <span class="n">sla</span><span class="o">.</span><span class="n">Box</span><span class="o">.</span><span class="n">shape</span>
     <span class="p">}</span>
 </code></pre>

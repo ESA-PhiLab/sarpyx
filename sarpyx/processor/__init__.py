@@ -6,9 +6,9 @@ import and can block CLI startup. Keep package import side-effect free.
 """
 
 import importlib
+from sarpyx import __version__
 
 __all__ = ['core', 'algorithms', 'data', 'utils']
-__version__ = "0.1.5"
 
 _module_cache = {}
 

@@ -4,6 +4,10 @@
 
 This tutorial demonstrates how to use sarpyx for ship detection in SAR imagery using Constant False Alarm Rate (CFAR) algorithms. We'll explore different CFAR detectors and how to optimize their parameters for various sea conditions.
 
+The CFAR detector and pipeline classes in this tutorial are workflow sketches.
+Use `sarpyx.snapflow.engine.GPT` or `sarpyx pipeline` for SNAP preprocessing,
+then adapt the detector code to your local product format.
+
 ## Learning Objectives
 
 By the end of this tutorial, you will be able to:
@@ -38,16 +42,10 @@ data_requirements = {
 ```python
 import numpy as np
 import matplotlib.pyplot as plt
-from sarpyx import SLA, SNAPProcessor
-from sarpyx.detection import CFARDetector
-from sarpyx.utils import visualization, metrics
-from sarpyx.science import radar_indices
+from sarpyx.snapflow.engine import GPT
+from sarpyx.utils import show_image
 import warnings
 warnings.filterwarnings('ignore')
-
-# Initialize processors
-snap_processor = SNAPProcessor()
-detector = CFARDetector()
 
 # Load and preprocess SAR data
 sar_file = 'path/to/sentinel1_maritime.zip'
@@ -71,6 +69,10 @@ preprocessing_config = {
         'output_gamma': False
     }
 }
+
+# Provide local wrappers for SNAP preprocessing and CFAR detection.
+snap_processor = ...  # for example, a wrapper around GPT or `sarpyx pipeline`
+detector = ...        # detector implementation configured in Step 2
 
 # Process with SNAP
 processed_data = snap_processor.process_sar_data(
@@ -544,9 +546,9 @@ plt.show()
 class ShipDetectionPipeline:
     """Complete ship detection pipeline with CFAR algorithms"""
     
-    def __init__(self, snap_processor=None):
-        self.snap_processor = snap_processor or SNAPProcessor()
-        self.cfar_detector = CFARDetector()
+    def __init__(self, snap_processor, cfar_detector):
+        self.snap_processor = snap_processor
+        self.cfar_detector = cfar_detector
         self.processing_history = []
         
     def process_scene(self, input_file, output_dir=None, 
@@ -698,7 +700,7 @@ class ShipDetectionPipeline:
         return outputs
 
 # Initialize and test pipeline
-pipeline = ShipDetectionPipeline(snap_processor)
+pipeline = ShipDetectionPipeline(snap_processor, detector)
 
 # Process the scene
 pipeline_results = pipeline.process_scene(

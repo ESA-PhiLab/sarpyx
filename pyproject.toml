@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "sarpyx"
-version = "1.0.1"
+version = "1.0.2"
 description = "A swissknife for SAR processing."
 readme = { file = "README.md", content-type = "text/markdown" }
 authors = [
@@ -123,6 +123,8 @@ namespaces = false
 
 [dependency-groups]
 dev = [
+    "markdown>=3.10,<4",
+    "pygments>=2.19,<3",
     "pytest==8.4.0",
     "sarpyx[geo,io,processing,torch,viz]",
 ]

@@ -57,6 +57,9 @@
     <h1 id="tutorial-7-ship-detection-with-cfar-algorithms">Tutorial 7: Ship Detection with CFAR Algorithms</h1>
 <h2 id="overview">Overview</h2>
 <p>This tutorial demonstrates how to use sarpyx for ship detection in SAR imagery using Constant False Alarm Rate (CFAR) algorithms. We&rsquo;ll explore different CFAR detectors and how to optimize their parameters for various sea conditions.</p>
+<p>The CFAR detector and pipeline classes in this tutorial are workflow sketches.
+Use <code>sarpyx.snapflow.engine.GPT</code> or <code>sarpyx pipeline</code> for SNAP preprocessing,
+then adapt the detector code to your local product format.</p>
 <h2 id="learning-objectives">Learning Objectives</h2>
 <p>By the end of this tutorial, you will be able to:
 - Implement CFAR-based ship detection algorithms
@@ -83,16 +86,10 @@
 <h3 id="11-load-and-preprocess-sar-data">1.1 Load and Preprocess SAR Data</h3>
 <pre class="codehilite"><code><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">sarpyx</span><span class="w"> </span><span class="kn">import</span> <span class="n">SLA</span><span class="p">,</span> <span class="n">SNAPProcessor</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">sarpyx.detection</span><span class="w"> </span><span class="kn">import</span> <span class="n">CFARDetector</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">sarpyx.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">visualization</span><span class="p">,</span> <span class="n">metrics</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">sarpyx.science</span><span class="w"> </span><span class="kn">import</span> <span class="n">radar_indices</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sarpyx.snapflow.engine</span><span class="w"> </span><span class="kn">import</span> <span class="n">GPT</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sarpyx.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">show_image</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">warnings</span>
 <span class="n">warnings</span><span class="o">.</span><span class="n">filterwarnings</span><span class="p">(</span><span class="s1">&#39;ignore&#39;</span><span class="p">)</span>
-
-<span class="c1"># Initialize processors</span>
-<span class="n">snap_processor</span> <span class="o">=</span> <span class="n">SNAPProcessor</span><span class="p">()</span>
-<span class="n">detector</span> <span class="o">=</span> <span class="n">CFARDetector</span><span class="p">()</span>
 
 <span class="c1"># Load and preprocess SAR data</span>
 <span class="n">sar_file</span> <span class="o">=</span> <span class="s1">&#39;path/to/sentinel1_maritime.zip&#39;</span>
@@ -116,6 +113,10 @@
         <span class="s1">&#39;output_gamma&#39;</span><span class="p">:</span> <span class="kc">False</span>
     <span class="p">}</span>
 <span class="p">}</span>
+
+<span class="c1"># Provide local wrappers for SNAP preprocessing and CFAR detection.</span>
+<span class="n">snap_processor</span> <span class="o">=</span> <span class="o">...</span>  <span class="c1"># for example, a wrapper around GPT or `sarpyx pipeline`</span>
+<span class="n">detector</span> <span class="o">=</span> <span class="o">...</span>        <span class="c1"># detector implementation configured in Step 2</span>
 
 <span class="c1"># Process with SNAP</span>
 <span class="n">processed_data</span> <span class="o">=</span> <span class="n">snap_processor</span><span class="o">.</span><span class="n">process_sar_data</span><span class="p">(</span>
@@ -558,9 +559,9 @@
 <pre class="codehilite"><code><span class="k">class</span><span class="w"> </span><span class="nc">ShipDetectionPipeline</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Complete ship detection pipeline with CFAR algorithms&quot;&quot;&quot;</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">snap_processor</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">snap_processor</span> <span class="o">=</span> <span class="n">snap_processor</span> <span class="ow">or</span> <span class="n">SNAPProcessor</span><span class="p">()</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">cfar_detector</span> <span class="o">=</span> <span class="n">CFARDetector</span><span class="p">()</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">snap_processor</span><span class="p">,</span> <span class="n">cfar_detector</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">snap_processor</span> <span class="o">=</span> <span class="n">snap_processor</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cfar_detector</span> <span class="o">=</span> <span class="n">cfar_detector</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">processing_history</span> <span class="o">=</span> <span class="p">[]</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">process_scene</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">input_file</span><span class="p">,</span> <span class="n">output_dir</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> 
@@ -712,7 +713,7 @@
         <span class="k">return</span> <span class="n">outputs</span>
 
 <span class="c1"># Initialize and test pipeline</span>
-<span class="n">pipeline</span> <span class="o">=</span> <span class="n">ShipDetectionPipeline</span><span class="p">(</span><span class="n">snap_processor</span><span class="p">)</span>
+<span class="n">pipeline</span> <span class="o">=</span> <span class="n">ShipDetectionPipeline</span><span class="p">(</span><span class="n">snap_processor</span><span class="p">,</span> <span class="n">detector</span><span class="p">)</span>
 
 <span class="c1"># Process the scene</span>
 <span class="n">pipeline_results</span> <span class="o">=</span> <span class="n">pipeline</span><span class="o">.</span><span class="n">process_scene</span><span class="p">(</span>

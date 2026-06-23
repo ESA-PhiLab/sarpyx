@@ -4,6 +4,10 @@
 
 This tutorial covers advanced interferometric SAR (InSAR) analysis using sarpyx, including differential interferometry (DInSAR), persistent scatterer interferometry (PSI), and small baseline subset (SBAS) techniques for deformation monitoring and surface change detection.
 
+The InSAR orchestration snippets below are methodological examples. Use
+`sarpyx.snapflow.engine.GPT`, `sarpyx pipeline s1_insar`, or local workflow
+helpers for the SNAP preprocessing steps.
+
 ## Learning Objectives
 
 By the end of this tutorial, you will be able to:
@@ -42,17 +46,9 @@ data_requirements = {
 import numpy as np
 import matplotlib.pyplot as plt
 from datetime import datetime, timedelta
-from sarpyx import SLA, SNAPProcessor
-from sarpyx.interferometry import InSARProcessor, PSAnalyzer
-from sarpyx.utils import visualization, phase_unwrapping
-from sarpyx.science import atmospheric_correction
+from sarpyx.snapflow.engine import GPT
 import warnings
 warnings.filterwarnings('ignore')
-
-# Initialize processors
-snap_processor = SNAPProcessor()
-insar_processor = InSARProcessor()
-ps_analyzer = PSAnalyzer()
 
 # Define SAR data stack
 sar_stack = {
@@ -206,11 +202,8 @@ for pair_name, interferogram in interferograms.items():
     
     # Apply phase unwrapping
     wrapped_phase = np.angle(interferogram)
-    unwrapped_phase = phase_unwrapping.unwrap_phase(
-        wrapped_phase=wrapped_phase,
-        quality_mask=quality_mask,
-        algorithm='minimum_cost_flow'  # or 'branch_cut', 'quality_guided'
-    )
+    # Replace this with your preferred phase-unwrapping implementation.
+    unwrapped_phase = run_phase_unwrapping(wrapped_phase, quality_mask=quality_mask)
     
     unwrapped_phases[pair_name] = unwrapped_phase
     print(f"Unwrapped phase for {pair_name}")
@@ -353,8 +346,6 @@ plt.show()
 # Atmospheric phase screen estimation
 print("Estimating atmospheric phase screens...")
 
-atmospheric_processor = atmospheric_correction.AtmosphericProcessor()
-
 # Configure atmospheric correction
 atm_config = {
     'method': 'linear_regression',  # 'linear_regression', 'kriging', 'polynomial'
@@ -367,6 +358,7 @@ atm_config = {
 
 atmospheric_screens = {}
 corrected_phases = {}
+atmospheric_processor = ...  # local atmospheric correction implementation
 
 for pair_name, unwrapped_phase in unwrapped_phases.items():
     # Estimate atmospheric phase screen

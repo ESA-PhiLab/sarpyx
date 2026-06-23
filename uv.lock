@@ -4167,7 +4167,7 @@ wheels = [
 
 [[package]]
 name = "sarpyx"
-version = "1.0.1"
+version = "1.0.2"
 source = { editable = "." }
 dependencies = [
     { name = "h5py" },
@@ -4292,6 +4292,8 @@ viz = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "markdown" },
+    { name = "pygments" },
     { name = "pytest" },
     { name = "sarpyx", extra = ["geo", "io", "processing", "torch", "viz"] },
 ]
@@ -4351,6 +4353,8 @@ provides-extras = ["copernicus", "geo", "hf", "io", "notebook", "processing", "t
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "markdown", specifier = ">=3.10,<4" },
+    { name = "pygments", specifier = ">=2.19,<3" },
     { name = "pytest", specifier = "==8.4.0" },
     { name = "sarpyx", extras = ["geo", "io", "processing", "torch", "viz"] },
 ]

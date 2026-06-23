@@ -27,7 +27,7 @@ sarpyx follows a modular approach to SAR processing:
 
 1. **Data Loading**: Import SAR data from various formats
 2. **Preprocessing**: Apply calibration, filtering, and corrections
-3. **Core Processing**: Execute focusing, autofocus, or analysis algorithms
+3. **Core Processing**: Execute focusing, sub-aperture, or analysis algorithms
 4. **Analysis**: Perform sub-look analysis, interferometry, or scientific applications
 5. **Visualization**: Display results and generate reports
 
@@ -119,7 +119,6 @@ sarpyx is organized into several main modules:
 ### `sarpyx.processor`
 Core SAR processing algorithms:
 - `core`: Focus algorithms, transforms, decoding
-- `autofocus`: Quality metrics and autofocus methods
 - `algorithms`: High-level algorithms (RDA, back-projection)
 - `data`: Data I/O and format conversion
 - `utils`: Processing utilities

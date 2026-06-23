@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>SNAP2StaMPS Guide – sarpyx Docs</title>
+  <link rel="stylesheet" href="../assets/style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="icon" href="../assets/sarpyx_logo.png" type="image/png">
+</head>
+<body>
+  <button class="menu-toggle" onclick="document.querySelector('.sidebar').classList.toggle('open')">☰</button>
+  <nav class="sidebar">
+    <a href="../index.html"><img class="logo" src="../assets/sarpyx_logo.png" alt="sarpyx"></a>
+    <h3>Home</h3>
+<a href="../index.html">Introduction</a>
+<h3>User Guide</h3>
+<a href="../user_guide/index.html">Overview</a>
+<a href="../user_guide/installation.html">Installation</a>
+<a href="../user_guide/getting_started.html">Getting Started</a>
+<a href="../user_guide/basic_concepts.html">Basic Concepts</a>
+<a href="../user_guide/data_formats.html">Data Formats</a>
+<a href="../user_guide/snap_integration.html">SNAP Integration</a>
+<a href="../user_guide/processing_workflows.html">Processing Workflows</a>
+<a href="../user_guide/science_applications.html">Science Applications</a>
+<a href="../user_guide/troubleshooting.html">Troubleshooting</a>
+<a href="../user_guide/INSTALL_S1ISP.html">Install S1-ISP</a>
+<h3>Tutorials</h3>
+<a href="../tutorials/index.html">Overview</a>
+<a href="../tutorials/01_first_sublook_analysis.html">01 – Sub-Look Analysis</a>
+<a href="../tutorials/02_snap_integration_basics.html">02 – SNAP Basics</a>
+<a href="../tutorials/03_visualization_quality.html">03 – Visualisation</a>
+<a href="../tutorials/04_multitemporal_analysis.html">04 – Multi-temporal</a>
+<a href="../tutorials/05_polarimetric_analysis.html">05 – Polarimetry</a>
+<a href="../tutorials/06_custom_workflows.html">06 – Custom Workflows</a>
+<a href="../tutorials/07_ship_detection.html">07 – Ship Detection</a>
+<a href="../tutorials/08_interferometric_analysis.html">08 – InSAR</a>
+<h3>API Reference</h3>
+<a href="../api/index.html">Overview</a>
+<a href="../api/snapflow/index.html">Snapflow</a>
+<a href="../api/snapflow/Snapflow_usage_example.html">Snapflow Examples</a>
+<a href="../api/science/index.html">Science</a>
+<a href="../api/sla/index.html">SLA</a>
+<a href="../api/processor/index.html">Processor</a>
+<a href="../api/utils/index.html">Utils</a>
+<a href="../api/utils/dem_utils.html">DEM Utilities</a>
+<h3>Examples</h3>
+<a href="../examples/index.html">Overview</a>
+<h3>Developer Guide</h3>
+<a href="../developer_guide/architecture.html">Architecture</a>
+<a href="../developer_guide/contributing.html">Contributing</a>
+<h3>Reference</h3>
+<a href="../metaParams.html">MetaParams</a>
+  </nav>
+  <main class="main">
+    <h1 id="snap2stamps-guide">SNAP2StaMPS Guide</h1>
+<p>This guide explains the processing-only <code>snap2stamps</code> implementation in <code>sarpyx.snapflow</code>.</p>
+<h2 id="scope">Scope</h2>
+<p>The canonical module is:</p>
+<ul>
+<li><code>sarpyx.snapflow.snap2stamps</code></li>
+</ul>
+<p>It implements the upstream processing branches as Python helpers and branch selectors:</p>
+<ul>
+<li>Sentinel-1 TOPSAR split/apply-orbit, coregistration/interferogram, and export variants</li>
+<li>TerraSAR-X/TanDEM-X Stripmap subset, coregistration, interferogram/topo-phase, and export variants</li>
+<li>Legacy pair-workflow helpers kept for notebook and test compatibility</li>
+</ul>
+<p>It does not recreate the upstream CLI/config runner, plotting scripts, or download automation.</p>
+<h2 id="quick-start">Quick Start</h2>
+<pre class="codehilite"><code><span class="kn">from</span><span class="w"> </span><span class="nn">sarpyx.snapflow.snap2stamps</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">PairProducts</span><span class="p">,</span>
+    <span class="n">list_pipeline_names</span><span class="p">,</span>
+    <span class="n">run_processing_pipeline</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="n">list_pipeline_names</span><span class="p">(</span><span class="s2">&quot;topsar&quot;</span><span class="p">))</span>
+
+<span class="n">pair</span> <span class="o">=</span> <span class="n">PairProducts</span><span class="p">(</span><span class="s2">&quot;master_orbit.dim&quot;</span><span class="p">,</span> <span class="s2">&quot;slave_orbit.dim&quot;</span><span class="p">)</span>
+<span class="n">result</span> <span class="o">=</span> <span class="n">run_processing_pipeline</span><span class="p">(</span>
+    <span class="s2">&quot;topsar_coreg_ifg_subset&quot;</span><span class="p">,</span>
+    <span class="n">pair</span><span class="o">=</span><span class="n">pair</span><span class="p">,</span>
+    <span class="n">outdir</span><span class="o">=</span><span class="s2">&quot;data/output/insar&quot;</span><span class="p">,</span>
+    <span class="n">master_count</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+    <span class="n">burst_count</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span>
+    <span class="n">subset_region</span><span class="o">=</span><span class="s2">&quot;0,0,1024,1024&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">pipeline_name</span><span class="p">,</span> <span class="n">result</span><span class="o">.</span><span class="n">coreg_path</span><span class="p">,</span> <span class="n">result</span><span class="o">.</span><span class="n">ifg_path</span><span class="p">)</span>
+</code></pre>
+<h2 id="topsar-branches">TOPSAR Branches</h2>
+<p>Branch selection follows the upstream behavior:</p>
+<ul>
+<li><code>select_topsar_split_pipeline(source_count)</code> chooses single-slice vs assemble+split</li>
+<li><code>select_topsar_coreg_ifg_pipeline(master_count, burst_count, external_dem_file=...)</code> chooses subset, no-ESD, and external-DEM variants</li>
+<li><code>select_topsar_export_pipeline(master_count, external_dem_file=...)</code> chooses direct export vs merge-IW export</li>
+</ul>
+<p>Main helpers:</p>
+<ul>
+<li><code>run_topsar_split_apply_orbit(...)</code></li>
+<li><code>run_topsar_coreg_ifg(...)</code></li>
+<li><code>run_topsar_export(...)</code></li>
+</ul>
+<h2 id="stripmap-branches">Stripmap Branches</h2>
+<p>Stripmap processing is exposed through:</p>
+<ul>
+<li><code>run_stripmap_subset(...)</code></li>
+<li><code>run_stripmap_coreg(...)</code></li>
+<li><code>run_stripmap_ifg(...)</code></li>
+<li><code>run_stripmap_export(...)</code></li>
+</ul>
+<p>Selectors:</p>
+<ul>
+<li><code>select_stripmap_coreg_pipeline(external_dem_file=...)</code></li>
+<li><code>select_stripmap_ifg_pipeline(external_dem_file=...)</code></li>
+</ul>
+<h2 id="legacy-pair-workflows">Legacy Pair Workflows</h2>
+<p>The older convenience workflow helpers remain available:</p>
+<ul>
+<li><code>prepare_pair(...)</code></li>
+<li><code>run_pair_workflow(...)</code></li>
+<li><code>run_graph_pipeline(...)</code></li>
+<li><code>run_pair_graph_pipeline(...)</code></li>
+</ul>
+<p>The deprecated import path <code>sarpyx.snapflow.snap2stamps_pipelines</code> re-exports the same API.</p>
+<h2 id="notes">Notes</h2>
+<ul>
+<li>Use <code>list_pipeline_names()</code> and <code>get_pipeline_definition()</code> to inspect available branches.</li>
+<li>Use <code>pipeline_requires_pair()</code> and <code>pipeline_requires_multi_input()</code> to validate caller inputs before dispatch.</li>
+<li>SNAP <code>gpt</code> and any DEM inputs must still be provided by the runtime environment.</li>
+</ul>
+    <div class="footer">
+      sarpyx Documentation &nbsp;·&nbsp; built with <code>build_site.py</code>
+    </div>
+  </main>
+</body>
+</html>

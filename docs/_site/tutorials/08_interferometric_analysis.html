@@ -57,6 +57,9 @@
     <h1 id="tutorial-8-advanced-interferometric-analysis">Tutorial 8: Advanced Interferometric Analysis</h1>
 <h2 id="overview">Overview</h2>
 <p>This tutorial covers advanced interferometric SAR (InSAR) analysis using sarpyx, including differential interferometry (DInSAR), persistent scatterer interferometry (PSI), and small baseline subset (SBAS) techniques for deformation monitoring and surface change detection.</p>
+<p>The InSAR orchestration snippets below are methodological examples. Use
+<code>sarpyx.snapflow.engine.GPT</code>, <code>sarpyx pipeline s1_insar</code>, or local workflow
+helpers for the SNAP preprocessing steps.</p>
 <h2 id="learning-objectives">Learning Objectives</h2>
 <p>By the end of this tutorial, you will be able to:
 - Generate interferograms from SAR image pairs
@@ -87,17 +90,9 @@
 <pre class="codehilite"><code><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">datetime</span><span class="w"> </span><span class="kn">import</span> <span class="n">datetime</span><span class="p">,</span> <span class="n">timedelta</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">sarpyx</span><span class="w"> </span><span class="kn">import</span> <span class="n">SLA</span><span class="p">,</span> <span class="n">SNAPProcessor</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">sarpyx.interferometry</span><span class="w"> </span><span class="kn">import</span> <span class="n">InSARProcessor</span><span class="p">,</span> <span class="n">PSAnalyzer</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">sarpyx.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">visualization</span><span class="p">,</span> <span class="n">phase_unwrapping</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">sarpyx.science</span><span class="w"> </span><span class="kn">import</span> <span class="n">atmospheric_correction</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sarpyx.snapflow.engine</span><span class="w"> </span><span class="kn">import</span> <span class="n">GPT</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">warnings</span>
 <span class="n">warnings</span><span class="o">.</span><span class="n">filterwarnings</span><span class="p">(</span><span class="s1">&#39;ignore&#39;</span><span class="p">)</span>
-
-<span class="c1"># Initialize processors</span>
-<span class="n">snap_processor</span> <span class="o">=</span> <span class="n">SNAPProcessor</span><span class="p">()</span>
-<span class="n">insar_processor</span> <span class="o">=</span> <span class="n">InSARProcessor</span><span class="p">()</span>
-<span class="n">ps_analyzer</span> <span class="o">=</span> <span class="n">PSAnalyzer</span><span class="p">()</span>
 
 <span class="c1"># Define SAR data stack</span>
 <span class="n">sar_stack</span> <span class="o">=</span> <span class="p">{</span>
@@ -241,11 +236,8 @@
 
     <span class="c1"># Apply phase unwrapping</span>
     <span class="n">wrapped_phase</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">angle</span><span class="p">(</span><span class="n">interferogram</span><span class="p">)</span>
-    <span class="n">unwrapped_phase</span> <span class="o">=</span> <span class="n">phase_unwrapping</span><span class="o">.</span><span class="n">unwrap_phase</span><span class="p">(</span>
-        <span class="n">wrapped_phase</span><span class="o">=</span><span class="n">wrapped_phase</span><span class="p">,</span>
-        <span class="n">quality_mask</span><span class="o">=</span><span class="n">quality_mask</span><span class="p">,</span>
-        <span class="n">algorithm</span><span class="o">=</span><span class="s1">&#39;minimum_cost_flow&#39;</span>  <span class="c1"># or &#39;branch_cut&#39;, &#39;quality_guided&#39;</span>
-    <span class="p">)</span>
+    <span class="c1"># Replace this with your preferred phase-unwrapping implementation.</span>
+    <span class="n">unwrapped_phase</span> <span class="o">=</span> <span class="n">run_phase_unwrapping</span><span class="p">(</span><span class="n">wrapped_phase</span><span class="p">,</span> <span class="n">quality_mask</span><span class="o">=</span><span class="n">quality_mask</span><span class="p">)</span>
 
     <span class="n">unwrapped_phases</span><span class="p">[</span><span class="n">pair_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">unwrapped_phase</span>
     <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unwrapped phase for </span><span class="si">{</span><span class="n">pair_name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
@@ -377,8 +369,6 @@
 <pre class="codehilite"><code><span class="c1"># Atmospheric phase screen estimation</span>
 <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Estimating atmospheric phase screens...&quot;</span><span class="p">)</span>
 
-<span class="n">atmospheric_processor</span> <span class="o">=</span> <span class="n">atmospheric_correction</span><span class="o">.</span><span class="n">AtmosphericProcessor</span><span class="p">()</span>
-
 <span class="c1"># Configure atmospheric correction</span>
 <span class="n">atm_config</span> <span class="o">=</span> <span class="p">{</span>
     <span class="s1">&#39;method&#39;</span><span class="p">:</span> <span class="s1">&#39;linear_regression&#39;</span><span class="p">,</span>  <span class="c1"># &#39;linear_regression&#39;, &#39;kriging&#39;, &#39;polynomial&#39;</span>
@@ -391,6 +381,7 @@
 
 <span class="n">atmospheric_screens</span> <span class="o">=</span> <span class="p">{}</span>
 <span class="n">corrected_phases</span> <span class="o">=</span> <span class="p">{}</span>
+<span class="n">atmospheric_processor</span> <span class="o">=</span> <span class="o">...</span>  <span class="c1"># local atmospheric correction implementation</span>
 
 <span class="k">for</span> <span class="n">pair_name</span><span class="p">,</span> <span class="n">unwrapped_phase</span> <span class="ow">in</span> <span class="n">unwrapped_phases</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
     <span class="c1"># Estimate atmospheric phase screen</span>

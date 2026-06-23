@@ -103,13 +103,11 @@ TOUP/snap_userdir.tar.gz
 
 *.agents/
 !.agents/
-.agents/*
 !.agents/skills/
 .agents/skills/*
 !.agents/skills/sarpyx/
 !.agents/skills/sarpyx/**
 .agents/skills/sarpyx/scripts/__pycache__/
-.agents/iterations/
 !.agents/memory/
 .agents/memory/*
 !.agents/memory/mistakes.md

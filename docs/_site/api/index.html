@@ -114,9 +114,14 @@
 <td>Radar Vegetation Index calculation</td>
 </tr>
 <tr>
-<td><code>calculate_entropy()</code></td>
-<td><code>sarpyx.processor.autofocus.metrics</code></td>
-<td>Image focus quality metric</td>
+<td><code>ssim()</code></td>
+<td><code>sarpyx.processor.utils.metrics</code></td>
+<td>Structural similarity metric</td>
+</tr>
+<tr>
+<td><code>psnr()</code></td>
+<td><code>sarpyx.processor.utils.metrics</code></td>
+<td>Peak signal-to-noise metric</td>
 </tr>
 <tr>
 <td><code>calculate_ndpoll()</code></td>
@@ -154,17 +159,16 @@
 <pre><code>sarpyx/
 ├── processor/          # Core processing algorithms
 │   ├── core/          # Focus, decode, transforms
-│   ├── autofocus/     # Autofocus algorithms and metrics
 │   ├── algorithms/    # High-level processing algorithms
 │   ├── data/          # Data I/O and format conversion
 │   └── utils/         # Processing utilities
 ├── sla/               # Sub-Look Analysis
 │   ├── core/          # Main SLA implementation
-│   └── utils/         # SLA-specific utilities
+│   ├── metrics.py     # SLA metrics
+│   └── variance/      # Coherence/covariance feature tools
 ├── snapflow/          # SNAP GPT integration
 ├── science/           # Scientific analysis tools
 ├── cli/               # Command-line interfaces (worldsar)
-├── algorithms/        # High-level algorithm wrappers
 └── utils/             # General utilities
     ├── viz.py         # Visualization and plotting
     ├── io.py          # File I/O, format conversion
@@ -189,7 +193,7 @@
 
 <span class="c1"># Import specific functions</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">sarpyx.science.indices</span><span class="w"> </span><span class="kn">import</span> <span class="n">calculate_rvi</span><span class="p">,</span> <span class="n">calculate_ndpoll</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">sarpyx.processor.autofocus.metrics</span><span class="w"> </span><span class="kn">import</span> <span class="n">calculate_entropy</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sarpyx.processor.utils.metrics</span><span class="w"> </span><span class="kn">import</span> <span class="n">ssim</span><span class="p">,</span> <span class="n">psnr</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">sarpyx.utils.dem_utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">tiles_from_wkt</span><span class="p">,</span> <span class="n">build_vrt</span>
 </code></pre>
 <h3 id="common-api-patterns">Common API Patterns</h3>

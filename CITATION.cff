@@ -2,8 +2,8 @@ cff-version: 1.2.0
 message: "If you use sarpyx, please cite the software and, once available, the associated JOSS paper."
 type: software
 title: "sarpyx"
-version: 0.1.10
-date-released: 2026-04-30
+version: 1.0.2
+date-released: 2026-06-22
 license: Apache-2.0
 url: "https://github.com/ESA-PhiLab/sarpyx"
 repository-code: "https://github.com/ESA-PhiLab/sarpyx"

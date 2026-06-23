@@ -109,16 +109,16 @@ focused_data = focus.range_compression(processed_data)
 focused_data = focus.azimuth_compression(focused_data)
 ```
 
-#### 3. Autofocus (if needed)
+#### 3. Quality Check
 ```python
-# Check focus quality
-from sarpyx.processor.autofocus import metrics
-focus_quality = metrics.calculate_entropy(focused_data)
+# Check image energy and contrast before deciding on more processing
+import numpy as np
 
-# Apply autofocus if necessary
-if focus_quality < threshold:
-    from sarpyx.processor.autofocus import compressor
-    autofocused = compressor.autofocus(focused_data)
+intensity = np.abs(focused_data) ** 2
+focus_quality = {
+    "mean_intensity": float(np.mean(intensity)),
+    "contrast": float(np.std(intensity) / (np.mean(intensity) + 1e-12)),
+}
 ```
 
 ## Frequency Domain Processing
@@ -212,18 +212,15 @@ geocoded = gpt.TerrainCorrection(
 ### Focus Quality Assessment
 
 ```python
-from sarpyx.processor.autofocus.metrics import (
-    calculate_entropy,
-    calculate_contrast,
-    calculate_sharpness
-)
+from sarpyx.processor.utils.metrics import psnr, ssim
 
-# Assess image focus quality
-entropy = calculate_entropy(sar_image)
-contrast = calculate_contrast(sar_image)
-sharpness = calculate_sharpness(sar_image)
+# Compare a candidate image against a reference or previous processing result
+reference_image = previous_result
+candidate_image = current_result
+similarity = ssim(reference_image, candidate_image)
+signal_quality = psnr(reference_image, candidate_image)
 
-print(f"Focus Quality - Entropy: {entropy:.3f}, Contrast: {contrast:.3f}")
+print(f"SSIM: {float(similarity):.3f}, PSNR: {float(signal_quality):.3f}")
 ```
 
 ### Statistical Measures
@@ -314,12 +311,12 @@ def assess_sar_quality(product_path):
     sla.SpectrumComputation()
     
     # Calculate quality metrics
-    entropy = calculate_entropy(sla.Box)
+    intensity = np.abs(sla.Box) ** 2
     
     # Generate report
     return {
-        'entropy': entropy,
-        'mean_intensity': np.mean(np.abs(sla.Box)**2),
+        'mean_intensity': float(np.mean(intensity)),
+        'contrast': float(np.std(intensity) / (np.mean(intensity) + 1e-12)),
         'data_shape': sla.Box.shape
     }
 ```

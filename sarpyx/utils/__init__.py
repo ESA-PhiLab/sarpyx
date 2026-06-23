@@ -5,6 +5,7 @@ pull optional heavy dependencies.
 """
 
 import importlib
+from sarpyx import __version__
 
 _EXPORT_MAP = {
     'show_image': 'viz',
@@ -19,7 +20,6 @@ _EXPORT_MAP = {
 }
 
 __all__ = list(_EXPORT_MAP)
-__version__ = '0.1.5'
 
 _module_cache = {}
 _value_cache = {}

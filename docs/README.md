@@ -17,6 +17,7 @@ The published site is available at <https://esa-philab.github.io/sarpyx/>.
 ## Build the Static Site
 
 ```bash
+uv sync --group dev
 python docs/generate_static_site.py
 ```
 

@@ -1,0 +1,1 @@
+For parallel SpaceHPC runs, never run recursive cleanup from the shared output root. Cleanup must be scoped to the current product root, and operational launches should keep intermediates unless cleanup is proven isolated.

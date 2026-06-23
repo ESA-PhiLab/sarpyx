@@ -1,6 +1,7 @@
 """SNAP integration module for sarpyx with lazy exports."""
 
 import importlib
+from sarpyx import __version__
 
 __all__ = [
     "GPT",
@@ -18,8 +19,6 @@ __all__ = [
     "run_processing_pipeline",
     "update_dim_add_bands_from_data_dir",
 ]
-
-__version__ = '0.1.5'
 
 _EXPORT_MODULES = {
     "GPT": "engine",

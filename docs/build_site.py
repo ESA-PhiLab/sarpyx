@@ -351,7 +351,11 @@ def _page_html(title: str, body_html: str, nav_html: str, toc_html: str,
 # ---------------------------------------------------------------------------
 def _collect_md_files(src: Path) -> list[Path]:
     """Return all .md files in src, sorted (excluding _site output dir)."""
-    return sorted(p for p in src.rglob("*.md") if "_site" not in p.parts)
+    return sorted(
+        p
+        for p in src.rglob("*.md")
+        if "_site" not in p.parts and "superpowers" not in p.parts
+    )
 
 
 def _fix_md_links(html: str, depth: int) -> str:
@@ -411,6 +415,11 @@ def build(src_dir: Path, out_dir: Path) -> None:
     else:
         print(f"⚠  Logo not found at {LOGO_SRC}")
 
+    # Preserve static report artifacts that are already authored as HTML.
+    results_dir = src_dir / "results"
+    if results_dir.exists():
+        shutil.copytree(results_dir, out_dir / "results", dirs_exist_ok=True)
+
     # ── collect all md paths ──────────────────────────
     md_files = _collect_md_files(src_dir)
     # Build a set of relative md paths that exist
@@ -469,13 +478,19 @@ def build(src_dir: Path, out_dir: Path) -> None:
         )
         converted += 1
 
-    # ── also copy .py example files as plain-text downloadable ────
-    for py in src_dir.rglob("*.py"):
-        if py.name == "build_site.py" or "_site" in py.parts:
-            continue
-        dest = out_dir / py.relative_to(src_dir)
+    # ── also copy example/notebook files as downloadable assets ────
+    copy_assets: list[Path] = []
+    examples_dir = src_dir / "examples"
+    notebooks_dir = src_dir / "notebooks"
+    if examples_dir.exists():
+        copy_assets.extend(examples_dir.rglob("*.py"))
+    if notebooks_dir.exists():
+        copy_assets.extend(notebooks_dir.rglob("*.ipynb"))
+
+    for asset in copy_assets:
+        dest = out_dir / asset.relative_to(src_dir)
         dest.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(py, dest)
+        shutil.copy2(asset, dest)
 
     print(f"✓  Built {converted} pages → {out_dir}")
 

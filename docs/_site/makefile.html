@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Makefile Usage – sarpyx Docs</title>
+  <link rel="stylesheet" href="./assets/style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="icon" href="./assets/sarpyx_logo.png" type="image/png">
+</head>
+<body>
+  <button class="menu-toggle" onclick="document.querySelector('.sidebar').classList.toggle('open')">☰</button>
+  <nav class="sidebar">
+    <a href="./index.html"><img class="logo" src="./assets/sarpyx_logo.png" alt="sarpyx"></a>
+    <h3>Home</h3>
+<a href="./index.html">Introduction</a>
+<h3>User Guide</h3>
+<a href="./user_guide/index.html">Overview</a>
+<a href="./user_guide/installation.html">Installation</a>
+<a href="./user_guide/getting_started.html">Getting Started</a>
+<a href="./user_guide/basic_concepts.html">Basic Concepts</a>
+<a href="./user_guide/data_formats.html">Data Formats</a>
+<a href="./user_guide/snap_integration.html">SNAP Integration</a>
+<a href="./user_guide/processing_workflows.html">Processing Workflows</a>
+<a href="./user_guide/science_applications.html">Science Applications</a>
+<a href="./user_guide/troubleshooting.html">Troubleshooting</a>
+<a href="./user_guide/INSTALL_S1ISP.html">Install S1-ISP</a>
+<h3>Tutorials</h3>
+<a href="./tutorials/index.html">Overview</a>
+<a href="./tutorials/01_first_sublook_analysis.html">01 – Sub-Look Analysis</a>
+<a href="./tutorials/02_snap_integration_basics.html">02 – SNAP Basics</a>
+<a href="./tutorials/03_visualization_quality.html">03 – Visualisation</a>
+<a href="./tutorials/04_multitemporal_analysis.html">04 – Multi-temporal</a>
+<a href="./tutorials/05_polarimetric_analysis.html">05 – Polarimetry</a>
+<a href="./tutorials/06_custom_workflows.html">06 – Custom Workflows</a>
+<a href="./tutorials/07_ship_detection.html">07 – Ship Detection</a>
+<a href="./tutorials/08_interferometric_analysis.html">08 – InSAR</a>
+<h3>API Reference</h3>
+<a href="./api/index.html">Overview</a>
+<a href="./api/snapflow/index.html">Snapflow</a>
+<a href="./api/snapflow/Snapflow_usage_example.html">Snapflow Examples</a>
+<a href="./api/science/index.html">Science</a>
+<a href="./api/sla/index.html">SLA</a>
+<a href="./api/processor/index.html">Processor</a>
+<a href="./api/utils/index.html">Utils</a>
+<a href="./api/utils/dem_utils.html">DEM Utilities</a>
+<h3>Examples</h3>
+<a href="./examples/index.html">Overview</a>
+<h3>Developer Guide</h3>
+<a href="./developer_guide/architecture.html">Architecture</a>
+<a href="./developer_guide/contributing.html">Contributing</a>
+<h3>Reference</h3>
+<a href="./metaParams.html">MetaParams</a>
+  </nav>
+  <main class="main">
+    <h1 id="makefile-usage">Makefile Usage</h1>
+<p>The Makefile is a thin user workflow wrapper. It keeps installation, download,
+pipeline execution, and PBS submission in one place while implementation details
+live in <code>scripts/</code>.</p>
+<p>Run <code>make help</code> to list the available targets.</p>
+<h2 id="defaults">Defaults</h2>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Default</th>
+<th>Used by</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ENV_PREFIX</code></td>
+<td><code>&lt;repo&gt;/.conda/sarpyx</code></td>
+<td><code>install</code>, <code>pipeline</code>, <code>pipeline-pair</code></td>
+</tr>
+<tr>
+<td><code>ENV_FILE</code></td>
+<td><code>&lt;repo&gt;/environment.yml</code></td>
+<td><code>install</code></td>
+</tr>
+<tr>
+<td><code>PYTHON</code></td>
+<td><code>$(ENV_PREFIX)/bin/python</code></td>
+<td><code>pipeline</code>, <code>pipeline-pair</code></td>
+</tr>
+<tr>
+<td><code>GPT_PATH</code></td>
+<td><code>$(ENV_PREFIX)/opt/esa-snap/bin/gpt</code></td>
+<td><code>pipeline</code>, <code>pipeline-pair</code></td>
+</tr>
+<tr>
+<td><code>PHIDOWN</code></td>
+<td><code>$(ENV_PREFIX)/bin/phidown</code></td>
+<td><code>download</code></td>
+</tr>
+<tr>
+<td><code>OUTPUT_ROOT</code></td>
+<td><code>outputs/make</code></td>
+<td><code>pipeline</code>, <code>pipeline-pair</code></td>
+</tr>
+<tr>
+<td><code>PIPELINE</code></td>
+<td><code>s1_tops</code></td>
+<td><code>pipeline</code>, <code>pipeline-pair</code></td>
+</tr>
+<tr>
+<td><code>OUTPUT</code></td>
+<td><code>$(OUTPUT_ROOT)/$(PIPELINE)</code></td>
+<td><code>pipeline</code>, <code>pipeline-pair</code></td>
+</tr>
+<tr>
+<td><code>CUTS_OUTDIR</code></td>
+<td><code>$(OUTPUT)/tiles</code></td>
+<td><code>pipeline</code>, <code>pipeline-pair</code></td>
+</tr>
+<tr>
+<td><code>DOWNLOAD_DIR</code></td>
+<td><code>input_data</code></td>
+<td><code>download</code></td>
+</tr>
+<tr>
+<td><code>DOWNLOAD_MODE</code></td>
+<td><code>safe</code></td>
+<td><code>download</code></td>
+</tr>
+<tr>
+<td><code>PBS_SIZE</code></td>
+<td><code>large</code></td>
+<td><code>pbs</code></td>
+</tr>
+<tr>
+<td><code>PBS_NAME</code></td>
+<td><code>sarpyx</code></td>
+<td><code>pbs</code></td>
+</tr>
+<tr>
+<td><code>PBS_QUEUE</code></td>
+<td><code>cpu_std</code></td>
+<td><code>pbs</code></td>
+</tr>
+</tbody>
+</table>
+<h2 id="install">Install</h2>
+<p>Create or update the local conda environment at <code>.conda/sarpyx</code> from
+<code>environment.yml</code>. This installs SNAP (<code>snap13</code>), this checkout in editable
+mode, and <code>phidown</code> through the <code>sarpyx[copernicus]</code> extra.
+The install script verifies exact local executables:</p>
+<ul>
+<li><code>.conda/sarpyx/opt/esa-snap/bin/gpt</code></li>
+<li><code>.conda/sarpyx/bin/sarpyx</code></li>
+<li><code>.conda/sarpyx/bin/phidown</code></li>
+</ul>
+<pre class="codehilite"><code>make<span class="w"> </span>install
+</code></pre>
+<p>Override the local environment prefix when needed:</p>
+<pre class="codehilite"><code>make<span class="w"> </span>install<span class="w"> </span><span class="nv">ENV_PREFIX</span><span class="o">=</span><span class="nv">$PWD</span>/.conda/sarpyx-snap
+conda<span class="w"> </span>activate<span class="w"> </span><span class="nv">$PWD</span>/.conda/sarpyx-snap
+</code></pre>
+<p>Use a different environment file when needed:</p>
+<pre class="codehilite"><code>make<span class="w"> </span>install<span class="w"> </span><span class="nv">ENV_FILE</span><span class="o">=</span>/path/to/environment.yml
+</code></pre>
+<h2 id="download">Download</h2>
+<p>Download a product with <code>phidown</code>:</p>
+<pre class="codehilite"><code>make<span class="w"> </span>download<span class="w"> </span><span class="nv">PRODUCT_NAME</span><span class="o">=</span>S1A_IW_SLC__1SDV_20240807T154929_20240807T154956_055109_06B710_F274.SAFE
+</code></pre>
+<p>The helper uses <code>.conda/sarpyx/bin/phidown</code> by default. It does not resolve
+<code>phidown</code> from <code>PATH</code>.</p>
+<p>Use a different output folder or config file:</p>
+<pre class="codehilite"><code>make<span class="w"> </span>download<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="nv">PRODUCT_NAME</span><span class="o">=</span>S1A_IW_SLC__1SDV_20240807T154929_20240807T154956_055109_06B710_F274.SAFE<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="nv">DOWNLOAD_DIR</span><span class="o">=</span>input_data<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="nv">CONFIG_FILE</span><span class="o">=</span>/path/to/.s5cfg
+</code></pre>
+<h2 id="single-product-pipeline">Single-Product Pipeline</h2>
+<p>Run a built-in or external single-product recipe:</p>
+<pre class="codehilite"><code>make<span class="w"> </span>pipeline<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="nv">PIPELINE</span><span class="o">=</span>s1_tops<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="nv">INPUT</span><span class="o">=</span>input_data/product.SAFE<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="nv">GRID_PATH</span><span class="o">=</span>grid/grid_10km.geojson<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="nv">GPT_PATH</span><span class="o">=</span>/path/to/gpt
+</code></pre>
+<p>The default output is <code>outputs/make/&lt;pipeline&gt;</code>, and tiles default to
+<code>outputs/make/&lt;pipeline&gt;/tiles</code>.</p>
+<p>The helper runs the repository dispatcher as <code>python -m sarpyx.cli.main</code> so it
+does not depend on an older <code>sarpyx</code> executable that may already be on <code>PATH</code>.
+By default it uses <code>.conda/sarpyx/bin/python</code> and resolves SNAP GPT at
+<code>.conda/sarpyx/opt/esa-snap/bin/gpt</code>.
+Ambient shell variables named <code>PYTHON</code>, <code>GPT_PATH</code>, or <code>PHIDOWN</code> are ignored by
+the Makefile so unrelated tools cannot be picked up accidentally. To override a
+path, pass it on the make command line:</p>
+<pre class="codehilite"><code>make<span class="w"> </span>pipeline<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="nv">PYTHON</span><span class="o">=</span>/path/to/env/bin/python<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="nv">GPT_PATH</span><span class="o">=</span>/path/to/env/opt/esa-snap/bin/gpt<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="nv">PIPELINE</span><span class="o">=</span>s1_tops<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="nv">INPUT</span><span class="o">=</span>input_data/product.SAFE
+</code></pre>
+<p>Pass recipe parameters as space-separated <code>NAME=VALUE</code> pairs:</p>
+<pre class="codehilite"><code>make<span class="w"> </span>pipeline<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="nv">PIPELINE</span><span class="o">=</span>s1_tops<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="nv">INPUT</span><span class="o">=</span>input_data/product.SAFE<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="nv">PARAMS</span><span class="o">=</span><span class="s1">&#39;first_burst=1 last_burst=1&#39;</span>
+</code></pre>
+<h2 id="pair-pipeline">Pair Pipeline</h2>
+<p>Run a double-product recipe such as <code>s1_insar</code>:</p>
+<pre class="codehilite"><code>make<span class="w"> </span>pipeline-pair<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="nv">PIPELINE</span><span class="o">=</span>s1_insar<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="nv">MASTER</span><span class="o">=</span>input_data/master.SAFE<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="nv">SLAVE</span><span class="o">=</span>input_data/slave.SAFE<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="nv">GRID_PATH</span><span class="o">=</span>grid/grid_10km.geojson<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="nv">GPT_PATH</span><span class="o">=</span>/path/to/gpt
+</code></pre>
+<h2 id="pbs">PBS</h2>
+<p>Submit any command to a CPU node through <code>scripts/pbs_caller.sh</code>:</p>
+<pre class="codehilite"><code>make<span class="w"> </span>pbs<span class="w"> </span><span class="nv">PBS_SIZE</span><span class="o">=</span>small<span class="w"> </span><span class="nv">CMD</span><span class="o">=</span><span class="s1">&#39;python -m sarpyx.cli.main pipeline --list&#39;</span>
+make<span class="w"> </span>pbs<span class="w"> </span><span class="nv">PBS_SIZE</span><span class="o">=</span>medium<span class="w"> </span><span class="nv">CMD</span><span class="o">=</span><span class="s1">&#39;python -m sarpyx.cli.main pipeline s1_tops --input input_data/product.SAFE --output outputs/make/s1_tops&#39;</span>
+make<span class="w"> </span>pbs<span class="w"> </span><span class="nv">PBS_SIZE</span><span class="o">=</span>large<span class="w"> </span><span class="nv">CMD</span><span class="o">=</span><span class="s1">&#39;python -m sarpyx.cli.main pipeline s1_insar --master input_data/master.SAFE --slave input_data/slave.SAFE --output outputs/make/s1_insar&#39;</span>
+</code></pre>
+<p>Dry-run the generated PBS script before submitting:</p>
+<pre class="codehilite"><code>make<span class="w"> </span>pbs<span class="w"> </span><span class="nv">PBS_SIZE</span><span class="o">=</span>small<span class="w"> </span><span class="nv">PBS_ARGS</span><span class="o">=</span>--dry-run<span class="w"> </span><span class="nv">CMD</span><span class="o">=</span><span class="s1">&#39;python -m sarpyx.cli.main pipeline --list&#39;</span>
+</code></pre>
+<p>Profiles are defined in <code>scripts/pbs_caller.sh</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Size</th>
+<th>Walltime</th>
+<th>CPUs</th>
+<th>Memory</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>small</code></td>
+<td><code>02:00:00</code></td>
+<td>32</td>
+<td><code>32g</code></td>
+</tr>
+<tr>
+<td><code>medium</code></td>
+<td><code>04:00:00</code></td>
+<td>96</td>
+<td><code>64g</code></td>
+</tr>
+<tr>
+<td><code>large</code></td>
+<td><code>06:00:00</code></td>
+<td>192</td>
+<td><code>128g</code></td>
+</tr>
+</tbody>
+</table>
+    <div class="footer">
+      sarpyx Documentation &nbsp;·&nbsp; built with <code>build_site.py</code>
+    </div>
+  </main>
+</body>
+</html>

@@ -13,8 +13,8 @@
 <a href="LICENSE">
   <img alt="License" src="https://img.shields.io/badge/License-Apache--2.0-374151?style=for-the-badge" />
 </a>
-<a href="https://github.com/ESA-PhiLab/sarpyx/releases/tag/v1.0.0">
-  <img alt="Version" src="https://img.shields.io/badge/Version-1.0.0-2563eb?style=for-the-badge" />
+<a href="https://github.com/ESA-PhiLab/sarpyx/releases/tag/v1.0.2">
+  <img alt="Version" src="https://img.shields.io/badge/Version-1.0.2-2563eb?style=for-the-badge" />
 </a>
 </div>
 

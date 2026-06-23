@@ -4,6 +4,6 @@ This module contains scientific algorithms and methods for SAR data analysis
 and processing applications.
 """
 
-__all__ = []
+from sarpyx import __version__
 
-__version__ = '0.1.5'
+__all__ = []
