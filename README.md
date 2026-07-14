@@ -62,7 +62,7 @@ conda install --override-channels \
   -c conda-forge \
   snap13=13.0.0=3 
 
-python -m pip install -e .
+python -m pip install -e ".[io,viz]"
 ```
 
 Verify the installation:
