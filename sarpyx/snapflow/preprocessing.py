@@ -362,7 +362,7 @@ def run_biomass_pipeline(
     ctx = make_context(
         product_path,
         output_dir,
-        "BEAM-DIMAP", #"GDAL-GTiff-WRITER"
+        "GDAL-GTiff-WRITER",
         gpt_kwargs,
         create_operator=create_operator,
         metadata=_tiling_metadata(product_wkt, grid_path, cuts_outdir, product_mode, gpt_kwargs, _.get("tile_writer", "zarr"), _.get("pre_write_hook"), _.get("report_outdir"), _.get("product_name")),
