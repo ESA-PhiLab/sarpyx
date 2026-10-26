@@ -368,7 +368,12 @@ class GPT:
         if self.last_returncode is not None:
             parts.append(f'returncode={self.last_returncode}')
         if self.last_stderr:
-            parts.append(f'stderr={self.last_stderr.strip()}')
+            stderr = self.last_stderr.strip()
+            prefix = '; '.join(parts + ['stderr='])
+            if len(prefix) + len(stderr) > max_chars:
+                marker = '[...truncated...] '
+                stderr = marker + stderr[-(max_chars - len(prefix) - len(marker)):]
+            return (prefix + stderr)[:max_chars]
         if not parts and self.last_stdout:
             parts.append(f'stdout={self.last_stdout.strip()}')
         summary = '; '.join(parts) if parts else 'unknown error'
