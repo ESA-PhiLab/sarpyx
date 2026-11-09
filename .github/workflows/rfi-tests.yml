@@ -1,0 +1,37 @@
+name: RFI acquisition timing tests
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "sarpyx/utils/rfigen.py"
+      - "tests/test_rfigen.py"
+      - "tests/fixtures/rfigen_legacy.py"
+      - "sarpyx/processor/core/code2physical.py"
+      - "sarpyx/processor/core/decode.py"
+      - "sarpyx/__init__.py"
+      - "sarpyx/utils/__init__.py"
+      - "pyproject.toml"
+      - ".github/workflows/rfi-tests.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  rfi-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install focused test dependencies
+        run: python -m pip install "numpy>=1.26,<3" "scipy>=1.11,<2" "pandas>=2.2,<3" "pytest==8.4.0"
+      - name: Check lightweight imports
+        run: python -c "from sarpyx.utils.rfigen import GenerateRFISignal, sentinel1_receive_times"
+      - name: Test acquisition-time interference generation
+        run: python -m pytest tests/test_rfigen.py -q

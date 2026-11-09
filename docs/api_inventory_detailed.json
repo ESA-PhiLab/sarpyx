@@ -24183,7 +24183,7 @@
         "side_effects": [
           "inferred from implementation"
         ],
-        "line": 4
+        "line": 19
       },
       {
         "name": "fspl",
@@ -24209,41 +24209,105 @@
         "side_effects": [
           "inferred from implementation"
         ],
-        "line": 7
+        "line": 23
+      },
+      {
+        "name": "sentinel1_receive_times",
+        "doc": "Return relative times of the first stored complex sample in each line.\n\nAccept one ordered, constant-PRI Sentinel-1 burst as decoded records or a\npandas DataFrame. ``pri`` and ``swst`` must already be in seconds, and\n``pri_count`` must be the instrument's integer counter. The physical-unit\naliases ``pri_s`` and ``sampling_window_start_time_s`` are also accepted.\nFull decoded timing and identity headers are required for every line.\nAcquisition gaps advance time by their counter gaps. SWST changes remain.\n\nTimes are relative to the first line's first stored sample. The common\nfilter transient suppression delay, 320 / (8 * f_ref), cancels in this\ndifference. Constant range decimation is required for one sample rate per\nstored array, independently of this common delay.\nRank is an echo propagation-delay parameter, not an additional delay between\nthese receive windows. Required coarse/fine timestamps cross-check the\ncounters; their quantization is not used to introduce artificial PRI jitter.\n\nVariable-PRI, mixed-channel or reordered acquisitions are rejected. For a\ndifferent acquisition scheme, construct ``line_start_times`` explicitly.\n\nExamples:\nfrom sarpyx.utils.rfigen import sentinel1_receive_times\n\nheaders = [\n    dict(pri=600e-6, swst=100e-6, pri_count=count,\n         coarse_time=1000, fine_time=fine, range_decimation=8,\n         rx_channel_id=1, swath_number=10, data_take_id=1, signal_type=0)\n    for count, fine in ((100, 0.1), (101, 0.1006), (103, 0.1018))\n]\nreceive_times = sentinel1_receive_times(headers)",
+        "signature": "sentinel1_receive_times(metadata: Sequence[Mapping[str, Any]])",
+        "parameters": [],
+        "raw_parameters": [
+          {
+            "name": "metadata",
+            "annotation": "Sequence[Mapping[str, Any]]",
+            "required": true,
+            "default": null
+          }
+        ],
+        "returns": "np.ndarray",
+        "exceptions": [
+          "ValueError"
+        ],
+        "side_effects": [],
+        "line": 27
       },
       {
         "name": "GenerateRFISignal",
-        "doc": "Generate Radio Frequency Interference (RFI) signal for SAR data.\n\nArgs:\n    sqd (np.ndarray): Input SAR single look complex data with shape (rows, cols).\n    RadPar (dict): Radar parameters containing:\n        - 'bw': Bandwidth in Hz\n        - 'fo': Center frequency in Hz\n        - 'fs': Sampling frequency in Hz\n    \nReturns:\n    tuple: A tuple containing:\n        - sInterf (np.ndarray): Generated interference signal with same shape as sqd\n        - IR (dict): Dictionary containing RFI parameters used in generation",
-        "signature": "GenerateRFISignal(sqd, RadPar=None, verbose=False)",
+        "doc": "Generate RFI at acquisition sample times, or explicitly replay legacy RFI.\n\n``sqd`` is a finite, nonempty (azimuth, range) raw echo array. ``RadPar``\nmust explicitly supply ``fs``, ``fo`` and ``bw`` in Hz for this acquisition.\n``line_start_times`` gives each row's first stored sample time in seconds,\nrelative to the first row (which must be zero). Sample [a, r] is evaluated\nat ``line_start_times[a] + r / fs``. Use ``sentinel1_receive_times`` for\ndecoded, constant-PRI Sentinel-1 headers. No timing is inferred from RFI PRF.\n\n``parameters`` optionally overrides ``PRF``, ``duty`` (pulse width / PRI),\n``bw``, ``freqShift``, ``SIR_dB``, ``pulse_probability`` or ``pulse_start``.\nT = duty / PRF; overlapping pulses are not supported. ``pulse_probability``\nindependently controls Bernoulli activation of nominal pulse slots (default\n1: a regular train). ``pulse_start`` is the first nominal pulse onset relative\nto the first stored sample; by default it is drawn within the preceding PRI.\nThe Hann envelope is evaluated analytically over the physical pulse duration.\n\nHalf-open azimuth/range extents gate samples after timing is established.\nChanging the mask does not change pulse arrivals, chirp phase or activation.\nSIR is normalized using mean clean and interference powers over the *whole\nstored array*, including zeros. Mask changes can therefore change amplitude.\nIf no active pulse intersects the selected samples, return zero interference,\nwarn, and record ``achieved_SIR_dB=None``; do not silently redraw the train.\n\nA local seeded NumPy generator leaves global RNG state untouched. Returned\nmetadata is JSON serializable and records the seed, active slots, receive\ntimes, physical parameters, source hash and optional generation commit.\nVersion 2 requires explicit acquisition timing and radar parameters; old\ncalls without them fail. ``mode=\"legacy\"`` explicitly selects the unchanged\nflattened-stream algorithm, emits a RuntimeWarning and adds legacy labels.\nIt keeps global ``np.random.seed`` behavior and the original metadata types,\nincluding the sampled ``t`` array. Acquisition-only keywords are rejected.\n\nExamples:\nimport numpy as np\nfrom sarpyx.utils.rfigen import GenerateRFISignal\n\necho = np.ones((8, 200), dtype=np.complex64)\nradar = {\"fs\": 4e6, \"fo\": 5.405e9, \"bw\": 1e6}\ninterference, parameters = GenerateRFISignal(\n    echo, radar, line_start_times=np.arange(8) * 600e-6, seed=12,\n    parameters={\"pulse_start\": 0, \"duty\": 0.8},\n    affected_az=(0, 8), affected_rg=(0, 200),\n)\n\n# Replay the historical model; its timing limits still apply.\nnp.random.seed(12)\nlegacy_interference, legacy_parameters = GenerateRFISignal(\n    echo, radar, mode=\"legacy\",\n)",
+        "signature": "GenerateRFISignal(sqd: np.ndarray, RadPar: Mapping[str, float] | None=None, verbose: bool=False, *, mode: str='acquisition', line_start_times: Sequence[float] | None=None, seed: int | None=None, parameters: Mapping[str, float] | None=None, affected_az: tuple[int, int] | None=None, affected_rg: tuple[int, int] | None=None, generator_revision: str | None=None)",
         "parameters": [],
         "raw_parameters": [
           {
             "name": "sqd",
-            "annotation": null,
+            "annotation": "np.ndarray",
             "required": true,
             "default": null
           },
           {
             "name": "RadPar",
-            "annotation": null,
+            "annotation": "Mapping[str, float] | None",
             "required": false,
             "default": "None"
           },
           {
             "name": "verbose",
-            "annotation": null,
+            "annotation": "bool",
             "required": false,
             "default": "False"
+          },
+          {
+            "name": "mode",
+            "annotation": "str",
+            "required": false,
+            "default": "'acquisition'"
+          },
+          {
+            "name": "line_start_times",
+            "annotation": "Sequence[float] | None",
+            "required": false,
+            "default": "None"
+          },
+          {
+            "name": "seed",
+            "annotation": "int | None",
+            "required": false,
+            "default": "None"
+          },
+          {
+            "name": "parameters",
+            "annotation": "Mapping[str, float] | None",
+            "required": false,
+            "default": "None"
+          },
+          {
+            "name": "affected_az",
+            "annotation": "tuple[int, int] | None",
+            "required": false,
+            "default": "None"
+          },
+          {
+            "name": "affected_rg",
+            "annotation": "tuple[int, int] | None",
+            "required": false,
+            "default": "None"
+          },
+          {
+            "name": "generator_revision",
+            "annotation": "str | None",
+            "required": false,
+            "default": "None"
           }
         ],
-        "returns": null,
+        "returns": "tuple[np.ndarray, dict]",
         "exceptions": [
           "ValueError"
         ],
         "side_effects": [
-          "io"
+          "emits RuntimeWarning for legacy mode or zero overlap",
+          "advances global NumPy RNG state in legacy mode",
+          "reads module source for acquisition-mode provenance"
         ],
-        "line": 10
+        "line": 173
       }
     ],
     "public_classes": [],
