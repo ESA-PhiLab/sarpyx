@@ -15,6 +15,7 @@ This guide provides comprehensive information for users of sarpyx, from installa
 9. [SNAP2StaMPS Guide](snap2stamps_guide.md)
 10. [CLI Usage Examples](cli_examples.md)
 11. [Generic Pipeline CLI](pipeline_cli.md)
+12. [RFI Generation and Existing-Data Notice](rfi_generation.md)
 
 ## Overview
 
