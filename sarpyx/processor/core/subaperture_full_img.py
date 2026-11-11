@@ -50,6 +50,25 @@ def _extract_iq_swath_pol_from_stem(stem: str):
     return iq, swath, pol
 
 
+def _resolve_iq_selectors(i_image, q_image, safe_swath=None, safe_polarization=None):
+    """Infer known selectors from each recognizable band and reject conflicts."""
+    swath = safe_swath.upper() if safe_swath else None
+    pol = safe_polarization.upper() if safe_polarization else None
+    for expected, path in (("i", i_image), ("q", q_image)):
+        parsed = _extract_iq_swath_pol_from_stem(os.path.splitext(os.path.basename(path))[0]) if isinstance(path, (str, os.PathLike)) else None
+        if parsed is None:
+            continue
+        role, inferred_swath, inferred_pol = parsed
+        if role != expected:
+            raise ValueError(f"Expected {expected.upper()} band, got {path}")
+        if swath and inferred_swath and swath != inferred_swath:
+            raise ValueError("Explicit or inferred swath disagrees with I/Q filenames")
+        if pol and inferred_pol and pol != inferred_pol:
+            raise ValueError("Explicit or inferred polarization disagrees with I/Q filenames")
+        swath = swath or inferred_swath
+        pol = pol or inferred_pol
+    return swath, pol
+
 def _candidate_priority(stem: str, iq: str, tag: str):
     """Lower tuples are preferred when several i/q files exist for one tag."""
     stem_u = stem.upper()
@@ -421,6 +440,8 @@ class CombinedSublooking:
         iw_crosslook_row_balance: bool = True,
         iw_crosslook_row_balance_smooth_win: int = 257,
         iw_crosslook_row_balance_clip: float = 1.5,
+        safe_swath: Optional[str] = None,
+        safe_polarization: Optional[str] = None,
     ):
         # ---- tunable knobs ----
         self.choice = 1  # Range == 0 | Azimuth == 1
@@ -519,8 +540,14 @@ class CombinedSublooking:
         else:
             raise ValueError("Supplied asset metadata in unrecognized format.")
 
-        meta = Handler(metadata_pointer)
+        safe_swath, safe_polarization = _resolve_iq_selectors(
+            i_image, q_image, safe_swath, safe_polarization)
+        meta = Handler(metadata_pointer, swath=safe_swath, polarization=safe_polarization,
+                       require_unique=True)
         meta.chain()
+        self.annotation_file = meta.annotation_file
+        if self.annotation_file:
+            logger.info("SAFE annotation used: %s", self.annotation_file)
 
         self.PRF = meta.PRF
         self.AzimBand = meta.AzimBand
@@ -670,10 +697,7 @@ class CombinedSublooking:
 
     def _ifftshift_freq_axis(self, arr):
         if isinstance(arr, da.Array):
-            return arr.map_blocks(
-                lambda block: np.fft.ifftshift(block, axes=0),
-                dtype=np.complex64,
-            )
+            return da.fft.ifftshift(arr, axes=0)
         return np.fft.ifftshift(arr, axes=0)
     def _smooth_1d(self, x, win):
         x = np.asarray(x, dtype=np.float32)
@@ -1181,10 +1205,18 @@ class CombinedSublooking:
         S_roll = self._roll_freq_axis(self.SpectrumOneDimNormDeWe, self.iw_roll_shift)
 
         local_shift = self._estimate_iw_dc_shift_from_rolled_support(S_roll, ss, ee)
+        support_len = ee - ss + 1
         if local_shift != 0:
             S_roll = self._roll_freq_axis(S_roll, local_shift)
-
-        support_len = ee - ss + 1
+        # The support moves with the samples. If it crosses the circular array
+        # boundary, rotate it to the front for contiguous slicing, then undo
+        # that bookkeeping rotation during reconstruction. Preserve its width.
+        ss = (ss + local_shift) % self.nRows
+        bookkeeping_shift = -ss if ss + support_len > self.nRows else 0
+        if bookkeeping_shift:
+            S_roll = self._roll_freq_axis(S_roll, bookkeeping_shift)
+            ss = 0
+        ee = ss + support_len - 1
         edges = self._compute_iw_subband_edges(S_roll, ss, ee)
         self.Looks = []
 
@@ -1196,7 +1228,7 @@ class CombinedSublooking:
 
             padded_roll = np.zeros((self.nRows, self.nCols), dtype=np.complex64)
             padded_roll[si:ei, :] = S_roll[si:ei, :]
-            padded = self._roll_freq_axis(padded_roll, -self.iw_roll_shift)
+            padded = self._roll_freq_axis(padded_roll, -self.iw_roll_shift - bookkeeping_shift)
             padded = self._ifftshift_freq_axis(padded)
             look = np.fft.ifft(padded, axis=0).astype(np.complex64)
 
@@ -1223,10 +1255,18 @@ class CombinedSublooking:
         S_roll = self._roll_freq_axis(self.SpectrumOneDimNormDeWe, self.iw_roll_shift)
 
         local_shift = self._estimate_iw_dc_shift_from_rolled_support(S_roll, ss, ee)
+        support_len = ee - ss + 1
         if local_shift != 0:
             S_roll = self._roll_freq_axis(S_roll, local_shift)
-
-        support_len = ee - ss + 1
+        # The support moves with the samples. If it crosses the circular array
+        # boundary, rotate it to the front for contiguous slicing, then undo
+        # that bookkeeping rotation during reconstruction. Preserve its width.
+        ss = (ss + local_shift) % self.nRows
+        bookkeeping_shift = -ss if ss + support_len > self.nRows else 0
+        if bookkeeping_shift:
+            S_roll = self._roll_freq_axis(S_roll, bookkeeping_shift)
+            ss = 0
+        ee = ss + support_len - 1
         edges = self._compute_iw_subband_edges(S_roll, ss, ee)
         self.Looks = []
 
@@ -1248,7 +1288,7 @@ class CombinedSublooking:
                 parts.append(da.zeros((bot_len, self.nCols), chunks=(bot_len, self._chunk_cols), dtype=np.complex64))
 
             padded_roll = da.concatenate(parts, axis=0).astype(np.complex64)
-            padded = self._roll_freq_axis(padded_roll, -self.iw_roll_shift)
+            padded = self._roll_freq_axis(padded_roll, -self.iw_roll_shift - bookkeeping_shift)
             padded = self._ifftshift_freq_axis(padded)
             # Dask FFT requires a single chunk along the transform axis.
             padded = padded.rechunk((self.nRows, self._chunk_cols))
@@ -1376,6 +1416,8 @@ def do_subaps(
     iw_crosslook_row_balance: bool = True,
     iw_crosslook_row_balance_smooth_win: int = 257,
     iw_crosslook_row_balance_clip: float = 1.5,
+    safe_swath: Optional[str] = None,
+    safe_polarization: Optional[str] = None,
 ):
     """
     Orchestrator:
@@ -1453,7 +1495,24 @@ def do_subaps(
         print(f"Metadata source SAFE: {safe_path}")
         print(f"Decompositions to run: {decomps}")
 
-    _ensure_subap_output_space(data_dir, _estimate_subap_output_bytes(data_dir, base_pairs, decomps, prefix))
+    if safe_polarization:
+        requested_pol = safe_polarization.upper()
+        pols = [tag for tag in pols if tag.split("_")[-1].upper() == requested_pol]
+        if not pols:
+            raise ValueError(f"No I/Q pair for requested polarization {requested_pol}")
+
+    # Resolve and validate *every* selected pair before any output is written.
+    # A single bad pair must not leave a partly processed multi-pol product.
+    pair_selectors = {}
+    for tag in pols:
+        i_fp, q_fp = base_pairs[tag]
+        swath, polarization = _resolve_iq_selectors(i_fp, q_fp, safe_swath, safe_polarization)
+        meta = Handler(safe_path, swath=swath, polarization=polarization, require_unique=True)
+        meta.chain()
+        pair_selectors[tag] = (swath, polarization)
+
+    selected_pairs = {tag: base_pairs[tag] for tag in pols}
+    _ensure_subap_output_space(data_dir, _estimate_subap_output_bytes(data_dir, selected_pairs, decomps, prefix))
 
     # -------------------------
     # Run one or multiple decompositions
@@ -1486,6 +1545,8 @@ def do_subaps(
             
             sub = CombinedSublooking(
                 metadata_pointer_safe=safe_path,
+                safe_swath=pair_selectors[pol][0],
+                safe_polarization=pair_selectors[pol][1],
                 numberofLooks=nlooks,
                 i_image=i_fp,
                 q_image=q_fp,
