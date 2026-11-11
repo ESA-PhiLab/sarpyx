@@ -543,7 +543,7 @@ class CombinedSublooking:
         safe_swath, safe_polarization = _resolve_iq_selectors(
             i_image, q_image, safe_swath, safe_polarization)
         meta = Handler(metadata_pointer, swath=safe_swath, polarization=safe_polarization,
-                       require_unique=True)
+                       require_unique=safe_swath is not None)
         meta.chain()
         self.annotation_file = meta.annotation_file
         if self.annotation_file:
@@ -1289,9 +1289,11 @@ class CombinedSublooking:
 
             padded_roll = da.concatenate(parts, axis=0).astype(np.complex64)
             padded = self._roll_freq_axis(padded_roll, -self.iw_roll_shift - bookkeeping_shift)
-            padded = self._ifftshift_freq_axis(padded)
-            # Dask FFT requires a single chunk along the transform axis.
+            # Collapse azimuth chunks before the global shift. da.fft.ifftshift
+            # otherwise shuffles/rechunks the axis, which the FFT would require
+            # anyway.
             padded = padded.rechunk((self.nRows, self._chunk_cols))
+            padded = self._ifftshift_freq_axis(padded)
             look = dafft.ifft(padded, axis=0).astype(np.complex64)
 
             scale = self._iw_energy_scale(full_len=support_len, sub_len=ei - si)
@@ -1507,7 +1509,8 @@ def do_subaps(
     for tag in pols:
         i_fp, q_fp = base_pairs[tag]
         swath, polarization = _resolve_iq_selectors(i_fp, q_fp, safe_swath, safe_polarization)
-        meta = Handler(safe_path, swath=swath, polarization=polarization, require_unique=True)
+        meta = Handler(safe_path, swath=swath, polarization=polarization,
+                       require_unique=swath is not None)
         meta.chain()
         pair_selectors[tag] = (swath, polarization)
 

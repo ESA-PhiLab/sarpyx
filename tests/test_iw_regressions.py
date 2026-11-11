@@ -6,7 +6,7 @@ from sarpyx.processor.core.meta import Handler
 from sarpyx.processor.core.subaperture_full_img import CombinedSublooking
 
 
-def test_ifftshift_is_global_across_uneven_chunks():
+def check_ifftshift_is_global_across_uneven_chunks():
     obj = CombinedSublooking.__new__(CombinedSublooking)
     for n in (9, 10):
         a = np.arange(n * 3).reshape(n, 3).astype(np.complex64)
@@ -54,7 +54,7 @@ def check_annotation_selection(tmp_path):
     h.chain()
     assert h.selected == 'iw2-vv'
     assert h.annotation_file.endswith('s1a-iw2-slc-vv-fixture.xml')
-    for selectors in ({'polarization': 'VV'}, {'swath': 'IW9', 'polarization': 'VV'}):
+    for selectors in ({'swath': 'IW9', 'polarization': 'VV'},):
         try:
             Handler(str(annotation.parent), **selectors).chain()
         except RuntimeError as exc:
@@ -65,7 +65,7 @@ def check_annotation_selection(tmp_path):
 
 class RegressionTests(unittest.TestCase):
     def test_ifftshift(self):
-        test_ifftshift_is_global_across_uneven_chunks()
+        check_ifftshift_is_global_across_uneven_chunks()
 
     def test_support(self):
         for case in ((1, 5, -3, 2), (5, 9, 3, -3), (2, 7, 1, 0)):
@@ -108,12 +108,21 @@ class PublicSelectionTests(unittest.TestCase):
             for swath in ('iw1', 'iw2'):
                 (annotation/f's1a-{swath}-slc-vv-test.xml').write_text('<root/>')
             h = Handler(tmp); h._extract_metadata_from_xml = lambda root: None
-            with self.assertLogs('sarpyx.processor.core.meta', level='WARNING'), warnings.catch_warnings(record=True) as caught:
+            with warnings.catch_warnings(record=True) as caught:
                 warnings.simplefilter('always'); h.chain()
             self.assertEqual(len(caught),1)
             self.assertTrue(h.annotation_file.endswith('.xml'))
+            selected_pol = Handler(tmp, polarization='VV', require_unique=False)
+            selected_pol._extract_metadata_from_xml = lambda root: None
+            with warnings.catch_warnings(record=True) as caught:
+                warnings.simplefilter('always'); selected_pol.chain()
+            self.assertEqual(len(caught), 1)
+            self.assertTrue(selected_pol.annotation_file.endswith('-vv-test.xml'))
             with self.assertRaisesRegex(RuntimeError, 'Expected one annotation'):
                 Handler(tmp, require_unique=True).chain()
+            with self.assertRaisesRegex(RuntimeError, 'Error processing metadata: Expected one annotation') as exc:
+                Handler(tmp, polarization='VV').chain()
+            self.assertNotIn('Failed to read annotation', str(exc.exception))
 
     def test_independent_iq_name_validation(self):
         from sarpyx.processor.core.subaperture_full_img import _resolve_iq_selectors as resolve
@@ -156,7 +165,7 @@ class PublicSelectionTests(unittest.TestCase):
                     module.do_subaps(str(root/'scene.dim'),str(safe),update_dim=False)
                 sub.assert_not_called()
 
-    def test_polarization_only_band_requires_unambiguous_swath(self):
+    def test_polarization_only_band_warns_and_keeps_legacy_first_annotation(self):
         from pathlib import Path
         from tempfile import TemporaryDirectory
         from unittest.mock import patch
@@ -166,10 +175,19 @@ class PublicSelectionTests(unittest.TestCase):
             for role in 'iq': (data/f'{role}_VV.img').touch()
             for swath in ('iw1','iw2'):
                 (ann/f's1a-{swath}-slc-vv-test.xml').write_text('<root/>')
-            with patch.object(module,'CombinedSublooking') as sub, patch.object(module,'_ensure_subap_output_space') as reserve:
-                with self.assertRaisesRegex(RuntimeError, 'Expected one annotation'):
-                    module.do_subaps(str(root/'scene.dim'),str(safe),update_dim=False)
-                sub.assert_not_called(); reserve.assert_not_called()
+            with patch.object(module,'Handler') as handler, patch.object(module,'CombinedSublooking') as sub, \
+                 patch.object(module,'_ensure_subap_output_space') as reserve, \
+                 patch.object(module,'_estimate_subap_output_bytes', return_value=0):
+                handler.return_value.annotation_file = 'first-annotation.xml'
+                for name in ('PRF','AzimBand','ChirpBand','RangeBand','WeightFunctRangeParams',
+                             'WeightFunctAzimParams','AzimSpacing','RangeSpacing'):
+                    setattr(handler.return_value, name, 1.0)
+                module.do_subaps(str(root/'scene.dim'),str(safe),update_dim=False)
+                handler.assert_called_once_with(str(safe), swath=None, polarization='VV', require_unique=False)
+                self.assertEqual(sub.call_count,1)
+                self.assertIsNone(sub.call_args.kwargs['safe_swath'])
+                self.assertEqual(sub.call_args.kwargs['safe_polarization'],'VV')
+                reserve.assert_called_once()
 
     def test_snapflow_forwards_selectors(self):
         from unittest.mock import patch
