@@ -1,7 +1,8 @@
 import xml.etree.ElementTree as ET
 from .utilis import iterNodes
 import os
-
+import re
+import warnings
 class Handler:
     """"
     Handler class for processing metadata from a zip file containing product information.
@@ -32,7 +33,18 @@ class Handler:
             such as PRF, bandwidths, resolutions, and spacing. The method reads the
             XML annotation file within the zip archive and parses the required data.
     """
-    def __init__(self, metadata_pointer):
+    def __init__(self, metadata_pointer, swath=None, polarization=None, require_unique=None):
+        self.swath = swath.upper() if swath else None
+        self.polarization = polarization.upper() if polarization else None
+        # Keep selector-based strictness by default for direct Handler users,
+        # while allowing higher-level legacy workflows to explicitly opt out
+        # when the band name does not identify a swath.
+        self.require_unique = (
+            bool(self.swath or self.polarization)
+            if require_unique is None
+            else bool(require_unique)
+        )
+        self.annotation_file = None
         
         if type(metadata_pointer) is str:
             self.filepath = metadata_pointer
@@ -97,15 +109,33 @@ class Handler:
 
     def _read_annotation(self, annotations):
         """
-        Reads the content of the first annotation file.
+        Read the unique annotation matching the requested swath and polarization.
         """
+        matches = []
+        for path in annotations:
+            tokens = re.split(r"[-_.]", os.path.basename(path).upper())
+            if self.swath and self.swath not in tokens:
+                continue
+            if self.polarization and self.polarization not in tokens:
+                continue
+            matches.append(path)
+        if not matches or (self.require_unique and len(matches) != 1):
+            raise ValueError(
+                f"Expected one annotation for swath={self.swath!r}, "
+                f"polarization={self.polarization!r}; found {len(matches)}: {matches}"
+            )
+        if len(matches) > 1:
+            message = (
+                "Multiple SAFE annotations match the supplied selectors; "
+                "selecting the first for backward compatibility. "
+                "Supply more specific selectors to avoid ambiguity."
+            )
+            warnings.warn(message, UserWarning, stacklevel=3)
+        self.annotation_file = matches[0]
         try:
-            # Use the first annotation file found
-            annotation_file = annotations[0]
-            
-            with open(annotation_file, 'r', encoding='utf-8') as file:
+            with open(self.annotation_file, 'r', encoding='utf-8') as file:
                 return file.read()
-        except Exception as e:
+        except OSError as e:
             raise RuntimeError(f"Failed to read annotation file: {e}")
 
 
