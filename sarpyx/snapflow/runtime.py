@@ -6,7 +6,7 @@ import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Mapping, Sequence
-from xml.etree.ElementTree import ParseError
+from xml.etree.ElementTree import ParseError, parse
 
 from sarpyx.snapflow.dim_updater import update_dim_add_bands_from_data_dir
 from sarpyx.snapflow.dimap import materialized_band_names
@@ -219,9 +219,34 @@ def step_write(ctx: PipelineContext, **kwargs):
     return _require(ctx.op.write(**kwargs), ctx, "Write")
 
 
+def tops_complex_tc_band_names(dim_path: Path) -> list[str]:
+    """Order materialized complex pairs before scalar H/Alpha bands for SNAP."""
+    names = set(materialized_band_names(dim_path))
+    units = {
+        band.findtext("BAND_NAME"): band.findtext("PHYSICAL_UNIT", "").lower()
+        for band in parse(dim_path).findall("./Image_Interpretation/Spectral_Band_Info")
+        if band.findtext("BAND_NAME") in names
+    }
+    remaining_q = {name for name, unit in units.items() if unit == "imaginary"}
+    pairs = []
+    for name, unit in units.items():
+        if unit != "real":
+            continue
+        partner = "q_" + name[2:]
+        if not name.startswith("i_") or partner not in remaining_q:
+            raise ValueError(f"Missing I/Q partner for {name} in {dim_path}")
+        pairs.extend((name, partner))
+        remaining_q.remove(partner)
+    if not pairs or remaining_q:
+        raise ValueError(f"Incomplete I/Q selection in {dim_path}: {sorted(remaining_q)}")
+    return pairs + [name for name in units if name.lower() in {"entropy", "anisotropy", "alpha"}]
+
+
 def step_terrain_correction(ctx: PipelineContext, **kwargs):
     kwargs = dict(kwargs)
     source_product = _op_result(ctx)
+    if kwargs.pop("ordered_tops_bands", False) and kwargs.get("source_bands") is None:
+        kwargs["source_bands"] = tops_complex_tc_band_names(Path(source_product))
     include_subap_source_bands = bool(kwargs.pop("include_subap_source_bands", False))
     if kwargs.get("source_bands") == ALL_SOURCE_BANDS:
         # SNAP Terrain-Correction rejects cloned sub-aperture bands in sourceBands.

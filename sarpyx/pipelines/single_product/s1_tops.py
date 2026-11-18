@@ -58,6 +58,7 @@ def steps(
         "map_projection": DEFAULT_MAP_PROJECTION,
         "pixel_spacing_in_meter": DEFAULT_PIXEL_SPACING_M,
         "source_bands": [sentinel_tc_source_band] if sentinel_tc_source_band else None,
+        "ordered_tops_bands": True,
         "save_selected_source_band": True,
     }
     return [
@@ -70,7 +71,7 @@ def steps(
         PipelineStep("polarimetric_decomposition", dict(PDEC_PARAMS), "pdec"),
         PipelineStep(
             "merge_iq_into_pdec",
-            {"src_ref": "deb", "pdec_ref": "pdec", "is_tops": True, "overwrite_copied_files": False, "backup": False},
+            {"src_ref": "subaps", "pdec_ref": "pdec", "is_tops": True, "overwrite_copied_files": False, "backup": False},
             "merged",
         ),
         PipelineStep("TerrainCorrection", tc_params, "tc"),
