@@ -103,9 +103,10 @@ def build_spectral_band_info(
     ET.SubElement(spectral, "PHYSICAL_UNIT").text = physical_unit
     ET.SubElement(spectral, "BAND_RASTER_WIDTH").text = str(width)
     ET.SubElement(spectral, "BAND_RASTER_HEIGHT").text = str(height)
-    ET.SubElement(spectral, "BAND_SCALING_FACTOR").text = "1.0"
-    ET.SubElement(spectral, "BAND_SCALING_OFFSET").text = "0.0"
-    ET.SubElement(spectral, "BAND_LOG10_SCALED").text = "false"
+    ET.SubElement(spectral, "DATA_TYPE").text = "float32"
+    ET.SubElement(spectral, "SCALING_FACTOR").text = "1.0"
+    ET.SubElement(spectral, "SCALING_OFFSET").text = "0.0"
+    ET.SubElement(spectral, "LOG10_SCALED").text = "false"
     if virtual and expr:
         ET.SubElement(spectral, "VIRTUAL_BAND").text = "true"
         ET.SubElement(spectral, "EXPRESSION").text = expr

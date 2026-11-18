@@ -21,8 +21,17 @@ class WorldSARZarrTileHook:
     chunk_size: tuple[int, int] = DEFAULT_WORLDSAR_ZARR_CHUNKS
     subap_features: SubapFeatureConfig = SubapFeatureConfig()
 
+    @property
+    def feature_halo(self) -> int:
+        if not self.subap_features.enabled:
+            return 0
+        self.subap_features.validate()
+        return max(self.subap_features.window_sizes or (self.subap_features.window_size,)) // 2
+
     def __call__(self, payload: TilePayload) -> TilePayload:
         arrays, feature_band_attrs, feature_names = add_subap_features(payload.arrays, payload.band_attrs, self.subap_features)
+        if payload.feature_crop is not None:
+            arrays = {name: array[payload.feature_crop] for name, array in arrays.items()}
         if payload.output_path.suffix.lower() == ".zarr":
             arrays, feature_band_attrs = _strip_iw_prefixes(arrays, feature_band_attrs)
             feature_names = [_strip_iw_prefix(name) for name in feature_names]
@@ -43,6 +52,7 @@ class WorldSARZarrTileHook:
         return replace(
             payload,
             arrays=arrays,
+            feature_crop=None,
             abstract_attrs={},
             band_attrs=band_attrs,
             root_attrs=attrs,
@@ -219,6 +229,8 @@ def _minimal_band_attrs(band_name: str, attrs: dict[str, Any], polarizations: li
         for key, value in {
             "polarization": band_pol,
             "unit": attrs.get("unit"),
+            "window_size": attrs.get("window_size"),
+            "estimator": attrs.get("estimator"),
         }.items()
         if not _blank(value)
     }
