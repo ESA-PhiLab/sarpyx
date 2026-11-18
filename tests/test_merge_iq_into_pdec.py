@@ -4,6 +4,7 @@ import xml.etree.ElementTree as ET
 import pytest
 
 from sarpyx.cli.merge_iq_into_pdec import merge_iq_into_pdec
+from sarpyx.snapflow.runtime import tops_complex_tc_band_names
 
 
 def _write_minimal_dim(path: Path, ncols: int = 4, nrows: int = 3) -> None:
@@ -87,3 +88,7 @@ def test_merge_iq_into_pdec_copies_iq_files_and_updates_pdec_dim(tmp_path: Path)
     intensity_band = root.findall("./Image_Interpretation/Spectral_Band_Info")[-1]
     assert intensity_band.findtext("VIRTUAL_BAND") == "true"
     assert intensity_band.findtext("EXPRESSION") == "i_VV == 0.0 ? 0.0 : i_VV * i_VV + q_VV * q_VV"
+    bands = root.findall("./Image_Interpretation/Spectral_Band_Info")
+    assert all(b.findtext("DATA_TYPE") == "float32" for b in bands[1:3])
+    assert all(b.findtext("SCALING_FACTOR") == "1.0" for b in bands[1:3])
+    assert tops_complex_tc_band_names(pdec_dim) == ["i_VV", "q_VV"]

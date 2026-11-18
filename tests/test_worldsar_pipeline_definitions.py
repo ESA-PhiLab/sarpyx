@@ -23,7 +23,7 @@ def test_sentinel_tops_pipeline_lists_explicit_operations():
     assert steps[0].params["subswath"] == (s1_tops.DEFAULT_SWATH or "IW*")
     assert steps[0].params["first_burst_index"] == s1_tops.DEFAULT_FIRST_BURST
     assert steps[0].params["last_burst_index"] == s1_tops.DEFAULT_LAST_BURST
-    assert steps[5].params["n_decompositions"] == [2]
+    assert steps[5].params["n_decompositions"] == [3]
     assert steps[8].params["source_bands"] is None
 
 

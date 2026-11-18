@@ -387,7 +387,7 @@ def test_pipeline_sentinel_strip_uses_update_dim_false_and_real_pdec_path(
     assert Path(result) == tmp_path / "tc.dim"
     assert fake_op.do_subaps_kwargs is not None
     assert fake_op.do_subaps_kwargs["update_dim"] is False
-    assert fake_op.do_subaps_kwargs["n_decompositions"] == [2]
+    assert fake_op.do_subaps_kwargs["n_decompositions"] == [3]
     assert len(merge_calls) == 1
     assert Path(merge_calls[0]["src_dim"]) == tmp_path / "cal.dim"
     assert Path(merge_calls[0]["pdec_dim"]) == tmp_path / "pdec.dim"
@@ -446,6 +446,14 @@ def test_pipeline_sentinel_strip_forwards_requested_subap_decomposition(
     assert fake_op.do_subaps_kwargs["n_decompositions"] == [5]
 
 
+@pytest.fixture
+def stub_tops_tc_inventory(monkeypatch):
+    # The fake SNAP operators in these tests do not emit a real DIMAP product.
+    monkeypatch.setattr("sarpyx.snapflow.runtime.tops_complex_tc_band_names",
+                        lambda _path: ["i_IW2_VV", "q_IW2_VV"])
+
+
+@pytest.mark.usefixtures("stub_tops_tc_inventory")
 def test_sentinel_post_chain_forwards_requested_subap_decomposition(tmp_path: Path):
     class FakeOp:
         def __init__(self):
@@ -491,6 +499,7 @@ def test_sentinel_post_chain_forwards_requested_subap_decomposition(tmp_path: Pa
     assert op.do_subaps_kwargs["n_decompositions"] == [5]
 
 
+@pytest.mark.usefixtures("stub_tops_tc_inventory")
 def test_sentinel_post_chain_continues_on_offline_orbit_download_failure(tmp_path: Path):
     merge_calls: list[dict[str, object]] = []
 
@@ -1110,6 +1119,7 @@ def test_pipeline_sentinel_tops_raises_when_split_output_is_missing(tmp_path: Pa
         )
 
 
+@pytest.mark.usefixtures("stub_tops_tc_inventory")
 def test_pipeline_sentinel_tops_can_limit_swath_and_burst(tmp_path: Path):
     split_calls: list[tuple[Path, dict[str, object]]] = []
     subap_calls: list[dict[str, object]] = []
@@ -1195,6 +1205,7 @@ def test_pipeline_sentinel_tops_can_limit_swath_and_burst(tmp_path: Path):
     assert subap_calls[0]["safe_path"] == str(tmp_path / "input.SAFE")
 
 
+@pytest.mark.usefixtures("stub_tops_tc_inventory")
 def test_pipeline_sentinel_tops_uses_recipe_swath_and_burst_defaults(tmp_path: Path):
     split_calls: list[tuple[Path, dict[str, object]]] = []
 

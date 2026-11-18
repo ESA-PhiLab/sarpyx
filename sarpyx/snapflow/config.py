@@ -139,6 +139,10 @@ def validate_runtime_args(args) -> None:
             "--sentinel-subap-feature-window-size must be a positive odd integer, "
             f"got {args.sentinel_subap_feature_window_size}"
         )
+    windows = getattr(args, "sentinel_subap_feature_window_sizes", None)
+    if windows is not None:
+        if any(w < 1 or w % 2 == 0 for w in windows) or len(set(windows)) != len(windows):
+            raise ValueError("--sentinel-subap-feature-window-sizes requires distinct positive odd integers")
 
 
 def resolve_db_dir(cuts_outdir=None) -> Path:
