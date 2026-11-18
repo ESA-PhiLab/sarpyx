@@ -45,13 +45,13 @@
   <h2 id="module-exports">Exported Symbols (<code>__all__</code>)</h2>
   <p>No explicit <code>__all__</code> list. Public symbols inferred from implementation.</p>
 
-  <h2 id="public-functions">Public Functions (3)</h2>
+  <h2 id="public-functions">Public Functions (4)</h2>
   
 <details class="api-item" id="sarpyx-utils-rfigen-py-freq2wavelen" data-searchable data-search="freq2wavelen freq2wavelen(f_hz)">
   <summary><code>freq2wavelen</code> <span class="api-kind">function</span></summary>
   <div class="api-body">
     <p>inferred from implementation.</p>
-    <p><strong>File location:</strong> <code>sarpyx/utils/rfigen.py:4</code></p>
+    <p><strong>File location:</strong> <code>sarpyx/utils/rfigen.py:19</code></p>
     <h3 id="sarpyx-utils-rfigen-py-freq2wavelen-signature">Signature</h3>
     <pre><code class="language-python">freq2wavelen(f_hz)</code></pre>
     <h3 id="sarpyx-utils-rfigen-py-freq2wavelen-parameters">Parameters</h3>
@@ -76,7 +76,7 @@ result = freq2wavelen(f_hz=&lt;f_hz&gt;)</code></pre>
   <summary><code>fspl</code> <span class="api-kind">function</span></summary>
   <div class="api-body">
     <p>inferred from implementation.</p>
-    <p><strong>File location:</strong> <code>sarpyx/utils/rfigen.py:7</code></p>
+    <p><strong>File location:</strong> <code>sarpyx/utils/rfigen.py:23</code></p>
     <h3 id="sarpyx-utils-rfigen-py-fspl-signature">Signature</h3>
     <pre><code class="language-python">fspl(r_m, wavelen_m)</code></pre>
     <h3 id="sarpyx-utils-rfigen-py-fspl-parameters">Parameters</h3>
@@ -97,28 +97,70 @@ result = fspl(r_m=&lt;r_m&gt;, wavelen_m=&lt;wavelen_m&gt;)</code></pre>
   </div>
 </details>
 
-<details class="api-item" id="sarpyx-utils-rfigen-py-generaterfisignal" data-searchable data-search="GenerateRFISignal GenerateRFISignal(sqd, RadPar=None, verbose=False)">
+<details class="api-item" id="sarpyx-utils-rfigen-py-sentinel1-receive-times" data-searchable data-search="sentinel1_receive_times sentinel1_receive_times(metadata: Sequence[Mapping[str, Any]])">
+  <summary><code>sentinel1_receive_times</code> <span class="api-kind">function</span></summary>
+  <div class="api-body">
+    <p>Return relative times of the first stored complex sample in each line.</p>
+    <p><strong>File location:</strong> <code>sarpyx/utils/rfigen.py:27</code></p>
+    <h3 id="sarpyx-utils-rfigen-py-sentinel1-receive-times-signature">Signature</h3>
+    <pre><code class="language-python">sentinel1_receive_times(metadata: Sequence[Mapping[str, Any]])</code></pre>
+    <h3 id="sarpyx-utils-rfigen-py-sentinel1-receive-times-parameters">Parameters</h3>
+    <table class="api-table"><thead><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Default</th><th>Description</th></tr></thead><tbody><tr><td><code>metadata</code></td><td><code>Sequence[Mapping[str, Any]]</code></td><td>yes</td><td><code>-</code></td><td>inferred from implementation.</td></tr></tbody></table>
+    <h3 id="sarpyx-utils-rfigen-py-sentinel1-receive-times-returns">Return Type</h3>
+    <p><code>np.ndarray</code></p>
+    <p>inferred from implementation.</p>
+    <h3 id="sarpyx-utils-rfigen-py-sentinel1-receive-times-exceptions">Exceptions</h3>
+    <ul><li><code>ValueError</code></li></ul>
+    <h3 id="sarpyx-utils-rfigen-py-sentinel1-receive-times-side-effects">Side Effects</h3>
+    <p>None explicitly documented; inferred from implementation.</p>
+    <h3 id="sarpyx-utils-rfigen-py-sentinel1-receive-times-example">Example Usage</h3>
+    <pre><code class="language-python">from sarpyx.utils.rfigen import sentinel1_receive_times
+
+headers = [
+    dict(pri=600e-6, swst=100e-6, pri_count=count,
+         coarse_time=1000, fine_time=fine, range_decimation=8,
+         rx_channel_id=1, swath_number=10, data_take_id=1, signal_type=0)
+    for count, fine in ((100, 0.1), (101, 0.1006), (103, 0.1018))
+]
+receive_times = sentinel1_receive_times(headers)</code></pre>
+    <h3 id="sarpyx-utils-rfigen-py-sentinel1-receive-times-edge-cases">Edge Cases</h3>
+    <p>May raise: ValueError.</p>
+  </div>
+</details>
+
+<details class="api-item" id="sarpyx-utils-rfigen-py-generaterfisignal" data-searchable data-search="GenerateRFISignal GenerateRFISignal(sqd: np.ndarray, RadPar: Mapping[str, float] | None=None, verbose: bool=False, *, mode: str=&#x27;acquisition&#x27;, line_start_times: Sequence[float] | None=None, seed: int | None=None, parameters: Mapping[str, float] | None=None, affected_az: tuple[int, int] | None=None, affected_rg: tuple[int, int] | None=None, generator_revision: str | None=None)">
   <summary><code>GenerateRFISignal</code> <span class="api-kind">function</span></summary>
   <div class="api-body">
-    <p>Generate Radio Frequency Interference (RFI) signal for SAR data.</p>
-    <p><strong>File location:</strong> <code>sarpyx/utils/rfigen.py:10</code></p>
+    <p>Generate RFI at acquisition sample times, or explicitly replay legacy RFI.</p>
+    <p><strong>File location:</strong> <code>sarpyx/utils/rfigen.py:173</code></p>
     <h3 id="sarpyx-utils-rfigen-py-generaterfisignal-signature">Signature</h3>
-    <pre><code class="language-python">GenerateRFISignal(sqd, RadPar=None, verbose=False)</code></pre>
+    <pre><code class="language-python">GenerateRFISignal(sqd: np.ndarray, RadPar: Mapping[str, float] | None=None, verbose: bool=False, *, mode: str=&#x27;acquisition&#x27;, line_start_times: Sequence[float] | None=None, seed: int | None=None, parameters: Mapping[str, float] | None=None, affected_az: tuple[int, int] | None=None, affected_rg: tuple[int, int] | None=None, generator_revision: str | None=None)</code></pre>
     <h3 id="sarpyx-utils-rfigen-py-generaterfisignal-parameters">Parameters</h3>
-    <table class="api-table"><thead><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Default</th><th>Description</th></tr></thead><tbody><tr><td><code>sqd</code></td><td><code>inferred from implementation</code></td><td>yes</td><td><code>-</code></td><td>Input SAR single look complex data with shape (rows, cols).</td></tr><tr><td><code>RadPar</code></td><td><code>inferred from implementation</code></td><td>no</td><td><code>None</code></td><td>Radar parameters containing: - &#x27;bw&#x27;: Bandwidth in Hz - &#x27;fo&#x27;: Center frequency in Hz - &#x27;fs&#x27;: Sampling frequency in Hz</td></tr><tr><td><code>verbose</code></td><td><code>inferred from implementation</code></td><td>no</td><td><code>False</code></td><td>inferred from implementation.</td></tr></tbody></table>
+    <table class="api-table"><thead><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Default</th><th>Description</th></tr></thead><tbody><tr><td><code>sqd</code></td><td><code>np.ndarray</code></td><td>yes</td><td><code>-</code></td><td>inferred from implementation.</td></tr><tr><td><code>RadPar</code></td><td><code>Mapping[str, float] | None</code></td><td>no</td><td><code>None</code></td><td>inferred from implementation.</td></tr><tr><td><code>verbose</code></td><td><code>bool</code></td><td>no</td><td><code>False</code></td><td>inferred from implementation.</td></tr><tr><td><code>mode</code></td><td><code>str</code></td><td>no</td><td><code>&#x27;acquisition&#x27;</code></td><td>inferred from implementation.</td></tr><tr><td><code>line_start_times</code></td><td><code>Sequence[float] | None</code></td><td>no</td><td><code>None</code></td><td>inferred from implementation.</td></tr><tr><td><code>seed</code></td><td><code>int | None</code></td><td>no</td><td><code>None</code></td><td>inferred from implementation.</td></tr><tr><td><code>parameters</code></td><td><code>Mapping[str, float] | None</code></td><td>no</td><td><code>None</code></td><td>inferred from implementation.</td></tr><tr><td><code>affected_az</code></td><td><code>tuple[int, int] | None</code></td><td>no</td><td><code>None</code></td><td>inferred from implementation.</td></tr><tr><td><code>affected_rg</code></td><td><code>tuple[int, int] | None</code></td><td>no</td><td><code>None</code></td><td>inferred from implementation.</td></tr><tr><td><code>generator_revision</code></td><td><code>str | None</code></td><td>no</td><td><code>None</code></td><td>inferred from implementation.</td></tr></tbody></table>
     <h3 id="sarpyx-utils-rfigen-py-generaterfisignal-returns">Return Type</h3>
-    <p><code>inferred from implementation</code></p>
-    <p>tuple: A tuple containing:
-        - sInterf (np.ndarray): Generated interference signal with same shape as sqd
-        - IR (dict): Dictionary containing RFI parameters used in generation</p>
+    <p><code>tuple[np.ndarray, dict]</code></p>
+    <p>inferred from implementation.</p>
     <h3 id="sarpyx-utils-rfigen-py-generaterfisignal-exceptions">Exceptions</h3>
     <ul><li><code>ValueError</code></li></ul>
     <h3 id="sarpyx-utils-rfigen-py-generaterfisignal-side-effects">Side Effects</h3>
-    <ul><li>io</li></ul>
+    <ul><li>emits RuntimeWarning for legacy mode or zero overlap</li><li>advances global NumPy RNG state in legacy mode</li><li>reads module source for acquisition-mode provenance</li></ul>
     <h3 id="sarpyx-utils-rfigen-py-generaterfisignal-example">Example Usage</h3>
-    <pre><code class="language-python">from sarpyx.utils.rfigen import GenerateRFISignal
+    <pre><code class="language-python">import numpy as np
+from sarpyx.utils.rfigen import GenerateRFISignal
 
-result = GenerateRFISignal(sqd=&lt;sqd&gt;)</code></pre>
+echo = np.ones((8, 200), dtype=np.complex64)
+radar = {&quot;fs&quot;: 4e6, &quot;fo&quot;: 5.405e9, &quot;bw&quot;: 1e6}
+interference, parameters = GenerateRFISignal(
+    echo, radar, line_start_times=np.arange(8) * 600e-6, seed=12,
+    parameters={&quot;pulse_start&quot;: 0, &quot;duty&quot;: 0.8},
+    affected_az=(0, 8), affected_rg=(0, 200),
+)
+
+# Replay the historical model; its timing limits still apply.
+np.random.seed(12)
+legacy_interference, legacy_parameters = GenerateRFISignal(
+    echo, radar, mode=&quot;legacy&quot;,
+)</code></pre>
     <h3 id="sarpyx-utils-rfigen-py-generaterfisignal-edge-cases">Edge Cases</h3>
     <p>May raise: ValueError. Includes optional parameters with implementation-defined fallback behavior.</p>
   </div>
@@ -131,7 +173,7 @@ result = GenerateRFISignal(sqd=&lt;sqd&gt;)</code></pre>
 
       </article>
       <footer class="page-footer">
-        <p>Generated from repository sources on 2026-04-23 15:44 UTC.</p>
+        <p>Generated from repository sources on 2026-11-08 16:25 UTC.</p>
       </footer>
     </main>
   </div>

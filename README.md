@@ -15,8 +15,8 @@
 <a href="LICENSE">
   <img alt="License" src="https://img.shields.io/badge/License-Apache--2.0-374151?style=for-the-badge" />
 </a>
-<a href="https://github.com/ESA-PhiLab/sarpyx/releases/tag/v1.0.0">
-  <img alt="Version" src="https://img.shields.io/badge/Version-1.0.1-2563eb?style=for-the-badge" />
+<a href="https://github.com/ESA-PhiLab/sarpyx/releases">
+<img alt="Version" src="https://img.shields.io/badge/Version-2.0.0-2563eb?style=for-the-badge" />
 </a>
 </div>
 
@@ -32,6 +32,11 @@
 - Sub-aperture decomposition for Sentinel-style BEAM-DIMAP products.
 - Geocoded outputs ready for GIS and downstream ML.
 - Utilities compatible with `rasterio`, `geopandas`, `pyproj`, `h5py`, `zarr`, and `dask`.
+
+> **RFI timing notice:** Earlier RFI injection skipped receive gaps. New generation
+> requires acquisition timing. Use `mode="legacy"` for historical replay.
+> Updating the code does not repair existing arrays. See the
+> [timing notice and migration guide](docs/user_guide/rfi_generation.md).
 
 ## Commands
 
@@ -50,6 +55,7 @@ sarpyx-pipeline --help  # Compatibility pipeline entry point
 - [CLI usage examples](docs/user_guide/cli_examples.md)
 - [User guide](docs/user_guide/README.md)
 - [API reference](docs/api/README.md)
+- [RFI timing, migration and existing-data notice](docs/user_guide/rfi_generation.md)
 
 ## Install
 

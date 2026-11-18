@@ -5317,23 +5317,30 @@
       {
         "name": "freq2wavelen",
         "signature": "freq2wavelen(f_hz)",
-        "line": 4,
+        "line": 19,
         "doc": null,
         "returns": null
       },
       {
         "name": "fspl",
         "signature": "fspl(r_m, wavelen_m)",
-        "line": 7,
+        "line": 23,
         "doc": null,
         "returns": null
       },
       {
+        "name": "sentinel1_receive_times",
+        "signature": "sentinel1_receive_times(metadata: Sequence[Mapping[str, Any]])",
+        "line": 27,
+        "doc": "Return relative times of the first stored complex sample in each line.",
+        "returns": "np.ndarray"
+      },
+      {
         "name": "GenerateRFISignal",
-        "signature": "GenerateRFISignal(sqd, RadPar=None, verbose=False)",
-        "line": 10,
-        "doc": "Generate Radio Frequency Interference (RFI) signal for SAR data.",
-        "returns": null
+        "signature": "GenerateRFISignal(sqd: np.ndarray, RadPar: Mapping[str, float] | None=None, verbose: bool=False, *, mode: str='acquisition', line_start_times: Sequence[float] | None=None, seed: int | None=None, parameters: Mapping[str, float] | None=None, affected_az: tuple[int, int] | None=None, affected_rg: tuple[int, int] | None=None, generator_revision: str | None=None)",
+        "line": 173,
+        "doc": "Generate RFI at acquisition sample times, or explicitly replay legacy RFI.",
+        "returns": "tuple[np.ndarray, dict]"
       }
     ],
     "public_classes": [],

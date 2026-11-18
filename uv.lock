@@ -4167,7 +4167,7 @@ wheels = [
 
 [[package]]
 name = "sarpyx"
-version = "1.0.1"
+version = "2.0.0"
 source = { editable = "." }
 dependencies = [
     { name = "h5py" },
