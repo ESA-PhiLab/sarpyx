@@ -30,6 +30,7 @@ class TilePayload:
     transform: tuple[float, float, float, float, float, float] | None = None
     root_attrs: dict[str, Any] | None = None
     writer_options: dict[str, Any] = field(default_factory=dict)
+    feature_crop: tuple[slice, slice] | None = None
 
 
 WRITER_SUFFIXES = {

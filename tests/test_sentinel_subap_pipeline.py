@@ -387,7 +387,7 @@ def test_pipeline_sentinel_strip_uses_update_dim_false_and_real_pdec_path(
     assert Path(result) == tmp_path / "tc.dim"
     assert fake_op.do_subaps_kwargs is not None
     assert fake_op.do_subaps_kwargs["update_dim"] is False
-    assert fake_op.do_subaps_kwargs["n_decompositions"] == [2]
+    assert fake_op.do_subaps_kwargs["n_decompositions"] == [3]
     assert len(merge_calls) == 1
     assert Path(merge_calls[0]["src_dim"]) == tmp_path / "cal.dim"
     assert Path(merge_calls[0]["pdec_dim"]) == tmp_path / "pdec.dim"

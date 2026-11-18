@@ -7,7 +7,7 @@ from sarpyx.snapflow.runtime import PipelineStep
 DEFAULT_ORBIT_TYPE = "Sentinel Precise (Auto Download)"
 INPUT_KIND = "single"
 PRODUCT_MODE = "S1STRIP"
-DEFAULT_SUBAP_DECOMPOSITIONS = [2]
+DEFAULT_SUBAP_DECOMPOSITIONS = [3]
 DEFAULT_MAP_PROJECTION = "AUTO:42001"
 DEFAULT_PIXEL_SPACING_M = 10.0
 PDEC_PARAMS = {"decomposition": "H-Alpha Dual Pol Decomposition", "window_size": 5}

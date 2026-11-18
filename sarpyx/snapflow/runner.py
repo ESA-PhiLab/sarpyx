@@ -321,6 +321,7 @@ def run(args) -> int:
                 subap_features=SubapFeatureConfig(
                     enabled=product_mode.startswith("S1"),
                     window_size=args.sentinel_subap_feature_window_size,
+                    window_sizes=tuple(getattr(args, "sentinel_subap_feature_window_sizes", None) or ()),
                 ),
             )
         product_wkt = resolve_product_wkt(args, product_path, product_mode)

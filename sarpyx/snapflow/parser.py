@@ -132,6 +132,8 @@ def add_worldsar_arguments(parser: argparse.ArgumentParser) -> None:
         default=5,
         help="Odd local window size for Sentinel sub-aperture Zarr features.",
     )
+    parser.add_argument("--sentinel-subap-feature-window-sizes", type=int, nargs="+", default=None,
+                        help="Window sweep for derived Zarr features; bands receive _W<size> suffixes.")
     parser.add_argument(
         "--skip-preprocessing",
         dest="skip_preprocessing",
