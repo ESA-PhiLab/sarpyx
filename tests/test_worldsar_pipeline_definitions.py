@@ -90,7 +90,6 @@ def test_insar_pipeline_declares_snapflow_v2_steps():
         "Deburst",
         "Interferogram",
         "TopoPhaseRemoval",
-        "Subset",
         "TerrainCorrection",
         "WorldSARTiling",
     ]
@@ -98,6 +97,7 @@ def test_insar_pipeline_declares_snapflow_v2_steps():
     assert recipe[1].params["continue_on_fail"] is True
     assert recipe[3].params["continue_on_fail"] is True
     assert recipe[4].params["use_esd"] is False
+    assert recipe[-2].params["source_ref"] == "topo"
     assert recipe[-1].params["intermediate_ref"] == "terrain_corrected"
 
 
@@ -138,9 +138,6 @@ def test_declared_insar_runtime_executes_recipe(monkeypatch, tmp_path: Path):
         def topo_phase_removal(self, **kwargs):
             return self._out("topo")
 
-        def subset(self, **kwargs):
-            return self._out("subset")
-
         def terrain_correction(self, **kwargs):
             return self._out("tc")
 
@@ -171,7 +168,6 @@ def test_declared_insar_runtime_executes_recipe(monkeypatch, tmp_path: Path):
         "deburst",
         "ifg",
         "topo",
-        "subset",
         "tc",
     ]
     assert ("coreg_kwargs", tmp_path / "out" / "master" / "orbit.dim", tmp_path / "out" / "slave" / "orbit.dim", False) in calls
