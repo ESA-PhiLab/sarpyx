@@ -51,6 +51,7 @@ def steps(
     orbit_continue_on_fail: bool = False,
     sentinel_tc_source_band: str | None = None,
     sentinel_subap_decompositions: list[int] | None = None,
+    sentinel_pdec_window_size: int = PDEC_PARAMS["window_size"],
 ):
     subap_params = dict(TOPS_SUBAP_PARAMS)
     subap_params["n_decompositions"] = sentinel_subap_decompositions or DEFAULT_SUBAP_DECOMPOSITIONS
@@ -68,7 +69,7 @@ def steps(
         PipelineStep("TopsarDerampDemod", {}, "deramp"),
         PipelineStep("Deburst", {}, "deb"),
         PipelineStep("do_subaps", subap_params, "subaps"),
-        PipelineStep("polarimetric_decomposition", dict(PDEC_PARAMS), "pdec"),
+        PipelineStep("polarimetric_decomposition", {**PDEC_PARAMS, "window_size": sentinel_pdec_window_size}, "pdec"),
         PipelineStep(
             "merge_iq_into_pdec",
             {"src_ref": "subaps", "pdec_ref": "pdec", "is_tops": True, "overwrite_copied_files": False, "backup": False},

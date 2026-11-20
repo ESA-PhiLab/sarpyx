@@ -126,6 +126,12 @@ def add_worldsar_arguments(parser: argparse.ArgumentParser) -> None:
         help="Sentinel sub-aperture decomposition count(s). Defaults to 2.",
     )
     parser.add_argument(
+        "--sentinel-window-size",
+        type=int,
+        default=None,
+        help="Use the same odd window for Sentinel H-Alpha and derived Zarr features (default: 5).",
+    )
+    parser.add_argument(
         "--sentinel-subap-feature-window-size",
         dest="sentinel_subap_feature_window_size",
         type=int,

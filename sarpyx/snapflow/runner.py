@@ -78,6 +78,7 @@ def _run_preprocessing(
     sentinel_last_burst=None,
     sentinel_tc_source_band=None,
     sentinel_subap_decompositions=None,
+    sentinel_pdec_window_size=5,
     product_wkt=None,
     grid_path=None,
     cuts_outdir=None,
@@ -118,6 +119,7 @@ def _run_preprocessing(
         sentinel_last_burst=sentinel_last_burst,
         sentinel_tc_source_band=sentinel_tc_source_band,
         sentinel_subap_decompositions=sentinel_subap_decompositions,
+        sentinel_pdec_window_size=sentinel_pdec_window_size,
         gpt_memory=gpt_memory,
         gpt_parallelism=gpt_parallelism,
         gpt_timeout=gpt_timeout,
@@ -312,6 +314,9 @@ def run(args) -> int:
         tile_writer = normalize_tile_writer(args.tile_writer)
         product_name = product_output_name(product_path)
         pre_write_hook = None
+        shared_window = getattr(args, "sentinel_window_size", None)
+        if product_mode.startswith("S1") and shared_window is not None and args.skip_preprocessing:
+            print("Reusing existing TC: --sentinel-window-size does not recompute its H-Alpha bands.")
         if tile_writer == "zarr":
             pre_write_hook = make_worldsar_zarr_tile_hook(
                 product_path,
@@ -320,7 +325,7 @@ def run(args) -> int:
                 chunk_size=tuple(args.zarr_chunk_size),
                 subap_features=SubapFeatureConfig(
                     enabled=product_mode.startswith("S1"),
-                    window_size=args.sentinel_subap_feature_window_size,
+                    window_size=shared_window or args.sentinel_subap_feature_window_size,
                     window_sizes=tuple(getattr(args, "sentinel_subap_feature_window_sizes", None) or ()),
                 ),
             )
@@ -337,6 +342,7 @@ def run(args) -> int:
             sentinel_last_burst=args.sentinel_last_burst or s1_tops.DEFAULT_LAST_BURST,
             sentinel_tc_source_band=args.sentinel_tc_source_band,
             sentinel_subap_decompositions=args.sentinel_subap_decompositions,
+            sentinel_pdec_window_size=shared_window or 5,
             product_wkt=product_wkt,
             grid_path=grid_path,
             cuts_outdir=cuts_outdir,

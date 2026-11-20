@@ -24,7 +24,14 @@ def test_sentinel_tops_pipeline_lists_explicit_operations():
     assert steps[0].params["first_burst_index"] == s1_tops.DEFAULT_FIRST_BURST
     assert steps[0].params["last_burst_index"] == s1_tops.DEFAULT_LAST_BURST
     assert steps[5].params["n_decompositions"] == [3]
+    assert steps[6].params["window_size"] == 5
     assert steps[8].params["source_bands"] is None
+
+
+def test_sentinel_recipes_apply_custom_pdec_window():
+    for module in (s1_tops, s1_strip):
+        (pdec,) = [step for step in module.steps(sentinel_pdec_window_size=3) if step.save_as == "pdec"]
+        assert pdec.params["window_size"] == 3
 
 
 def test_sentinel_strip_pipeline_lists_fallback_bandmerge():

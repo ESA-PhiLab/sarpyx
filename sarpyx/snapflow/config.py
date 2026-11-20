@@ -134,6 +134,11 @@ def validate_runtime_args(args) -> None:
         invalid = [n for n in args.sentinel_subap_decompositions if n < 2]
         if invalid:
             raise ValueError(f"--sentinel-subap-decompositions values must be >= 2, got {invalid}")
+    shared_window = getattr(args, "sentinel_window_size", None)
+    if shared_window is not None and (not 1 <= shared_window <= 99 or shared_window % 2 == 0):
+        raise ValueError("--sentinel-window-size must be an odd integer between 1 and 99")
+    if shared_window is not None and getattr(args, "sentinel_subap_feature_window_sizes", None):
+        raise ValueError("--sentinel-window-size cannot be combined with --sentinel-subap-feature-window-sizes")
     if args.sentinel_subap_feature_window_size < 1 or args.sentinel_subap_feature_window_size % 2 == 0:
         raise ValueError(
             "--sentinel-subap-feature-window-size must be a positive odd integer, "

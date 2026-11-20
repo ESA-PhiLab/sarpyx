@@ -157,6 +157,7 @@ def run_sentinel_tops_pipeline(
     cuts_outdir=None,
     product_mode="S1TOPS",
     keep_intermediate=True,
+    sentinel_pdec_window_size=5,
     **_,
 ):
     output_dir = Path(output_dir)
@@ -166,6 +167,7 @@ def run_sentinel_tops_pipeline(
         orbit_continue_on_fail=orbit_continue_on_fail,
         sentinel_tc_source_band=sentinel_tc_source_band,
         sentinel_subap_decompositions=sentinel_subap_decompositions,
+        sentinel_pdec_window_size=sentinel_pdec_window_size,
     )
     first_burst = sentinel_first_burst or s1_tops.DEFAULT_FIRST_BURST
     last_burst = sentinel_last_burst or s1_tops.DEFAULT_LAST_BURST
@@ -256,6 +258,7 @@ def run_sentinel_strip_pipeline(
     cuts_outdir=None,
     product_mode="S1STRIP",
     keep_intermediate=True,
+    sentinel_pdec_window_size=5,
     **_,
 ):
     gpt_kwargs = _gpt_kwargs(gpt_memory, gpt_parallelism, gpt_timeout, gpt_cache_size)
@@ -277,6 +280,7 @@ def run_sentinel_strip_pipeline(
             orbit_continue_on_fail=orbit_continue_on_fail,
             sentinel_tc_source_band=sentinel_tc_source_band,
             sentinel_subap_decompositions=sentinel_subap_decompositions,
+            sentinel_pdec_window_size=sentinel_pdec_window_size,
         ),
     )
     if _tiling_created_final_tiles(ctx.saved.get("tiling")):
