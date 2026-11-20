@@ -95,6 +95,15 @@ def test_validate_runtime_args_rejects_negative_lock_timeout() -> None:
         config.validate_runtime_args(args)
 
 
+@pytest.mark.parametrize("value", ["0", "4", "101"])
+def test_validate_runtime_args_rejects_invalid_shared_window(value) -> None:
+    from sarpyx.snapflow import config
+
+    args = create_parser().parse_args(["--input", "/tmp/product.SAFE", "--sentinel-window-size", value])
+    with pytest.raises(ValueError, match="sentinel-window-size"):
+        config.validate_runtime_args(args)
+
+
 def test_main_dispatches_to_run(monkeypatch: pytest.MonkeyPatch) -> None:
     from sarpyx.cli import worldsar as worldsar_module
 
@@ -125,7 +134,14 @@ def test_main_dispatches_to_run(monkeypatch: pytest.MonkeyPatch) -> None:
     assert calls[0].gpt_path == '/tmp/gpt'
 
 
-def test_run_defaults_outputs_next_to_input(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+@pytest.mark.parametrize(("window_args", "pdec_window", "feature_window"), [
+    ([], 5, 5),
+    (["--sentinel-window-size", "3"], 3, 3),
+    (["--sentinel-subap-feature-window-size", "7"], 5, 7),
+])
+def test_run_defaults_outputs_next_to_input(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, window_args, pdec_window, feature_window,
+) -> None:
     from sarpyx.snapflow import config
     from sarpyx.snapflow import runner
 
@@ -143,6 +159,7 @@ def test_run_defaults_outputs_next_to_input(monkeypatch: pytest.MonkeyPatch, tmp
         captured["tile_writer"] = kwargs["tile_writer"]
         captured["pre_write_hook"] = kwargs["pre_write_hook"]
         captured["keep_intermediate"] = kwargs["keep_intermediate"]
+        captured["pdec_window_size"] = kwargs["sentinel_pdec_window_size"]
         (Path(output_dir) / "keep.txt").write_text("unrelated", encoding="utf-8")
         out = Path(output_dir) / "tc.dim"
         out.write_text("tc", encoding="utf-8")
@@ -157,7 +174,7 @@ def test_run_defaults_outputs_next_to_input(monkeypatch: pytest.MonkeyPatch, tmp
     monkeypatch.setattr(config, "db_indexing", True)
     monkeypatch.setattr(config, "ensure_grid_file", lambda grid_path, _base_path: grid_path)
 
-    args = create_parser().parse_args(["--input", str(product)])
+    args = create_parser().parse_args(["--input", str(product), *window_args])
 
     assert runner.run(args) == 0
     assert captured["output_dir"] == product.parent / "output"
@@ -167,7 +184,8 @@ def test_run_defaults_outputs_next_to_input(monkeypatch: pytest.MonkeyPatch, tmp
     assert captured["tile_writer"] == "zarr"
     assert callable(captured["pre_write_hook"])
     assert captured["pre_write_hook"].subap_features.enabled is True
-    assert captured["pre_write_hook"].subap_features.window_size == 5
+    assert captured["pre_write_hook"].subap_features.window_size == feature_window
+    assert captured["pdec_window_size"] == pdec_window
     assert captured["keep_intermediate"] is False
     assert (product.parent / "output" / "db").is_dir()
     assert (product.parent / "output" / "pdfs").is_dir()

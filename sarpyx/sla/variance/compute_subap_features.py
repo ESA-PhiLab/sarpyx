@@ -60,9 +60,48 @@ def coherence(si: np.ndarray, sj: np.ndarray, win: int, eps: float = 1e-8) -> np
 
 
 def phase_variance(stack: np.ndarray) -> np.ndarray:
+    """Legacy look-phase dispersion, retained for diagnostic comparison only."""
     phases = np.angle(stack)
     coh_phase = np.abs(np.mean(np.exp(1j * phases), axis=0))
     return 1.0 - coh_phase
+
+
+def adjacent_phase_variance(stack: np.ndarray, win: int = 1,
+                            method: str = "singlelook") -> np.ndarray:
+    """Circular variance of adjacent differences (not of look phases).
+
+    singlelook: compute per-pixel variance, then spatially average the scalar
+    map. covariance: average adjacent complex products first, normalize each
+    covariance, then compute circular variance (FMNISAR multilooked estimator).
+    These operations do not commute. Equal frequency spacing is assumed.
+    Every look must be finite and nonzero. At least three looks are required;
+    two looks give one difference and a trivially zero, uninformative variance.
+    """
+    stack = np.asarray(stack)
+    if stack.ndim != 3 or stack.shape[0] < 3:
+        raise ValueError("adjacent phase variance requires at least three looks (N,H,W)")
+    if not isinstance(win, (int, np.integer)) or win < 1 or win % 2 == 0:
+        raise ValueError("win must be a positive odd integer")
+    if method not in {"singlelook", "covariance"}:
+        raise ValueError("method must be singlelook or covariance")
+    valid = np.all(np.isfinite(stack) & (np.abs(stack) > 0), axis=0)
+    clean = np.where(valid[None], stack.astype(np.complex128), 0)
+    products = clean[:-1] * clean[1:].conj()
+    if method == "covariance" and win > 1:
+        count = local_mean(valid.astype(float), win)
+        products = np.stack([local_mean(p, win) for p in products])
+        np.divide(products, count[None], out=products, where=count[None] > 0)
+        valid = count > 0
+    amplitude = np.abs(products)
+    valid &= np.all(np.isfinite(products) & (amplitude > 0), axis=0)
+    unit = np.divide(products, amplitude, out=np.zeros_like(products), where=amplitude > 0)
+    variance = np.clip(1 - np.abs(unit.mean(axis=0)), 0, 1)
+    if method == "singlelook" and win > 1:
+        count = local_mean(valid.astype(float), win)
+        numerator = local_mean(np.where(valid, variance, 0), win)
+        variance = np.divide(numerator, count, out=np.full_like(numerator, np.nan), where=count > 0)
+        valid = count > 0
+    return np.where(valid, variance, np.nan).astype(np.float32)
 
 
 def covariance_terms(stack: Sequence[np.ndarray], win: int) -> Dict[str, np.ndarray]:

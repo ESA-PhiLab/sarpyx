@@ -62,6 +62,16 @@ def add_worldsar_arguments(parser: argparse.ArgumentParser) -> None:
         help="Chunk size for Zarr outputs (default: 128 128).",
     )
     parser.add_argument("--overwrite-zarr", dest="overwrite_zarr", action="store_true")
+    parser.add_argument(
+        "--preprocessing-root-name",
+        dest="preprocessing_root_name",
+        type=str,
+        default=None,
+        help=(
+            "Use the deterministic directory worldsar_tmp_<name> below --output, "
+            "replacing it if it already exists. By default a random suffix is used."
+        ),
+    )
     parser.add_argument("--tile-writer", dest="tile_writer", type=str, default="zarr", help="Tile artifact writer: h5, zarr, numpy/npz, npy, geotiff/tif, or pickle.")
     parser.add_argument(
         "--gpt-path",
@@ -116,12 +126,20 @@ def add_worldsar_arguments(parser: argparse.ArgumentParser) -> None:
         help="Sentinel sub-aperture decomposition count(s). Defaults to 2.",
     )
     parser.add_argument(
+        "--sentinel-window-size",
+        type=int,
+        default=None,
+        help="Use the same odd window for Sentinel H-Alpha and derived Zarr features (default: 5).",
+    )
+    parser.add_argument(
         "--sentinel-subap-feature-window-size",
         dest="sentinel_subap_feature_window_size",
         type=int,
         default=5,
         help="Odd local window size for Sentinel sub-aperture Zarr features.",
     )
+    parser.add_argument("--sentinel-subap-feature-window-sizes", type=int, nargs="+", default=None,
+                        help="Window sweep for derived Zarr features; bands receive _W<size> suffixes.")
     parser.add_argument(
         "--skip-preprocessing",
         dest="skip_preprocessing",
