@@ -23,7 +23,15 @@ def steps(
     dem_name: str = DEFAULT_DEM_NAME,
     pixel_spacing_in_meter: float = DEFAULT_PIXEL_SPACING_M,
     map_projection: str = DEFAULT_MAP_PROJECTION,
+    mask_out_area_without_elevation: bool = True,
+    nodata_value_at_sea: bool = False,
 ):
+    """Build the recipe; disabling DEM masking requires land-coverage preflight.
+
+    With verified land tiles, mask_out_area_without_elevation=False permits
+    SNAP's EGM sea-level fallback for unpublished ocean cells. It is not itself
+    an ocean classifier and must not be used to hide missing land DEM files.
+    """
     split_params = {
         "subswath": subswath,
         "selected_polarisations": selected_polarisations,
@@ -63,6 +71,7 @@ def steps(
                 "outdir": "pair",
                 "use_esd": use_esd,
                 "dem_name": dem_name,
+                "mask_out_area_without_elevation": mask_out_area_without_elevation,
             },
             "coreg",
         ),
@@ -89,6 +98,7 @@ def steps(
                 "dem_name": dem_name,
                 "pixel_spacing_in_meter": pixel_spacing_in_meter,
                 "map_projection": map_projection,
+                "nodata_value_at_sea": nodata_value_at_sea,
             },
             "terrain_corrected",
         ),

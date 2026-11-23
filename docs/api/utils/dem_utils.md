@@ -52,6 +52,48 @@ https://copernicus-dem-30m.s3.eu-central-1.amazonaws.com/<tile_name>/<tile_name>
 
 ## Functions
 
+### `prepare_tiles_for_wkt()`
+
+```python
+prepare_tiles_for_wkt(
+    wkt_string, output_dir, resolution_m=30, *,
+    download=False, catalogue_path=None, validate_tile=None, max_workers=4,
+) -> list[dict[str, str]]
+```
+
+Catalogue-aware preparation for processing pipelines. Shares tile selection and
+the transfer implementation with `download_tiles_for_wkt()`, but raises on
+missing published tiles or download failures instead of omitting failed results.
+
+- Existing files are reused. Supply `validate_tile(path)` to verify raster
+  contents; without a callback, existing files are checked for existence only.
+- Missing cells trigger a public `tileList.txt` lookup, or read the local
+  `catalogue_path` for fully offline classification. No lookup occurs when all
+  required files are already present.
+- Unpublished cells return `status="not_in_catalogue"`; they are not assigned
+  synthetic zero elevations. GLO-30/GLO-90 do not provide all-ocean bathymetry.
+- Missing published rasters fail by default. `download=True` explicitly allows
+  directory creation and downloads, using unique staging files and atomic
+  publication. A validation callback also runs before downloaded data is
+  published. Invalid cached files are not silently replaced.
+- Catalogue failures, transfer errors (including a published tile returning
+  404), and validation errors are not classified as ocean.
+
+Each result contains `name`, `path`, and `status` (`reused`, `downloaded`, or
+`not_in_catalogue`). A successful report does not itself define downstream sea
+masking or disable SNAP's independent retrieval behavior.
+
+### `load_tile_catalogue()`
+
+```python
+load_tile_catalogue(resolution_m=30, path=None) -> set[str]
+```
+
+Reads official published tile names from a local `tileList.txt`, or fetches
+catalogue metadata from the corresponding public bucket in memory. Rejects an
+empty/malformed catalogue or one with the wrong resolution. The local file
+must be a complete, trusted catalogue, not an inventory of the local cache.
+
 ### `tiles_from_wkt()`
 
 ```python

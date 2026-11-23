@@ -10,7 +10,7 @@ from sarpyx.utils.worldsar_h5 import normalize_expected_tile_geometries
 from sarpyx.snapflow import config
 from sarpyx.snapflow.footprint_wkt import resolve_tiling_wkt as _resolve_tiling_wkt
 from sarpyx.snapflow.gpt import run_gpt_op
-from sarpyx.snapflow.h5_quality import summarize_h5_raster_quality, summarize_zarr_raster_quality
+from sarpyx.snapflow.raster_quality import summarize_h5_raster_quality, summarize_zarr_raster_quality
 from sarpyx.snapflow.nisar_tiles import write_nisar_bbox_tile
 from sarpyx.snapflow.product import extract_product_id
 from sarpyx.snapflow.raster import _pixel_region_is_within_bounds, _read_geotransform, _read_raster_size, _update_h5_corners, _utm_bbox_to_pixel_region, _write_tile_subsets_from_dim, _write_tile_subsets_from_dim_rectangles

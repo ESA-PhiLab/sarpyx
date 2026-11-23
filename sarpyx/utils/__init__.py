@@ -12,6 +12,8 @@ _EXPORT_MAP = {
     'show_histogram': 'viz',
     'show_histogram_equalization': 'viz',
     'download_tiles_for_wkt': 'dem_utils',
+    'prepare_tiles_for_wkt': 'dem_utils',
+    'load_tile_catalogue': 'dem_utils',
     'tiles_from_wkt': 'dem_utils',
     'tile_name': 'dem_utils',
     'tile_url': 'dem_utils',

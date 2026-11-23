@@ -8,7 +8,7 @@ import pytest
 import zarr
 
 from sarpyx.hooks.worldsar import make_worldsar_zarr_tile_hook, validate_worldsar_zarr_tile, validate_worldsar_zarr_tile_group
-from sarpyx.snapflow.h5_quality import summarize_zarr_raster_quality
+from sarpyx.snapflow.raster_quality import summarize_zarr_raster_quality
 from sarpyx.snapflow.tile_writers import TilePayload, write_tile_payloads
 from sarpyx.snapflow.tiling import _cut_single_tile, _validate_tile_result
 

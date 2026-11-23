@@ -28,7 +28,7 @@ from sarpyx.utils.worldsar_h5 import (
     write_h5_validation_report_pdf,
 )
 from sarpyx.cli import worldsar
-from sarpyx.snapflow.h5_quality import summarize_h5_raster_quality
+from sarpyx.snapflow.raster_quality import summarize_h5_raster_quality
 from sarpyx.snapflow.report_manifest import hydrate_tiling_result, write_tiling_manifest
 from sarpyx.snapflow.reports import _validate_tile_group
 from sarpyx.snapflow.tile_crs import prepare_products_by_epsg

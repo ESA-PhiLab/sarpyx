@@ -16,7 +16,7 @@ from sarpyx.utils.worldsar_h5 import (
     write_h5_validation_report_pdf,
 )
 from sarpyx.snapflow import config
-from sarpyx.snapflow.h5_quality import summarize_h5_raster_quality
+from sarpyx.snapflow.raster_quality import summarize_h5_raster_quality
 from sarpyx.snapflow.report_manifest import hydrate_tiling_result, write_tiling_manifest
 
 _hydrate_tiling_result = hydrate_tiling_result

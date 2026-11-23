@@ -174,6 +174,8 @@ def _write_zarr(payload: TilePayload) -> None:
     chunks = writer_options.get("zarr_chunks") or writer_options.get("chunks")
     for band_name, data in payload.arrays.items():
         create_kwargs = {"data": data, "overwrite": False}
+        if "write_empty_chunks" in writer_options:
+            create_kwargs["config"] = {"write_empty_chunks": bool(writer_options["write_empty_chunks"])}
         normalized_chunks = _normalize_zarr_chunks(data, chunks)
         if normalized_chunks is not None:
             create_kwargs["chunks"] = normalized_chunks
