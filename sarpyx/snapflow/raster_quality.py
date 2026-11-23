@@ -1,4 +1,4 @@
-"""H5 raster no-data quality checks."""
+"""Raster no-data quality checks for HDF5 and Zarr tiles."""
 
 from __future__ import annotations
 
@@ -81,6 +81,12 @@ def summarize_zarr_raster_quality(tile_path: Path | str) -> dict[str, Any]:
         return _empty_summary("missing /bands group")
     arrays = []
     for name in bands_group.keys():
+        if root.attrs.get("product_mode") == "S1INSAR" and not name.lower().startswith(
+            ("i_ifg_", "q_ifg_", "phase_ifg_", "coh_", "coherence_")
+        ):
+            # Elevation and incidence angle can be valid where radar signal is
+            # completely absent; they must not turn an empty IFG into a valid tile.
+            continue
         array = bands_group[name]
         if len(array.shape) == 2 and np.issubdtype(array.dtype, np.number):
             arrays.append(array[:])

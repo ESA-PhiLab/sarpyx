@@ -24,11 +24,15 @@ from __future__ import annotations
 
 import logging
 import math
+import os
+import re
+import shutil
+import tempfile
 import urllib.request
 import urllib.error
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
-from typing import List, Optional, Sequence, Tuple
+from typing import Callable, List, Optional, Sequence, Tuple
 
 from shapely import wkt as shapely_wkt
 from shapely.geometry import box as shapely_box
@@ -121,6 +125,9 @@ def _bounding_tiles(
     lat_end = math.ceil(max_lat)       # exclusive upper bound
     lon_start = math.floor(min_lon)
     lon_end = math.ceil(max_lon)
+    # Points and horizontal/vertical lines still occupy a tile.
+    lat_end = max(lat_start + 1, lat_end)
+    lon_end = max(lon_start + 1, lon_end)
 
     # If max_lat/max_lon land exactly on a boundary we don't need the next tile
     if max_lat == lat_end:
@@ -181,6 +188,7 @@ def _download_one(
     dest: Path,
     overwrite: bool = False,
     timeout: int = 300,
+    validate_tile: Callable[[Path], None] | None = None,
 ) -> Path:
     """Download a single tile from *url* to *dest*.
 
@@ -190,16 +198,23 @@ def _download_one(
         If the tile does not exist on the server (404) or other HTTP error.
     """
     if dest.exists() and not overwrite:
+        if validate_tile:
+            validate_tile(dest)
         logger.debug("Skipping (exists): %s", dest.name)
         return dest
 
     dest.parent.mkdir(parents=True, exist_ok=True)
-    tmp = dest.with_suffix(".tif.part")
+    fd, staging = tempfile.mkstemp(prefix=f".{dest.stem}-", suffix=".tif.part", dir=dest.parent)
+    os.close(fd)
+    tmp = Path(staging)
 
     try:
         logger.info("Downloading %s …", dest.name)
-        urllib.request.urlretrieve(url, str(tmp))
-        tmp.rename(dest)
+        with urllib.request.urlopen(url, timeout=timeout) as source, tmp.open("wb") as sink:
+            shutil.copyfileobj(source, sink)
+        if validate_tile:
+            validate_tile(tmp)
+        os.replace(tmp, dest)
         logger.info("Saved %s (%.1f MB)", dest.name, dest.stat().st_size / 1e6)
     except Exception:
         if tmp.exists():
@@ -207,6 +222,110 @@ def _download_one(
         raise
 
     return dest
+
+
+def load_tile_catalogue(
+    resolution_m: int = 30,
+    path: str | Path | None = None,
+) -> set[str]:
+    """Read official published tile names, locally or from AWS (metadata only).
+
+    A missing filename in the cache is not evidence of ocean. Only a successful,
+    well-formed catalogue read can establish that a grid cell is unpublished.
+    A supplied local catalogue enables fully offline checks.
+    """
+    if resolution_m not in _RES_CODES:
+        raise ValueError(f"resolution_m must be 30 or 90, got {resolution_m}")
+    if path is not None:
+        text = Path(path).read_text(encoding="utf-8")
+    else:
+        with urllib.request.urlopen(f"{_BASE_URLS[resolution_m]}/tileList.txt", timeout=60) as source:
+            text = source.read().decode("utf-8")
+    names = {line.strip().rstrip("/") for line in text.splitlines() if line.strip()}
+    pattern = re.compile(
+        rf"Copernicus_DSM_COG_{_RES_CODES[resolution_m]}_[NS]\d{{2}}_00_[EW]\d{{3}}_00_DEM"
+    )
+    if not names or any(not pattern.fullmatch(name) for name in names):
+        raise ValueError("DEM tile catalogue is empty, malformed, or for the wrong resolution")
+    return names
+
+
+def prepare_tiles_for_wkt(
+    wkt_string: str,
+    output_dir: str | Path,
+    resolution_m: int = 30,
+    *,
+    download: bool = False,
+    catalogue_path: str | Path | None = None,
+    validate_tile: Callable[[Path], None] | None = None,
+    max_workers: int = 4,
+) -> list[dict[str, str]]:
+    """Validate/reuse coverage and optionally download missing published tiles.
+
+    Uses the same tile selection and transfer implementation as
+    :func:`download_tiles_for_wkt`, but fails on errors instead of silently
+    omitting them. Returns ``name``, ``path`` and ``status`` for every required
+    cell: ``reused``, ``downloaded``, or ``not_in_catalogue``.
+
+    Raster downloads and directory creation require ``download=True``.
+    When any raster is absent, read a supplied local catalogue, or fetch the
+    public catalogue in memory. Unpublished cells are NOT assigned zero height.
+    Existing invalid rasters fail validation and are never silently replaced.
+    """
+    if resolution_m not in _RES_CODES:
+        raise ValueError(f"resolution_m must be 30 or 90, got {resolution_m}")
+    if max_workers < 1:
+        raise ValueError("max_workers must be positive")
+    output_dir = Path(output_dir)
+    if not output_dir.is_dir():
+        if not download:
+            raise FileNotFoundError(f"Required DEM directory is missing: {output_dir}")
+        output_dir.mkdir(parents=True, exist_ok=True)
+    tile_info = tiles_from_wkt(wkt_string, resolution_m)
+    results = {}
+    missing = []
+    for info in tile_info:
+        _, _, name, _ = info
+        target = output_dir / f"{name}.tif"
+        if target.is_file():
+            if validate_tile:
+                validate_tile(target)
+            results[name] = {"name": name, "path": str(target), "status": "reused"}
+        else:
+            missing.append(info)
+    if missing:
+        catalogue = load_tile_catalogue(resolution_m, catalogue_path)
+        published = []
+        for info in missing:
+            _, _, name, _ = info
+            if name in catalogue:
+                published.append(info)
+            else:
+                results[name] = {
+                    "name": name, "path": str(output_dir / f"{name}.tif"),
+                    "status": "not_in_catalogue",
+                }
+        if published and not download:
+            paths = ", ".join(str(output_dir / f"{info[2]}.tif") for info in published)
+            raise FileNotFoundError(
+                f"Required published DEM tiles are missing: {paths}; "
+                "raster downloading is disabled (enable download explicitly to populate the cache)"
+            )
+
+        def transfer(info):
+            _, _, name, url = info
+            target = output_dir / f"{name}.tif"
+            try:
+                _download_one(url, target, validate_tile=validate_tile)
+            except Exception as exc:
+                # Even a 404 is an error for a catalogue-listed tile.
+                raise RuntimeError(f"Could not prepare published DEM tile {name}: {exc}") from exc
+            return {"name": name, "path": str(target), "status": "downloaded"}
+
+        with ThreadPoolExecutor(max_workers=max_workers) as pool:
+            for result in pool.map(transfer, published):
+                results[result["name"]] = result
+    return [results[name] for name in sorted(results)]
 
 
 def download_tiles_for_wkt(

@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from sarpyx.hooks.subap_features import SubapFeatureConfig, add_subap_features
-from sarpyx.snapflow.h5_quality import summarize_zarr_raster_quality
+from sarpyx.snapflow.raster_quality import summarize_zarr_raster_quality
 from sarpyx.snapflow.tile_writers import TilePayload, tile_glob_pattern
 DEFAULT_WORLDSAR_ZARR_CHUNKS = (128, 128)
 POLARIZATION_RE = re.compile(r"(?<![A-Z0-9])(HH|HV|VH|VV)(?![A-Z0-9])", re.IGNORECASE)
@@ -48,7 +48,8 @@ class WorldSARZarrTileHook:
             for band_name in arrays
         }
         options = dict(payload.writer_options)
-        options.update({"zarr_chunks": self.chunk_size, "minimal_metadata": True})
+        options.update({"zarr_chunks": self.chunk_size, "minimal_metadata": True,
+                        "write_empty_chunks": True})
         return replace(
             payload,
             arrays=arrays,
