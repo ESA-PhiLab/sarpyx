@@ -85,22 +85,30 @@ def _terrain_correct_to_epsg(intermediate_product: Path, epsg: int, terrain_corr
     params.pop("output_name", None)
     params["map_projection"] = f"EPSG:{epsg}"
     outdir = Path(terrain_correction.get("output_dir") or intermediate_product.parent) / "worldsar_tc_epsg"
-    output_name = f"{source_product.stem}_TC_EPSG{epsg}"
+    split_polarimetric = terrain_correction.get("split_polarimetric_resampling", False)
+    # Do not reuse an old mixed-BISINC result for the new resampling policy.
+    tc_label = "TC_SPLIT" if split_polarimetric else "TC"
+    output_name = f"{source_product.stem}_{tc_label}_EPSG{epsg}"
     output_path = outdir / f"{output_name}.dim"
     if output_path.exists():
         print(f"Reusing WorldSAR EPSG:{epsg} Terrain-Correction intermediate: {output_path}")
         _ensure_subap_bands_terrain_corrected(source_product, output_path, epsg, params, gpt_kwargs)
         return output_path
     print(f"Creating WorldSAR Terrain-Correction intermediate for EPSG:{epsg}: {source_product}")
-    product = run_gpt_op(
-        source_product,
-        outdir,
-        "BEAM-DIMAP",
-        "TerrainCorrection",
-        output_name=output_name,
-        **params,
-        **gpt_kwargs,
-    )
+    if split_polarimetric:
+        from sarpyx.snapflow.terrain import run_split_terrain_correction
+
+        product = run_split_terrain_correction(source_product, outdir, output_name, params, gpt_kwargs)
+    else:
+        product = run_gpt_op(
+            source_product,
+            outdir,
+            "BEAM-DIMAP",
+            "TerrainCorrection",
+            output_name=output_name,
+            **params,
+            **gpt_kwargs,
+        )
     _ensure_subap_bands_terrain_corrected(source_product, product, epsg, params, gpt_kwargs)
     return product
 

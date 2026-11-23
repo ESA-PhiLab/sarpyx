@@ -60,6 +60,7 @@ def steps(
         "pixel_spacing_in_meter": DEFAULT_PIXEL_SPACING_M,
         "source_bands": [sentinel_tc_source_band] if sentinel_tc_source_band else None,
         "ordered_tops_bands": True,
+        "split_polarimetric_resampling": True,
         "save_selected_source_band": True,
     }
     return [

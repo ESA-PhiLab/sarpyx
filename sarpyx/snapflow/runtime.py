@@ -32,6 +32,7 @@ class PipelineContext:
     saved: dict[str, Any]
     metadata: dict[str, Any]
     gpt_kwargs: dict[str, Any]
+    create_operator: CreateGptOperator = create_gpt_operator
 
 
 CreateGptOperator = Callable[..., Any]
@@ -55,6 +56,7 @@ def make_context(
         saved={},
         metadata=dict(metadata or {}),
         gpt_kwargs=dict(gpt_kwargs),
+        create_operator=create_operator,
     )
 
 
@@ -245,7 +247,9 @@ def tops_complex_tc_band_names(dim_path: Path) -> list[str]:
 def step_terrain_correction(ctx: PipelineContext, **kwargs):
     kwargs = dict(kwargs)
     source_product = _op_result(ctx)
-    if kwargs.pop("ordered_tops_bands", False) and kwargs.get("source_bands") is None:
+    split_polarimetric = kwargs.pop("split_polarimetric_resampling", False)
+    auto_tops_bands = kwargs.pop("ordered_tops_bands", False) and kwargs.get("source_bands") is None
+    if auto_tops_bands:
         kwargs["source_bands"] = tops_complex_tc_band_names(Path(source_product))
     include_subap_source_bands = bool(kwargs.pop("include_subap_source_bands", False))
     if kwargs.get("source_bands") == ALL_SOURCE_BANDS:
@@ -261,12 +265,27 @@ def step_terrain_correction(ctx: PipelineContext, **kwargs):
             kwargs["source_bands"] = source_bands
         else:
             kwargs.pop("source_bands", None)
-    result = _require(ctx.op.TerrainCorrection(**kwargs), ctx, "Terrain Correction")
+    split = False
+    if split_polarimetric and auto_tops_bands:
+        from sarpyx.snapflow.terrain import POLARIMETRIC_BANDS, run_split_terrain_correction
+
+        split = any(b.lower() in POLARIMETRIC_BANDS for b in kwargs["source_bands"])
+    if split:
+        params = dict(kwargs)
+        output_name = params.pop("output_name", None) or f"{ctx.op.name}_TC"
+        result = run_split_terrain_correction(
+            Path(source_product), Path(ctx.output_dir or ctx.op.outdir), output_name, params,
+            ctx.gpt_kwargs, create_operator=ctx.create_operator,
+        )
+        ctx.op.prod_path = result
+    else:
+        result = _require(ctx.op.TerrainCorrection(**kwargs), ctx, "Terrain Correction")
     runs = ctx.metadata.setdefault("terrain_correction_runs", {})
     runs[str(Path(result))] = {
         "source_product": str(source_product),
         "params": dict(kwargs),
         "output_dir": str(ctx.output_dir),
+        "split_polarimetric_resampling": split,
     }
     return result
 
