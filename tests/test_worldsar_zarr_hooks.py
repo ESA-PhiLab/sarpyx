@@ -125,8 +125,12 @@ def test_cut_single_tc_tile_to_zarr_from_dimap(tmp_path: Path, monkeypatch: pyte
     assert "subap_coherence_VH_gamma12" in band_names
     assert "subap_coherence_VH_gamma_mean" in band_names
     assert "subap_covariance_IW1_VH_C1" not in band_names
-    assert "subap_covariance_VH_C11" in band_names
-    assert "subap_phase_variance_VH" in band_names
+    assert "subap_covariance_VH_C11" not in band_names
+    assert "subap_phase_diff_VH_pd12" in band_names
+    # This fixture contains only two looks: one phase difference cannot yield
+    # an informative variance. Keep coherence and the individual phase difference.
+    assert "subap_phase_variance_VH" not in band_names
+    assert "subap_adjacent_phase_variance_VH" not in band_names
     assert root.attrs["subap_feature_bands"]
     zarr.create_group(store=(cuts_dir / "other-swath-tile.zarr").as_posix(), zarr_format=3, overwrite=True)
     group = validate_worldsar_zarr_tile_group(
@@ -224,7 +228,31 @@ def _write_zarr_tile(path: Path, arrays: dict[str, np.ndarray]) -> None:
         bands.create_array(name, data=data, chunks=tuple(min(128, dim) for dim in data.shape))
 
 
-def _write_synthetic_tc_dimap(dim_path: Path) -> Path:
+def test_zarr_features_match_full_raster_at_tile_boundary(tmp_path: Path) -> None:
+    import rasterio
+
+    from sarpyx.hooks.subap_features import SubapFeatureConfig, add_subap_features
+    from sarpyx.snapflow.raster import _write_tile_subsets_from_dim
+
+    dim_path = _write_synthetic_tc_dimap(tmp_path / "TC.dim", three_looks=True)
+    arrays = {}
+    for path in dim_path.with_suffix(".data").glob("*.img"):
+        with rasterio.open(path) as src:
+            arrays[path.stem] = src.read(1)
+    config = SubapFeatureConfig(enabled=True, window_sizes=(1, 5, 15))
+    reference, _, derived_names = add_subap_features(arrays, {}, config)
+    hook = make_worldsar_zarr_tile_hook("S1_TEST.SAFE", product_mode="S1TOPS", subap_features=config)
+    target = tmp_path / "partial.zarr"
+    _write_tile_subsets_from_dim(dim_path, [("0,7,56,48", target)], tile_writer="zarr", pre_write_hook=hook)
+    root = zarr.open(str(target), mode="r")
+    assert "subap_adjacent_phase_variance_VH_W15" in root["bands"]
+    for name in derived_names:
+        saved = root["bands"][name.replace("_IW1_", "_")]
+        np.testing.assert_allclose(saved[:], reference[name][7:55, :56], atol=1e-7, equal_nan=True)
+    np.testing.assert_array_equal(root["bands"]["Sigma0_VH"][:], arrays["Sigma0_VH"][7:55, :56])
+
+
+def _write_synthetic_tc_dimap(dim_path: Path, *, three_looks: bool = False) -> Path:
     data_dir = dim_path.with_suffix(".data")
     data_dir.mkdir(parents=True)
     data = np.arange(128 * 128, dtype=np.float32).reshape(128, 128)
@@ -235,10 +263,16 @@ def _write_synthetic_tc_dimap(dim_path: Path) -> Path:
     _write_envi_band(data_dir / "i_IW1_VH_SA2.img", np.full((128, 128), 0.5, dtype=np.float32), crs_wkt)
     _write_envi_band(data_dir / "q_IW1_VH_SA2.img", np.full((128, 128), 0.75, dtype=np.float32), crs_wkt)
 
-    band_xml = "\n".join(_spectral_band_xml(name) for name in ("Sigma0_VH", "i_IW1_VH_SA1", "q_IW1_VH_SA1", "i_IW1_VH_SA2", "q_IW1_VH_SA2"))
+    names = ["Sigma0_VH", "i_IW1_VH_SA1", "q_IW1_VH_SA1", "i_IW1_VH_SA2", "q_IW1_VH_SA2"]
+    if three_looks:
+        rng = np.random.default_rng(9021)
+        for name in ("i_IW1_VH_SA3", "q_IW1_VH_SA3"):
+            _write_envi_band(data_dir / f"{name}.img", rng.normal(size=data.shape).astype(np.float32), crs_wkt)
+            names.append(name)
+    band_xml = "\n".join(_spectral_band_xml(name) for name in names)
     data_xml = "\n".join(
         f'<Data_File><BAND_INDEX>{index}</BAND_INDEX><DATA_FILE_PATH href="./TC.data/{name}.hdr" /></Data_File>'
-        for index, name in enumerate(("Sigma0_VH", "i_IW1_VH_SA1", "q_IW1_VH_SA1", "i_IW1_VH_SA2", "q_IW1_VH_SA2"))
+        for index, name in enumerate(names)
     )
     dim_path.write_text(
         f"""<Dimap_Document>

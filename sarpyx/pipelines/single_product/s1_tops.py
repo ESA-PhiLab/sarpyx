@@ -14,7 +14,7 @@ DEFAULT_SWATH = "IW1" if DEBUG else None
 DEFAULT_SWATHS = ("IW1", "IW2", "IW3")
 DEFAULT_FIRST_BURST = 1
 DEFAULT_LAST_BURST = 3 if DEBUG else 9999
-DEFAULT_SUBAP_DECOMPOSITIONS = [2]
+DEFAULT_SUBAP_DECOMPOSITIONS = [3]
 DEFAULT_MAP_PROJECTION = "AUTO:42001"
 DEFAULT_PIXEL_SPACING_M = 10.0
 
@@ -51,6 +51,7 @@ def steps(
     orbit_continue_on_fail: bool = False,
     sentinel_tc_source_band: str | None = None,
     sentinel_subap_decompositions: list[int] | None = None,
+    sentinel_pdec_window_size: int = PDEC_PARAMS["window_size"],
 ):
     subap_params = dict(TOPS_SUBAP_PARAMS)
     subap_params["n_decompositions"] = sentinel_subap_decompositions or DEFAULT_SUBAP_DECOMPOSITIONS
@@ -58,6 +59,8 @@ def steps(
         "map_projection": DEFAULT_MAP_PROJECTION,
         "pixel_spacing_in_meter": DEFAULT_PIXEL_SPACING_M,
         "source_bands": [sentinel_tc_source_band] if sentinel_tc_source_band else None,
+        "ordered_tops_bands": True,
+        "split_polarimetric_resampling": True,
         "save_selected_source_band": True,
     }
     return [
@@ -67,10 +70,10 @@ def steps(
         PipelineStep("TopsarDerampDemod", {}, "deramp"),
         PipelineStep("Deburst", {}, "deb"),
         PipelineStep("do_subaps", subap_params, "subaps"),
-        PipelineStep("polarimetric_decomposition", dict(PDEC_PARAMS), "pdec"),
+        PipelineStep("polarimetric_decomposition", {**PDEC_PARAMS, "window_size": sentinel_pdec_window_size}, "pdec"),
         PipelineStep(
             "merge_iq_into_pdec",
-            {"src_ref": "deb", "pdec_ref": "pdec", "is_tops": True, "overwrite_copied_files": False, "backup": False},
+            {"src_ref": "subaps", "pdec_ref": "pdec", "is_tops": True, "overwrite_copied_files": False, "backup": False},
             "merged",
         ),
         PipelineStep("TerrainCorrection", tc_params, "tc"),

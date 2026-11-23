@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Demodulate Sentinel-1 IW/TOPS azimuth subapertures toward baseband before
+  reconstruction, using equally spaced frequency shifts in both NumPy and
+  Dask ([#43](https://github.com/ESA-PhiLab/sarpyx/issues/43)). Subband
+  partitioning is unchanged. IW sublook phases change, but single-look
+  circular variance of adjacent phase differences is preserved in radar geometry.
+
 ## 2.0.0 (unreleased)
 
 ### RFI acquisition timing (generator 2.0.0)

@@ -155,6 +155,8 @@ def _write_tile_subsets_from_dim(dim_path: Path, subsets: list[tuple], tile_writ
     band_metadata = {band_name: _read_band_metadata(dim_path, band_name) for band_name in band_names}
     data_dir = get_data_dir_from_dim(dim_path)
     geotransform = _read_geotransform(dim_path)
+    halo = getattr(pre_write_hook, "feature_halo", 0)
+    raster_size = _read_raster_size(dim_path) if halo else None
     try:
         crs_wkt = _read_crs_wkt(dim_path)
     except Exception:
@@ -164,7 +166,9 @@ def _write_tile_subsets_from_dim(dim_path: Path, subsets: list[tuple], tile_writ
             _remove_tile_output(output_path)
         for offset in range(0, len(normalized_subsets), max_open_outputs):
             chunk = normalized_subsets[offset : offset + max_open_outputs]
-            payloads = _read_tile_payload_chunk(data_dir, band_names, band_metadata, abstract_attrs, geotransform, crs_wkt, chunk)
+            payloads = _read_tile_payload_chunk(
+                data_dir, band_names, band_metadata, abstract_attrs, geotransform, crs_wkt,
+                chunk, halo=halo, raster_size=raster_size)
             write_tile_payloads(payloads, tile_writer, pre_write_hook)
     except Exception:
         for output_path in output_paths:
@@ -207,7 +211,7 @@ def _band_attrs(metadata: dict[str, str], data) -> dict[str, str | int]:
     }
 
 
-def _read_tile_payload_chunk(data_dir: Path, band_names: list[str], band_metadata: dict[str, dict[str, str]], abstract_attrs: dict[str, str], geotransform: tuple, crs_wkt: str | None, subsets: list[tuple[str, Path, str]]) -> list[TilePayload]:
+def _read_tile_payload_chunk(data_dir: Path, band_names: list[str], band_metadata: dict[str, dict[str, str]], abstract_attrs: dict[str, str], geotransform: tuple, crs_wkt: str | None, subsets: list[tuple[str, Path, str]], *, halo: int = 0, raster_size: tuple[int, int] | None = None) -> list[TilePayload]:
     import rasterio
     from rasterio.windows import Window
 
@@ -215,8 +219,17 @@ def _read_tile_payload_chunk(data_dir: Path, band_names: list[str], band_metadat
     windows = []
     for region, output_path, tile_name in subsets:
         col_start, row_start, width, height = (int(value) for value in region.split(","))
-        windows.append(Window(col_start, row_start, width, height))
-        payloads.append(TilePayload(tile_name, output_path, {}, dict(abstract_attrs), {}, region=region, crs_wkt=crs_wkt, transform=_tile_transform(geotransform, region)))
+        crop = None
+        if halo and raster_size is not None:
+            x0, y0 = max(col_start - halo, 0), max(row_start - halo, 0)
+            x1 = min(col_start + width + halo, raster_size[0])
+            y1 = min(row_start + height + halo, raster_size[1])
+            dx, dy = col_start - x0, row_start - y0
+            crop = (slice(dy, dy + height), slice(dx, dx + width))
+            windows.append(Window(x0, y0, x1 - x0, y1 - y0))
+        else:
+            windows.append(Window(col_start, row_start, width, height))
+        payloads.append(TilePayload(tile_name, output_path, {}, dict(abstract_attrs), {}, region=region, crs_wkt=crs_wkt, transform=_tile_transform(geotransform, region), feature_crop=crop))
     for band_name in band_names:
         hdr_path = data_dir / f"{band_name}.hdr"
         raster_path = data_dir / f"{band_name}.img"

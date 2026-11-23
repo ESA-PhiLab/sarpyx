@@ -809,6 +809,21 @@ class CombinedSublooking:
             return np.linspace(ss, ee + 1, self.numberOfLooks + 1).astype(int)
         return edges.astype(int)
 
+    def _iw_demodulation_rolls(self, edges: np.ndarray) -> np.ndarray:
+        """Move IW sublooks near DC with equally spaced demodulation frequencies.
+
+        The centers are measured in the same rolled coordinates used to slice
+        the spectrum, including any wrap-around bookkeeping. The selected
+        subbands do not change. Equal increments leave the single-look circular
+        variance of adjacent phase differences invariant, even when the
+        equal-energy subbands themselves are not equally spaced.
+        """
+        centers = (edges[:-1] + edges[1:]) / 2
+        n_pairs = centers.size - 1
+        spacing = int(round((centers[-1] - centers[0]) / n_pairs)) if n_pairs else 0
+        first = int(round(centers.mean() - spacing * n_pairs / 2))
+        return self.nRows // 2 - (first + spacing * np.arange(centers.size))
+
     def _iw_energy_scale(self, full_len: int, sub_len: int) -> np.float32:
         if not getattr(self, "iw_energy_compensation", True):
             return np.float32(1.0)
@@ -1191,10 +1206,9 @@ class CombinedSublooking:
         IW-TOPS-specific sublook generation.
 
         The de-weighted spectrum is already in shifted-frequency coordinates.
-        For each sublook, this method preserves the selected subband in its
-        coherent shifted position, then applies ``ifftshift`` and ``ifft`` along
-        azimuth. This avoids the old reversed-slice reconstruction that can
-        introduce deterministic modulation in IW-TOPS.
+        Each selected subband is demodulated toward DC before the azimuth
+        ``ifftshift`` and ``ifft``. The frequency shifts have equal increments
+        rather than centering each equal-energy subband independently.
         """
         if self.iw_support_start_rolled is None or self.iw_support_end_rolled is None:
             self._prepare_iw_tops_support(self.SpectrumOneDimNormDeWe)
@@ -1209,8 +1223,8 @@ class CombinedSublooking:
         if local_shift != 0:
             S_roll = self._roll_freq_axis(S_roll, local_shift)
         # The support moves with the samples. If it crosses the circular array
-        # boundary, rotate it to the front for contiguous slicing, then undo
-        # that bookkeeping rotation during reconstruction. Preserve its width.
+        # boundary, rotate it to the front for contiguous slicing. Demodulation
+        # below uses the resulting bin coordinates and preserves the width.
         ss = (ss + local_shift) % self.nRows
         bookkeeping_shift = -ss if ss + support_len > self.nRows else 0
         if bookkeeping_shift:
@@ -1218,6 +1232,7 @@ class CombinedSublooking:
             ss = 0
         ee = ss + support_len - 1
         edges = self._compute_iw_subband_edges(S_roll, ss, ee)
+        demodulation_rolls = self._iw_demodulation_rolls(edges)
         self.Looks = []
 
         for it in range(self.numberOfLooks):
@@ -1228,7 +1243,7 @@ class CombinedSublooking:
 
             padded_roll = np.zeros((self.nRows, self.nCols), dtype=np.complex64)
             padded_roll[si:ei, :] = S_roll[si:ei, :]
-            padded = self._roll_freq_axis(padded_roll, -self.iw_roll_shift - bookkeeping_shift)
+            padded = self._roll_freq_axis(padded_roll, demodulation_rolls[it])
             padded = self._ifftshift_freq_axis(padded)
             look = np.fft.ifft(padded, axis=0).astype(np.complex64)
 
@@ -1259,8 +1274,8 @@ class CombinedSublooking:
         if local_shift != 0:
             S_roll = self._roll_freq_axis(S_roll, local_shift)
         # The support moves with the samples. If it crosses the circular array
-        # boundary, rotate it to the front for contiguous slicing, then undo
-        # that bookkeeping rotation during reconstruction. Preserve its width.
+        # boundary, rotate it to the front for contiguous slicing. Demodulation
+        # below uses the resulting bin coordinates and preserves the width.
         ss = (ss + local_shift) % self.nRows
         bookkeeping_shift = -ss if ss + support_len > self.nRows else 0
         if bookkeeping_shift:
@@ -1268,6 +1283,7 @@ class CombinedSublooking:
             ss = 0
         ee = ss + support_len - 1
         edges = self._compute_iw_subband_edges(S_roll, ss, ee)
+        demodulation_rolls = self._iw_demodulation_rolls(edges)
         self.Looks = []
 
         for it in range(self.numberOfLooks):
@@ -1288,7 +1304,7 @@ class CombinedSublooking:
                 parts.append(da.zeros((bot_len, self.nCols), chunks=(bot_len, self._chunk_cols), dtype=np.complex64))
 
             padded_roll = da.concatenate(parts, axis=0).astype(np.complex64)
-            padded = self._roll_freq_axis(padded_roll, -self.iw_roll_shift - bookkeeping_shift)
+            padded = self._roll_freq_axis(padded_roll, demodulation_rolls[it])
             # Collapse azimuth chunks before the global shift. da.fft.ifftshift
             # otherwise shuffles/rechunks the axis, which the FFT would require
             # anyway.

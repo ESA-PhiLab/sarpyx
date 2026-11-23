@@ -23,8 +23,15 @@ def test_sentinel_tops_pipeline_lists_explicit_operations():
     assert steps[0].params["subswath"] == (s1_tops.DEFAULT_SWATH or "IW*")
     assert steps[0].params["first_burst_index"] == s1_tops.DEFAULT_FIRST_BURST
     assert steps[0].params["last_burst_index"] == s1_tops.DEFAULT_LAST_BURST
-    assert steps[5].params["n_decompositions"] == [2]
+    assert steps[5].params["n_decompositions"] == [3]
+    assert steps[6].params["window_size"] == 5
     assert steps[8].params["source_bands"] is None
+
+
+def test_sentinel_recipes_apply_custom_pdec_window():
+    for module in (s1_tops, s1_strip):
+        (pdec,) = [step for step in module.steps(sentinel_pdec_window_size=3) if step.save_as == "pdec"]
+        assert pdec.params["window_size"] == 3
 
 
 def test_sentinel_strip_pipeline_lists_fallback_bandmerge():
@@ -90,7 +97,6 @@ def test_insar_pipeline_declares_snapflow_v2_steps():
         "Deburst",
         "Interferogram",
         "TopoPhaseRemoval",
-        "Subset",
         "TerrainCorrection",
         "WorldSARTiling",
     ]
@@ -98,6 +104,7 @@ def test_insar_pipeline_declares_snapflow_v2_steps():
     assert recipe[1].params["continue_on_fail"] is True
     assert recipe[3].params["continue_on_fail"] is True
     assert recipe[4].params["use_esd"] is False
+    assert recipe[-2].params["source_ref"] == "topo"
     assert recipe[-1].params["intermediate_ref"] == "terrain_corrected"
 
 
@@ -138,9 +145,6 @@ def test_declared_insar_runtime_executes_recipe(monkeypatch, tmp_path: Path):
         def topo_phase_removal(self, **kwargs):
             return self._out("topo")
 
-        def subset(self, **kwargs):
-            return self._out("subset")
-
         def terrain_correction(self, **kwargs):
             return self._out("tc")
 
@@ -171,7 +175,6 @@ def test_declared_insar_runtime_executes_recipe(monkeypatch, tmp_path: Path):
         "deburst",
         "ifg",
         "topo",
-        "subset",
         "tc",
     ]
     assert ("coreg_kwargs", tmp_path / "out" / "master" / "orbit.dim", tmp_path / "out" / "slave" / "orbit.dim", False) in calls

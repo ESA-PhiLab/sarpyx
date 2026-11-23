@@ -17,6 +17,41 @@ def check_ifftshift_is_global_across_uneven_chunks():
         assert not np.array_equal(old, result)
 
 
+def assert_iw_reconstruction(obj, looks, spectrum, start, end, shift, roll_shift, flipped=False):
+    """Check each look against the native reconstruction followed by a phase ramp."""
+    n = obj.nRows
+    size = end - start + 1
+    moved_start = (start + shift) % n
+    bookkeeping = -moved_start if moved_start + size > n else 0
+    first_bin = (moved_start + bookkeeping) % n
+    shifted_spectrum = np.roll(spectrum, shift + bookkeeping, axis=0)
+    edges = obj._compute_iw_subband_edges(shifted_spectrum, first_bin, first_bin + size - 1)
+    rolls = obj._iw_demodulation_rolls(edges)
+    assert len(looks) == len(rolls) == len(edges) - 1
+    if len(rolls) > 2:
+        assert np.unique(np.diff(rolls)).size == 1
+    native_looks = []
+    for lo, hi, look, roll in zip(edges[:-1], edges[1:], looks, rolls):
+        band = np.zeros_like(spectrum)
+        band[lo:hi] = shifted_spectrum[lo:hi]
+        ordered = np.fft.ifftshift(np.roll(band, -roll_shift - bookkeeping, axis=0), axes=0)
+        native = np.fft.ifft(ordered, axis=0)
+        phase = np.exp(2j * np.pi * (roll + roll_shift + bookkeeping) * np.arange(n) / n)
+        expected = native * phase[:, None]
+        if flipped:
+            native, expected = np.flip(native, axis=0), np.flip(expected, axis=0)
+        np.testing.assert_allclose(look, expected, atol=2e-6)
+        np.testing.assert_allclose(np.abs(look), np.abs(native), atol=2e-6)
+        native_looks.append(native)
+    # Recovering the native looks must still preserve the whole shifted support.
+    reconstructed = sum(native_looks)
+    if flipped:
+        reconstructed = np.flip(reconstructed, axis=0)
+    reconstructed = np.fft.fftshift(np.fft.fft(reconstructed, axis=0), axes=0)
+    np.testing.assert_allclose(reconstructed, np.roll(spectrum, shift - roll_shift, axis=0), atol=1e-5)
+    return np.stack(native_looks)
+
+
 def check_shifted_support(start, end, shift, roll_shift):
     n, cols = 11, 3
     spectrum = np.zeros((n, cols), dtype=np.complex64)
@@ -37,8 +72,7 @@ def check_shifted_support(start, end, shift, roll_shift):
         obj.SpectrumOneDimNormDeWe = da.from_array(original, chunks=(n, 2)) if dask_backend else original.copy()
         (obj._generation_dask_iw if dask_backend else obj._generation_numpy_iw)()
         looks = [x.compute() if dask_backend else x for x in obj.Looks]
-        reconstructed = np.fft.fftshift(np.fft.fft(sum(looks), axis=0), axes=0)
-        np.testing.assert_allclose(reconstructed, np.roll(spectrum, shift - roll_shift, axis=0), atol=1e-5)
+        assert_iw_reconstruction(obj, looks, spectrum, start, end, shift, roll_shift)
         results.append(looks)
     np.testing.assert_allclose(results[0], results[1], atol=1e-6)
 
@@ -202,6 +236,14 @@ class PublicSelectionTests(unittest.TestCase):
 
 
 class SupportReconstructionTests(unittest.TestCase):
+    def test_equal_step_demodulation_keeps_unequal_band_edges(self):
+        obj = CombinedSublooking.__new__(CombinedSublooking)
+        obj.nRows = 2856
+        edges = np.array([0, 643, 1245, 1910])
+        # Fairbanks IW2/VV: widths are unchanged despite the uneven centers.
+        np.testing.assert_array_equal(obj._iw_demodulation_rolls(edges), [1108, 480, -148])
+        np.testing.assert_array_equal(obj._iw_demodulation_rolls(np.array([0, 1910])), [473])
+
     def test_odd_even_multilook_complex_tone_and_flip(self):
         for n, start, end, shift, roll in ((10,1,7,-4,2),(11,2,8,3,-2),(10,0,9,13,4)):
             for dask_backend in (False,True):
@@ -218,8 +260,13 @@ class SupportReconstructionTests(unittest.TestCase):
                     obj.SpectrumOneDimNormDeWe=da.from_array(original,chunks=(n,1)) if dask_backend else original.copy()
                     (obj._generation_dask_iw if dask_backend else obj._generation_numpy_iw)()
                     looks=[x.compute() if dask_backend else x for x in obj.Looks]
-                    expected=np.flip(np.fft.ifft(np.fft.ifftshift(np.roll(original,shift,axis=0),axes=0),axis=0),axis=0)
-                    np.testing.assert_allclose(sum(looks),expected,atol=2e-6)
+                    native = assert_iw_reconstruction(obj, looks, spectrum, start, end, shift, roll, flipped=True)
+                    from sarpyx.sla.variance.compute_subap_features import adjacent_phase_variance
+                    np.testing.assert_allclose(
+                        adjacent_phase_variance(np.stack(looks), win=1),
+                        adjacent_phase_variance(native, win=1),
+                        atol=2e-6,
+                    )
 
 
 if __name__ == '__main__':

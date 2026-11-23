@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import shutil
 import tempfile
 from pathlib import Path
@@ -19,6 +20,7 @@ from sarpyx.snapflow.runtime import PipelineStep, make_context, run_step, run_st
 from sarpyx.snapflow.tiling_runtime import finalize_tops_tiling
 
 ISOLATED_PREPROCESSING_PREFIX = "worldsar_tmp_"
+_PREPROCESSING_ROOT_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 
 
 def _gpt_kwargs(gpt_memory=None, gpt_parallelism=None, gpt_timeout=None, gpt_cache_size=None) -> dict:
@@ -59,10 +61,29 @@ def _dimap_data_dir(dim_path: Path) -> Path:
     return dim_path.with_suffix(".data")
 
 
-def _create_isolated_preprocessing_root(output_dir) -> Path:
+def _create_isolated_preprocessing_root(output_dir, root_name=None) -> Path:
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
-    return Path(tempfile.mkdtemp(prefix=ISOLATED_PREPROCESSING_PREFIX, dir=output_dir))
+    if root_name is None:
+        return Path(tempfile.mkdtemp(prefix=ISOLATED_PREPROCESSING_PREFIX, dir=output_dir))
+
+    root_name = str(root_name)
+    if not _PREPROCESSING_ROOT_NAME_RE.fullmatch(root_name):
+        raise ValueError(
+            "preprocessing root name must be a basename containing only "
+            "letters, digits, '.', '_' and '-': "
+            f"{root_name!r}"
+        )
+
+    root = output_dir / f"{ISOLATED_PREPROCESSING_PREFIX}{root_name}"
+    if root.is_symlink():
+        raise ValueError(f"refusing to replace preprocessing root symlink: {root}")
+    if root.exists():
+        if not root.is_dir():
+            raise ValueError(f"preprocessing root exists and is not a directory: {root}")
+        shutil.rmtree(root)
+    root.mkdir()
+    return root
 
 
 def _isolated_preprocessing_root_for_path(path, output_dir) -> Path | None:
@@ -136,6 +157,7 @@ def run_sentinel_tops_pipeline(
     cuts_outdir=None,
     product_mode="S1TOPS",
     keep_intermediate=True,
+    sentinel_pdec_window_size=5,
     **_,
 ):
     output_dir = Path(output_dir)
@@ -145,6 +167,7 @@ def run_sentinel_tops_pipeline(
         orbit_continue_on_fail=orbit_continue_on_fail,
         sentinel_tc_source_band=sentinel_tc_source_band,
         sentinel_subap_decompositions=sentinel_subap_decompositions,
+        sentinel_pdec_window_size=sentinel_pdec_window_size,
     )
     first_burst = sentinel_first_burst or s1_tops.DEFAULT_FIRST_BURST
     last_burst = sentinel_last_burst or s1_tops.DEFAULT_LAST_BURST
@@ -163,7 +186,11 @@ def run_sentinel_tops_pipeline(
         _.get("report_outdir"),
         _.get("product_name"),
     )
-    processing_root = _create_isolated_preprocessing_root(output_dir) if tiling_metadata else output_dir
+    processing_root = (
+        _create_isolated_preprocessing_root(output_dir, _.get("preprocessing_root_name"))
+        if tiling_metadata
+        else output_dir
+    )
     base_ctx = make_context(product_path, processing_root, "BEAM-DIMAP", gpt_kwargs, create_operator=create_operator)
     for swath in swaths:
         sw_ctx = make_context(
@@ -231,6 +258,7 @@ def run_sentinel_strip_pipeline(
     cuts_outdir=None,
     product_mode="S1STRIP",
     keep_intermediate=True,
+    sentinel_pdec_window_size=5,
     **_,
 ):
     gpt_kwargs = _gpt_kwargs(gpt_memory, gpt_parallelism, gpt_timeout, gpt_cache_size)
@@ -252,6 +280,7 @@ def run_sentinel_strip_pipeline(
             orbit_continue_on_fail=orbit_continue_on_fail,
             sentinel_tc_source_band=sentinel_tc_source_band,
             sentinel_subap_decompositions=sentinel_subap_decompositions,
+            sentinel_pdec_window_size=sentinel_pdec_window_size,
         ),
     )
     if _tiling_created_final_tiles(ctx.saved.get("tiling")):

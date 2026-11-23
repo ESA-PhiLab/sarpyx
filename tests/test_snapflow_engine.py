@@ -48,3 +48,15 @@ def test_execute_command_captures_failure_output(tmp_path, capsys):
     assert gpt.last_stdout == "partial stdout"
     assert gpt.last_stderr == "partial stderr"
     assert gpt.last_returncode == 3
+
+
+def test_last_error_summary_keeps_end_of_long_stderr(tmp_path):
+    gpt = _gpt_for_command(tmp_path)
+    gpt.last_returncode = 1
+    gpt.last_stderr = "startup warning\n" * 100 + "OperatorException: final failure detail"
+
+    summary = gpt.last_error_summary(max_chars=100)
+
+    assert len(summary) == 100
+    assert summary.startswith("returncode=1; stderr=[...truncated...] ")
+    assert summary.endswith("OperatorException: final failure detail")

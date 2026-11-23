@@ -30,16 +30,69 @@ def steps(
         "first_burst_index": DEFAULT_FIRST_BURST,
         "last_burst_index": DEFAULT_LAST_BURST,
     }
-    orbit_params = {"orbit_type": orbit_type, "continue_on_fail": orbit_continue_on_fail}
+    orbit_params = {
+        "orbit_type": orbit_type,
+        "continue_on_fail": orbit_continue_on_fail,
+    }
     return [
-        PipelineStep("TopsarSplit", {"source_ref": "master", "outdir": "master", **split_params}, "master_split"),
-        PipelineStep("ApplyOrbitFile", {"source_ref": "master_split", "outdir": "master", **orbit_params}, "master_orbit"),
-        PipelineStep("TopsarSplit", {"source_ref": "slave", "outdir": "slave", **split_params}, "slave_split"),
-        PipelineStep("ApplyOrbitFile", {"source_ref": "slave_split", "outdir": "slave", **orbit_params}, "slave_orbit"),
-        PipelineStep("TopsarCoregistration", {"master_ref": "master_orbit", "slave_ref": "slave_orbit", "outdir": "pair", "use_esd": use_esd, "dem_name": dem_name}, "coreg"),
+        PipelineStep(
+            "TopsarSplit",
+            {"source_ref": "master", "outdir": "master", **split_params},
+            "master_split",
+        ),
+        PipelineStep(
+            "ApplyOrbitFile",
+            {"source_ref": "master_split", "outdir": "master", **orbit_params},
+            "master_orbit",
+        ),
+        PipelineStep(
+            "TopsarSplit",
+            {"source_ref": "slave", "outdir": "slave", **split_params},
+            "slave_split",
+        ),
+        PipelineStep(
+            "ApplyOrbitFile",
+            {"source_ref": "slave_split", "outdir": "slave", **orbit_params},
+            "slave_orbit",
+        ),
+        PipelineStep(
+            "TopsarCoregistration",
+            {
+                "master_ref": "master_orbit",
+                "slave_ref": "slave_orbit",
+                "outdir": "pair",
+                "use_esd": use_esd,
+                "dem_name": dem_name,
+            },
+            "coreg",
+        ),
         PipelineStep("Deburst", {"source_ref": "coreg", "outdir": "pair"}, "coreg_deb"),
-        PipelineStep("Interferogram", {"source_ref": "coreg_deb", "outdir": "pair", "subtract_flat_earth_phase": True}, "ifg"),
-        PipelineStep("TopoPhaseRemoval", {"source_ref": "ifg", "outdir": "pair", "dem_name": dem_name}, "topo"),
-        PipelineStep("TerrainCorrection", {"source_ref": "subset", "outdir": "pair", "dem_name": dem_name, "pixel_spacing_in_meter": pixel_spacing_in_meter, "map_projection": map_projection}, "terrain_corrected"),
-        PipelineStep("WorldSARTiling", {"intermediate_ref": "terrain_corrected"}, "tiling"),
+        PipelineStep(
+            "Interferogram",
+            {
+                "source_ref": "coreg_deb",
+                "outdir": "pair",
+                "subtract_flat_earth_phase": True,
+            },
+            "ifg",
+        ),
+        PipelineStep(
+            "TopoPhaseRemoval",
+            {"source_ref": "ifg", "outdir": "pair", "dem_name": dem_name},
+            "topo",
+        ),
+        PipelineStep(
+            "TerrainCorrection",
+            {
+                "source_ref": "topo",
+                "outdir": "pair",
+                "dem_name": dem_name,
+                "pixel_spacing_in_meter": pixel_spacing_in_meter,
+                "map_projection": map_projection,
+            },
+            "terrain_corrected",
+        ),
+        PipelineStep(
+            "WorldSARTiling", {"intermediate_ref": "terrain_corrected"}, "tiling"
+        ),
     ]

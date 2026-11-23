@@ -7,7 +7,7 @@ from sarpyx.snapflow.runtime import PipelineStep
 DEFAULT_ORBIT_TYPE = "Sentinel Precise (Auto Download)"
 INPUT_KIND = "single"
 PRODUCT_MODE = "S1STRIP"
-DEFAULT_SUBAP_DECOMPOSITIONS = [2]
+DEFAULT_SUBAP_DECOMPOSITIONS = [3]
 DEFAULT_MAP_PROJECTION = "AUTO:42001"
 DEFAULT_PIXEL_SPACING_M = 10.0
 PDEC_PARAMS = {"decomposition": "H-Alpha Dual Pol Decomposition", "window_size": 5}
@@ -22,6 +22,7 @@ def steps(
     orbit_continue_on_fail: bool = False,
     sentinel_tc_source_band: str | None = None,
     sentinel_subap_decompositions: list[int] | None = None,
+    sentinel_pdec_window_size: int = PDEC_PARAMS["window_size"],
 ):
     subap_params = {
         "n_decompositions": sentinel_subap_decompositions or DEFAULT_SUBAP_DECOMPOSITIONS,
@@ -39,7 +40,7 @@ def steps(
         PipelineStep("ApplyOrbitFile", {"orbit_type": orbit_type, "orbit_continue_on_fail": orbit_continue_on_fail}, "orbit"),
         PipelineStep("Calibration", {"output_complex": True}, "cal"),
         PipelineStep("do_subaps", subap_params, "subaps"),
-        PipelineStep("polarimetric_decomposition", dict(PDEC_PARAMS), "pdec"),
+        PipelineStep("polarimetric_decomposition", {**PDEC_PARAMS, "window_size": sentinel_pdec_window_size}, "pdec"),
         PipelineStep(
             "merge_iq_into_pdec",
             {"src_ref": "cal", "pdec_ref": "pdec", "is_tops": False, "overwrite_copied_files": False, "backup": False, "fallback_steps": FALLBACK_BANDMERGE_STEPS},
