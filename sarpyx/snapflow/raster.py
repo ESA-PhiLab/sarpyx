@@ -241,6 +241,10 @@ def _read_tile_payload_chunk(data_dir: Path, band_names: list[str], band_metadat
                 data = src.read(1, window=window)
                 payload.arrays[band_name] = data
                 payload.band_attrs[band_name] = _band_attrs(metadata, data)
+                if src.nodata is not None:
+                    import math
+                    if math.isfinite(src.nodata):
+                        payload.band_attrs[band_name]["nodata"] = src.nodata
     return payloads
 
 

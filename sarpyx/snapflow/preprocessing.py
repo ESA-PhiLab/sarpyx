@@ -157,6 +157,7 @@ def run_sentinel_tops_pipeline(
     cuts_outdir=None,
     product_mode="S1TOPS",
     keep_intermediate=True,
+    timeseries_output=False,
     **_,
 ):
     output_dir = Path(output_dir)
@@ -201,6 +202,7 @@ def run_sentinel_tops_pipeline(
         sw_ctx.original_product = product_path
         sw_ctx.metadata.update(tiling_metadata)
         sw_ctx.metadata["swath"] = swath
+        sw_ctx.metadata["preserve_swath_tiles"] = timeseries_output
         sw_ctx.metadata["keep_intermediate"] = keep_intermediate
         if merge_func is not None:
             sw_ctx.metadata["merge_iq_into_pdec"] = merge_func

@@ -51,6 +51,7 @@ def steps(
     orbit_continue_on_fail: bool = False,
     sentinel_tc_source_band: str | None = None,
     sentinel_subap_decompositions: list[int] | None = None,
+    timeseries_output: bool = False,
 ):
     subap_params = dict(TOPS_SUBAP_PARAMS)
     subap_params["n_decompositions"] = sentinel_subap_decompositions or DEFAULT_SUBAP_DECOMPOSITIONS

@@ -63,7 +63,7 @@ def run_tiling_step(ctx, intermediate_product, swath: str | None = None, collect
     source_product = Path(ctx.original_product)
     intermediate_product = Path(intermediate_product)
     product_name = data.get("product_name")
-    collapse_swath_tiles = product_mode == "S1TOPS" and bool(swath)
+    collapse_swath_tiles = product_mode == "S1TOPS" and bool(swath) and not ctx.metadata.get("preserve_swath_tiles", False)
     if product_name:
         product_cuts_dir = data["cuts_outdir"] / product_name
         cuts_outdir = product_cuts_dir if collapse_swath_tiles or not swath else product_cuts_dir / swath

@@ -220,6 +220,16 @@ def _minimal_training_attrs(
         "epsg": _epsg(payload.crs_wkt),
         "transform": list(payload.transform) if payload.transform else None,
         "pixel_spacing": _pixel_spacing(payload.transform, abstract),
+        # Preserve these until the timeseries publisher moves shared metadata
+        # into Parquet. Existing training-only callers also retain their units.
+        "source_metadata": {
+            key: abstract[key] for key in (
+                "radar_frequency", "range_bandwidth", "azimuth_bandwidth",
+                "pulse_repetition_frequency", "range_spacing", "azimuth_spacing",
+                "ABS_ORBIT", "REL_ORBIT", "orbit_state_vector_file",
+            ) if key in abstract
+        },
+        "crs_wkt": payload.crs_wkt,
     }
     return {key: value for key, value in attrs.items() if not _blank(value)}
 
@@ -232,6 +242,9 @@ def _minimal_band_attrs(band_name: str, attrs: dict[str, Any], polarizations: li
             "unit": attrs.get("unit"),
             "window_size": attrs.get("window_size"),
             "estimator": attrs.get("estimator"),
+            **{key: value for key, value in attrs.items()
+               if key not in {"CLASS", "IMAGE_VERSION", "raster_height", "raster_width",
+                              "log10_scaled", "scaling_factor", "scaling_offset"}},
         }.items()
         if not _blank(value)
     }

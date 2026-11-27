@@ -196,6 +196,10 @@ def run_insar_step(ctx: InSARContext, step: PipelineStep):
     if step.name == "Subset":
         return _require(gpt.subset(**_clean_params(params)), gpt, "Subset")
     if step.name == "TerrainCorrection":
+        if params.pop("pair_bands_only", False):
+            from sarpyx.utils.timeseries import pair_source_bands
+
+            params["source_bands"] = pair_source_bands(_dimap_bands(Path(_source(ctx, source_ref))))
         result = _require(gpt.terrain_correction(**_clean_params(params)), gpt, "Terrain-Correction")
         runs = ctx.metadata.setdefault("terrain_correction_runs", {})
         runs[str(Path(result))] = {

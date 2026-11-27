@@ -25,6 +25,7 @@ def steps(
     map_projection: str = DEFAULT_MAP_PROJECTION,
     mask_out_area_without_elevation: bool = True,
     nodata_value_at_sea: bool = False,
+    timeseries_output: bool = False,
 ):
     """Build the recipe; disabling DEM masking requires land-coverage preflight.
 
@@ -99,6 +100,8 @@ def steps(
                 "pixel_spacing_in_meter": pixel_spacing_in_meter,
                 "map_projection": map_projection,
                 "nodata_value_at_sea": nodata_value_at_sea,
+                **({"pair_bands_only": True, "save_dem": False,
+                    "save_local_incidence_angle": False} if timeseries_output else {}),
             },
             "terrain_corrected",
         ),
